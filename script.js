@@ -421,10 +421,10 @@ if (heroVisual) {
 
 function claimOffer(offerName) {
 
-    const phone = "91XXXXXXXXXX";
+    const phone = "918927100145";
 
     const message =
-        `Hi Rocky Gym! 💪\n\n` +
+        `Hi Alpha Gym! 💪\n\n` +
         `I am interested in the ${offerName}.\n` +
         `Please share the details and eligibility.`;
 

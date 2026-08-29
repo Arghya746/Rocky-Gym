@@ -1,4 +1,4 @@
-# 🏋️ Rocky Gym — Gym Management System
+# 🏋️ Alpha Gym — Gym Management System
 
 A modern, responsive gym website and management system demo designed for fitness centers and gym owners.
 
@@ -45,7 +45,7 @@ Coming soon...
 ## 📁 Project Structure
 
 ```text
-rocky-gym/
+alpha-gym/
 │
 ├── index.html
 ├── style.css
