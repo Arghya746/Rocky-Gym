@@ -464,7 +464,8 @@ select {
 
     object-fit: cover;
 
-    object-position: 50% 18%;
+    object-position: 52% 18%;
+    transform: translateX(5px);
 
     border-radius: 20px;
 
@@ -522,9 +523,9 @@ select {
 /* ================= CALORIE CARD ================= */
 
 .card-top {
-    top: 18px;
-    right: 12px;
-    transform: scale(.82);
+    top: 155px;
+    right: 24px;
+    transform: scale(.7);
     transform-origin: top right;
     z-index: 10;
 }
@@ -533,10 +534,10 @@ select {
 /* ================= BOTTOM CARD ================= */
 
 .card-bottom {
-    bottom: 70px;
-    left: 18px;
+    bottom: 132px;
+    left: 56px;
 
-    transform: scale(0.90);
+    transform: scale(0.7);
 
     transform-origin:
         bottom left;
@@ -2427,472 +2428,327 @@ footer {
    ========================================================= */
 
 @media (max-width: 900px) {
-
     .nav-links {
-        display:
-            none;
+        display: none;
     }
 
     .hero {
-        padding-top:
-            120px;
+        padding-top: 120px;
     }
 
     .hero-grid {
-        grid-template-columns:
-            1fr;
+        grid-template-columns: 1fr;
+    }
+
+    .hero-content {
+        text-align: center;
+    }
+
+    .hero-tag {
+        justify-content: center;
+    }
+
+    .hero-description {
+        margin-left: auto;
+        margin-right: auto;
+    }
+
+    .hero-buttons {
+        justify-content: center;
+    }
+
+    .hero-mini-stats {
+        justify-content: center;
     }
 
     .hero-visual {
-        position:
-            relative;
-
-        height:
-            560px;
-
-        overflow:
-            hidden;
-
-        border-radius:
-            20px;
+        position: relative;
+        height: 560px;
+        overflow: hidden;
+        border-radius: 20px;
     }
-
-
-    /* ================= TABLET ATHLETE ================= */
 
     .athlete {
-        width:
-            100%;
-
-        height:
-            100%;
-
-        object-fit:
-            cover;
-
-        object-position:
-            50% 18%;
-
-        border-radius:
-            20px;
-
-        filter:
-            contrast(1.1)
-            saturate(1.25)
-            brightness(0.95);
-
-        transition:
-            object-position 0.3s ease,
-            transform 0.3s ease;
+        width: 100%;
+        height: 100%;
+        object-fit: cover;
+        object-position: 52% 18%;
+        transform: translateX(3px);
+        border-radius: 20px;
+        filter: contrast(1.1) saturate(1.25) brightness(0.95);
     }
 
-
-    /* ================= TABLET CALORIE CARD ================= */
-
-    
-        .card-top {
-        top: 12px;
-        right: 10px;
-        transform: scale(.72);
+    .card-top {
+        top: 120px;
+        right: 12px;
+        transform: scale(0.62);
         transform-origin: top right;
     }
 
-}
-
     .card-bottom {
-        bottom:
-            35px;
-
-        left:
-            15px;
-
-        transform:
-            scale(0.82);
-
-        transform-origin:
-            bottom left;
+        bottom: 88px;
+        left: 18px;
+        transform: scale(0.56);
+        transform-origin: bottom left;
     }
 
     .hero-circle {
-        width:
-            350px;
-
-        height:
-            350px;
+        width: 350px;
+        height: 350px;
     }
 
     .feature-grid,
     .pricing-grid,
     .testimonial-grid {
-        grid-template-columns:
-            1fr;
+        grid-template-columns: 1fr;
     }
 
     .price-card.popular {
-        transform:
-            none;
+        transform: none;
     }
 
     .software-intro {
-        flex-direction:
-            column;
-
-        align-items:
-            flex-start;
+        flex-direction: column;
+        align-items: flex-start;
     }
 
     .dashboard {
-        grid-template-columns:
-            1fr;
+        grid-template-columns: 1fr;
     }
 
     .dashboard-sidebar {
-        display:
-            flex;
-
-        overflow-x:
-            auto;
-
-        gap:
-            5px;
-
-        border-right:
-            none;
-
-        border-bottom:
-            1px solid rgba(255, 255, 255, 0.08);
+        display: flex;
+        overflow-x: auto;
+        gap: 5px;
+        border-right: none;
+        border-bottom: 1px solid rgba(255, 255, 255, 0.08);
     }
 
     .dashboard-logo {
-        display:
-            none;
+        display: none;
     }
 
     .dashboard-tab {
-        min-width:
-            120px;
+        min-width: 120px;
     }
 
     .contact-grid {
-        grid-template-columns:
-            1fr;
-
-        gap:
-            50px;
+        grid-template-columns: 1fr;
+        gap: 50px;
     }
 
     .footer-content {
-        flex-direction:
-            column;
-
-        text-align:
-            center;
+        flex-direction: column;
+        text-align: center;
     }
 
     .offers-grid {
-        grid-template-columns:
-            repeat(2, 1fr);
+        grid-template-columns: repeat(2, 1fr);
     }
 }
 
-
-/* =========================================================
-   ================= SMALL MOBILE ==========================
-   ========================================================= */
-
 @media (max-width: 600px) {
-
     .nav-btn {
-        display:
-            none;
+        display: none;
+    }
+
+    .nav {
+        min-height: 64px;
+    }
+
+    .logo {
+        font-size: 26px;
     }
 
     .hero {
-        min-height:
-            auto;
-
-        padding-bottom:
-            70px;
+        min-height: auto;
+        padding-top: 108px;
+        padding-bottom: 70px;
     }
 
     .hero h1 {
-        font-size:
-            72px;
+        font-size: clamp(52px, 18vw, 86px);
+        line-height: 0.82;
     }
 
-
-    /* ================= MOBILE HERO ================= */
-
-    .hero-visual {
-        height:
-            430px;
-
-        border-radius:
-            18px;
-
-        overflow:
-            hidden;
+    .hero-description {
+        font-size: 15px;
+        max-width: 100%;
     }
 
-
-    /* ================= MOBILE ATHLETE ================= */
-
-    .athlete {
-        width:
-            100%;
-
-        height:
-            100%;
-
-        object-fit:
-            cover;
-
-        object-position:
-            48% 17%;
-
-        border-radius:
-            18px;
-
-        filter:
-            contrast(1.1)
-            saturate(1.25)
-            brightness(0.95);
-
-        transition:
-            object-position 0.3s ease,
-            transform 0.3s ease;
+    .hero-buttons {
+        flex-direction: column;
+        align-items: stretch;
     }
 
-
-    /* ================= MOBILE CALORIE CARD ================= */
-
-    .card-top {
-        
-        top: 8px;
-        right: 8px;
-        transform: scale(.60);
-        transform-origin: top right;
-    }
-
-}
-
-
-    /* ================= MOBILE BOTTOM CARD ================= */
-
-    .card-bottom {
-        bottom:
-            12px;
-
-        left:
-            8px;
-
-        transform:
-            scale(0.68);
-
-        transform-origin:
-            bottom left;
-    }
-
-
-    .hero-circle {
-        width:
-            300px;
-
-        height:
-            300px;
+    .primary-btn,
+    .secondary-btn {
+        width: 100%;
     }
 
     .hero-mini-stats {
-        gap:
-            20px;
-
-        flex-wrap:
-            wrap;
+        gap: 18px;
+        flex-wrap: wrap;
+        justify-content: space-between;
     }
 
     .hero-mini-stats strong {
-        font-size:
-            26px;
-    }
-
-
-    /* ================= MOBILE FLOATING CARDS ================= */
-
-    .floating-card {
-        padding:
-            10px 12px;
-
-        gap:
-            8px;
-    }
-
-    .floating-card strong {
-        font-size:
-            11px;
-    }
-
-    .floating-card small {
-        font-size:
-            7px;
-    }
-
-    .card-icon {
-        font-size:
-            18px;
-
-        padding:
-            5px;
-    }
-
-
-    .dashboard-main {
-        padding:
-            18px;
-    }
-
-    .dashboard-stats {
-        grid-template-columns:
-            1fr;
-    }
-
-    .table-row {
-        grid-template-columns:
-            1fr 1fr;
-
-        gap:
-            7px;
-    }
-
-    .table-head {
-        display:
-            none;
-    }
-
-    .input-row {
-        grid-template-columns:
-            1fr;
-    }
-
-    .motivation h2 {
-        font-size:
-            65px;
-    }
-
-    .contact-form {
-        padding:
-            22px;
-    }
-
-
-    /* ================= MOBILE OFFERS ================= */
-
-    .offers-grid {
-        grid-template-columns:
-            1fr;
-
-        gap:
-            18px;
-    }
-
-    .offer-card {
-        min-height:
-            auto;
-
-        padding:
-            25px;
-    }
-
-    .featured-offer {
-        transform:
-            none;
-    }
-
-    .featured-offer:hover {
-        transform:
-            translateY(-10px);
-    }
-
-    .offers-whatsapp {
-        flex-direction:
-            column;
-
-        align-items:
-            flex-start;
-
-        padding:
-            25px;
-    }
-
-    .whatsapp-btn {
-        width:
-            100%;
-
-        text-align:
-            center;
-    }
-
-    .offer-card h3 {
-        font-size:
-            36px;
-    }
-
-    .offer-icon {
-        font-size:
-            45px;
-    }
-}
-
-
-/* =========================================================
-   ================= EXTRA SMALL DEVICES ====================
-   ========================================================= */
-
-@media (max-width: 380px) {
-
-    .hero h1 {
-        font-size:
-            62px;
+        font-size: 26px;
     }
 
     .hero-visual {
-        height:
-            390px;
+        height: 430px;
+        border-radius: 18px;
+        overflow: hidden;
     }
-
-
-    /* ================= EXTRA SMALL ATHLETE ================= */
 
     .athlete {
-        object-position:
-            47% 16%;
+        width: 100%;
+        height: 100%;
+        object-fit: cover;
+        object-position: 50% 17%;
+        transform: translateX(3px);
+        border-radius: 18px;
+        filter: contrast(1.1) saturate(1.25) brightness(0.95);
     }
-
-
-    /* ================= EXTRA SMALL CALORIE ================= */
 
     .card-top {
-        top: 5px;
-        right: 6px;
-        transform: scale(.54);
+        top: 110px;
+        right: 8px;
+        transform: scale(0.5);
         transform-origin: top right;
     }
-}
- .card-bottom {
-        bottom:
-            8px;
 
-        left:
-            5px;
+    .card-bottom {
+        bottom: 74px;
+        left: 12px;
+        transform: scale(0.5);
+        transform-origin: bottom left;
+    }
 
-        transform:
-            scale(0.60);
-
-        transform-origin:
-            bottom left;
+    .hero-circle {
+        width: 300px;
+        height: 300px;
     }
 
     .floating-card {
-        transform:
-            scale(0.60);
+        padding: 10px 12px;
+        gap: 8px;
+    }
+
+    .floating-card strong {
+        font-size: 11px;
+    }
+
+    .floating-card small {
+        font-size: 7px;
+    }
+
+    .card-icon {
+        font-size: 18px;
+        padding: 5px;
+    }
+
+    .vertical-text {
+        display: none;
+    }
+
+    .dashboard-main {
+        padding: 18px;
+    }
+
+    .dashboard-stats {
+        grid-template-columns: 1fr;
+    }
+
+    .table-row {
+        grid-template-columns: 1fr 1fr;
+        gap: 7px;
+    }
+
+    .table-head {
+        display: none;
+    }
+
+    .input-row {
+        grid-template-columns: 1fr;
+    }
+
+    .motivation h2 {
+        font-size: 65px;
+    }
+
+    .contact-form {
+        padding: 22px;
+    }
+
+    .offers-grid {
+        grid-template-columns: 1fr;
+        gap: 18px;
+    }
+
+    .offer-card {
+        min-height: auto;
+        padding: 25px;
+    }
+
+    .featured-offer {
+        transform: none;
+    }
+
+    .featured-offer:hover {
+        transform: translateY(-10px);
+    }
+
+    .offers-whatsapp {
+        flex-direction: column;
+        align-items: flex-start;
+        padding: 25px;
+    }
+
+    .whatsapp-btn {
+        width: 100%;
+        text-align: center;
+    }
+
+    .offer-card h3 {
+        font-size: 36px;
+    }
+
+    .offer-icon {
+        font-size: 45px;
+    }
+}
+
+@media (max-width: 380px) {
+    .hero h1 {
+        font-size: 62px;
+    }
+
+    .hero-visual {
+        height: 390px;
+    }
+
+    .athlete {
+        object-position: 49% 16%;
+        transform: translateX(2px);
+    }
+
+    .card-top {
+        top: 108px;
+        right: 8px;
+        transform: scale(0.48);
+        transform-origin: top right;
+    }
+
+    .card-bottom {
+        bottom: 8px;
+        left: 5px;
+        transform: scale(0.6);
+        transform-origin: bottom left;
+    }
+
+    .floating-card {
+        transform: scale(0.6);
     }
 }
