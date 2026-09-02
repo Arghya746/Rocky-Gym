@@ -1618,6 +1618,160 @@ select {
 }
 
 
+/* ================= TRAINERS SECTION ================= */
+
+.trainers-section {
+    background: linear-gradient(
+        135deg,
+        rgba(139,92,246,.05),
+        rgba(255,77,0,.05)
+    );
+}
+
+.trainers-grid {
+    display: grid;
+    grid-template-columns: repeat(auto-fit, minmax(320px, 1fr));
+    gap: 30px;
+    margin-top: 60px;
+}
+
+.trainer-card {
+    background: var(--card);
+    border: 1px solid var(--border);
+    border-radius: 12px;
+    overflow: hidden;
+    transition: .3s;
+    display: flex;
+    flex-direction: column;
+}
+
+.trainer-card:hover {
+    transform: translateY(-10px);
+    border-color: var(--orange);
+    box-shadow: 0 20px 60px rgba(255,77,0,.15);
+}
+
+.trainer-image {
+    position: relative;
+    width: 100%;
+    height: 280px;
+    overflow: hidden;
+}
+
+.trainer-photo {
+    width: 100%;
+    height: 100%;
+    object-fit: cover;
+    object-position: center;
+    transition: .4s;
+}
+
+.trainer-card:hover .trainer-photo {
+    transform: scale(1.08);
+}
+
+.trainer-overlay {
+    position: absolute;
+    inset: 0;
+    background: linear-gradient(
+        135deg,
+        rgba(255,77,0,.7),
+        rgba(139,92,246,.7)
+    );
+    display: flex;
+    align-items: center;
+    justify-content: center;
+    opacity: 0;
+    transition: .3s;
+}
+
+.trainer-card:hover .trainer-overlay {
+    opacity: 1;
+}
+
+.trainer-badge {
+    background: rgba(0,0,0,.6);
+    color: white;
+    padding: 12px 22px;
+    border-radius: 25px;
+    font-family: var(--mono);
+    font-size: 12px;
+    font-weight: 700;
+    letter-spacing: 1px;
+}
+
+.trainer-content {
+    padding: 28px;
+    display: flex;
+    flex-direction: column;
+    gap: 15px;
+    flex: 1;
+}
+
+.trainer-content h3 {
+    font-family: var(--heading);
+    font-size: 24px;
+    color: var(--text);
+}
+
+.trainer-description {
+    font-size: 14px;
+    color: var(--muted);
+    line-height: 1.7;
+    flex: 1;
+}
+
+.trainer-benefits {
+    list-style: none;
+    display: grid;
+    gap: 10px;
+    padding: 0;
+    margin: 12px 0;
+}
+
+.trainer-benefits li {
+    font-size: 13px;
+    color: var(--text);
+    display: flex;
+    gap: 10px;
+    align-items: center;
+}
+
+.trainer-benefits li::before {
+    content: '';
+    display: inline-block;
+    width: 3px;
+    height: 3px;
+    background: var(--orange);
+    border-radius: 50%;
+}
+
+.trainer-btn {
+    display: inline-flex;
+    align-items: center;
+    justify-content: center;
+    gap: 8px;
+    background: linear-gradient(135deg, var(--orange), var(--orange-light));
+    color: #000;
+    border: none;
+    padding: 12px 18px;
+    border-radius: 6px;
+    font-family: var(--mono);
+    font-weight: 700;
+    font-size: 11px;
+    cursor: pointer;
+    transition: .3s;
+    text-decoration: none;
+    align-self: flex-start;
+    margin-top: auto;
+}
+
+.trainer-btn:hover {
+    transform: translateY(-2px);
+    box-shadow: 0 8px 25px rgba(255,77,0,.28);
+}
+
+
 /* ================= MOTIVATION ================= */
 
 .motivation {
@@ -2109,6 +2263,31 @@ footer {
         display: none;
     }
 
+    .trainers-grid {
+        grid-template-columns: repeat(2, 1fr);
+        gap: 20px;
+    }
+
+    .trainer-card {
+        border-radius: 10px;
+    }
+
+    .trainer-image {
+        height: 220px;
+    }
+
+    .trainer-content {
+        padding: 20px;
+    }
+
+    .trainer-content h3 {
+        font-size: 20px;
+    }
+
+    .trainer-description {
+        font-size: 13px;
+    }
+
     .hero {
         padding-top: 120px;
     }
@@ -2211,6 +2390,32 @@ footer {
 
     .nav-btn {
         display: none;
+    }
+
+    .trainers-grid {
+        grid-template-columns: 1fr;
+        gap: 15px;
+    }
+
+    .trainer-image {
+        height: 240px;
+    }
+
+    .trainer-content {
+        padding: 18px;
+    }
+
+    .trainer-content h3 {
+        font-size: 18px;
+    }
+
+    .trainer-description {
+        font-size: 12px;
+        line-height: 1.6;
+    }
+
+    .trainer-benefits li {
+        font-size: 12px;
     }
 
     .hero {
