@@ -417,19 +417,4 @@ if (heroVisual) {
 
         }
     );
-} // ================= SEASONAL OFFER =================
-
-function claimOffer(offerName) {
-
-    const phone = "918927100145";
-
-    const message =
-        `Hi Alpha Gym! 💪\n\n` +
-        `I am interested in the ${offerName}.\n` +
-        `Please share the details and eligibility.`;
-
-    const whatsappURL =
-        `https://wa.me/${phone}?text=${encodeURIComponent(message)}`;
-
-    window.open(whatsappURL, "_blank");
 }
