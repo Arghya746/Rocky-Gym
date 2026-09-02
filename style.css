@@ -171,6 +171,25 @@ select {
     color: var(--orange);
 }
 
+.logo-img {
+    display: flex;
+    align-items: center;
+    justify-content: center;
+    padding: 4px 0;
+}
+
+.logo-image {
+    height: 50px;
+    width: auto;
+    object-fit: contain;
+    transition: .3s;
+}
+
+.logo-img:hover .logo-image {
+    filter: brightness(1.1);
+    transform: scale(1.05);
+}
+
 .nav-links {
 
     display: flex;
