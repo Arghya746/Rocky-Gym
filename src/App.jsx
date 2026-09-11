@@ -1,5 +1,11 @@
+
 import { useEffect, useState } from 'react';
-import { BrowserRouter, Route, Routes } from 'react-router-dom';
+import {
+  BrowserRouter,
+  Route,
+  Routes,
+} from 'react-router-dom';
+
 import './App.css';
 
 import AboutUsSection from './components/AboutUsSection';
@@ -19,6 +25,15 @@ import TestimonialSection from './components/TestimonialSection';
 import TimingsSection from './components/TimingsSection';
 import TrainersSection from './components/TrainersSection';
 
+import ProtectedRoute from './components/ProtectedRoute';
+
+// ADMIN PAGES
+import AdminLogin from './pages/AdminLogin';
+import AdminDashboard from './pages/AdminDashboard';
+import MemberDetails from './pages/MemberDetails';
+import PaymentReceipt from './pages/PaymentReceipt';
+
+
 function HomePage({
   onSelectPlan,
   onClaimOffer,
@@ -33,6 +48,7 @@ function HomePage({
       />
 
       <main>
+
         {/* HERO */}
         <Hero />
 
@@ -81,11 +97,15 @@ function HomePage({
 
         {/* CONTACT */}
         <ContactSection />
+
       </main>
+
 
       {/* FOOTER */}
       <footer>
+
         <div className="container footer-content">
+
           <p>
             © 2026 Alpha Gym • Premium fitness experience
           </p>
@@ -93,13 +113,19 @@ function HomePage({
           <span>
             TRAIN HARD • LIVE STRONG
           </span>
+
         </div>
 
+
         <div className="container disclaimer">
+
           * Schedule and offers may vary. Please contact Alpha Gym
           for the latest membership information.
+
         </div>
+
       </footer>
+
 
       {/* TOAST MESSAGE */}
       <div
@@ -108,19 +134,26 @@ function HomePage({
         aria-live="polite"
         aria-atomic="true"
       />
+
     </>
   );
 }
 
+
 function App() {
+
   const [theme, setTheme] = useState(
-    () => localStorage.getItem('fitness-theme') || 'dark'
+    () =>
+      localStorage.getItem('fitness-theme') || 'dark'
   );
+
 
   /* ================================
      THEME MANAGEMENT
-     ================================ */
+  ================================ */
+
   useEffect(() => {
+
     document.body.classList.toggle(
       'light',
       theme === 'light'
@@ -130,30 +163,48 @@ function App() {
       'fitness-theme',
       theme
     );
+
   }, [theme]);
+
 
   /* ================================
      TOAST MESSAGE
-     ================================ */
+  ================================ */
+
   const showToast = (message) => {
-    const toast = document.getElementById('toast');
+
+    const toast =
+      document.getElementById('toast');
 
     if (!toast) return;
 
     toast.textContent = message;
+
     toast.classList.add('show');
 
-    window.clearTimeout(showToast.timeoutId);
+    window.clearTimeout(
+      showToast.timeoutId
+    );
 
-    showToast.timeoutId = window.setTimeout(() => {
-      toast.classList.remove('show');
-    }, 2800);
+    showToast.timeoutId =
+      window.setTimeout(() => {
+
+        toast.classList.remove('show');
+
+      }, 2800);
+
   };
+
 
   /* ================================
      PRICING PLAN
-     ================================ */
-  const handleSelectPlan = (plan, price) => {
+  ================================ */
+
+  const handleSelectPlan = (
+    plan,
+    price
+  ) => {
+
     showToast(
       `${plan} selected • ₹${Number(price).toLocaleString('en-IN')}`
     );
@@ -163,12 +214,18 @@ function App() {
       ?.scrollIntoView({
         behavior: 'smooth',
       });
+
   };
+
 
   /* ================================
      OFFER
-     ================================ */
-  const handleClaimOffer = (offerName) => {
+  ================================ */
+
+  const handleClaimOffer = (
+    offerName
+  ) => {
+
     showToast(
       `${offerName} selected`
     );
@@ -178,21 +235,39 @@ function App() {
       ?.scrollIntoView({
         behavior: 'smooth',
       });
+
   };
+
 
   /* ================================
      APP ROUTES
-     ================================ */
+  ================================ */
+
   return (
+
     <BrowserRouter>
+
       <Routes>
+
+
+        {/* =========================
+            PUBLIC HOME PAGE
+        ========================= */}
+
         <Route
           path="/"
           element={
             <HomePage
-              onSelectPlan={handleSelectPlan}
-              onClaimOffer={handleClaimOffer}
+              onSelectPlan={
+                handleSelectPlan
+              }
+
+              onClaimOffer={
+                handleClaimOffer
+              }
+
               theme={theme}
+
               onToggleTheme={() =>
                 setTheme((current) =>
                   current === 'light'
@@ -203,9 +278,68 @@ function App() {
             />
           }
         />
+
+
+        {/* =========================
+            ADMIN LOGIN
+        ========================= */}
+
+        <Route
+          path="/admin/login"
+          element={
+            <AdminLogin />
+          }
+        />
+
+
+        {/* =========================
+            PROTECTED ADMIN DASHBOARD
+        ========================= */}
+
+        <Route
+          path="/admin"
+          element={
+            <ProtectedRoute>
+              <AdminDashboard />
+            </ProtectedRoute>
+          }
+        />
+
+
+        {/* =========================
+            PROTECTED MEMBER DETAILS
+        ========================= */}
+
+        <Route
+          path="/admin/members/:id"
+          element={
+            <ProtectedRoute>
+              <MemberDetails />
+            </ProtectedRoute>
+          }
+        />
+
+
+        {/* =========================
+            PROTECTED PAYMENT RECEIPT
+        ========================= */}
+
+        <Route
+          path="/admin/payments/:id/receipt"
+          element={
+            <ProtectedRoute>
+              <PaymentReceipt />
+            </ProtectedRoute>
+          }
+        />
+
+
       </Routes>
+
     </BrowserRouter>
+
   );
 }
+
 
 export default App;

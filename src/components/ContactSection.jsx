@@ -19,10 +19,10 @@ export default function ContactSection() {
     }));
   };
 
-  const handleSubmit = (event) => {
+  const handleSubmit = async (event) => {
     event.preventDefault();
 
-    const { name, phone } = formState;
+    const { name, phone, goal, message } = formState;
 
     if (!name.trim() || !phone.trim()) {
       setFormMessage('Please enter your name and phone number.');
@@ -34,16 +34,45 @@ export default function ContactSection() {
       return;
     }
 
-    setFormMessage(
-      `Thanks ${name.trim()}! Your ${formState.goal.toLowerCase()} enquiry has been recorded in this demo.`
-    );
+    try {
+      setFormMessage('Submitting your enquiry...');
 
-    setFormState({
-      name: '',
-      phone: '',
-      goal: 'Muscle Building',
-      message: '',
-    });
+      const response = await fetch('http://localhost:5000/api/contacts', {
+        method: 'POST',
+        headers: {
+          'Content-Type': 'application/json',
+        },
+        body: JSON.stringify({
+          name: name.trim(),
+          phone: phone.trim(),
+          goal,
+          message: message.trim(),
+        }),
+      });
+
+      const data = await response.json();
+
+      if (!response.ok) {
+        throw new Error(data.message || 'Something went wrong.');
+      }
+
+      setFormMessage(
+        `Thanks ${name.trim()}! Your ${goal.toLowerCase()} enquiry has been submitted successfully.`
+      );
+
+      setFormState({
+        name: '',
+        phone: '',
+        goal: 'Muscle Building',
+        message: '',
+      });
+    } catch (error) {
+      console.error('Contact form error:', error);
+
+      setFormMessage(
+        'Unable to submit your enquiry. Please try again.'
+      );
+    }
   };
 
   return (
