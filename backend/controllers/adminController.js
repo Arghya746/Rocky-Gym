@@ -2,7 +2,6 @@ const Admin = require('../models/Admin');
 const bcrypt = require('bcryptjs');
 const jwt = require('jsonwebtoken');
 
-
 // ===============================
 // ADMIN REGISTER
 // ===============================
@@ -41,16 +40,17 @@ const registerAdmin = async(req, res) => {
                 email: admin.email,
             },
         });
-
     } catch (error) {
-        console.error('Admin Register Error:', error.message);
+        console.error(
+            'Admin Register Error:',
+            error.message
+        );
 
         res.status(500).json({
             message: 'Server error. Please try again.',
         });
     }
 };
-
 
 // ===============================
 // ADMIN LOGIN
@@ -103,9 +103,11 @@ const loginAdmin = async(req, res) => {
                 email: admin.email,
             },
         });
-
     } catch (error) {
-        console.error('Admin Login Error:', error.message);
+        console.error(
+            'Admin Login Error:',
+            error.message
+        );
 
         res.status(500).json({
             message: 'Server error. Please try again.',
@@ -113,6 +115,9 @@ const loginAdmin = async(req, res) => {
     }
 };
 
+// ===============================
+// EXPORT CONTROLLERS
+// ===============================
 
 module.exports = {
     registerAdmin,

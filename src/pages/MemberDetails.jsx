@@ -54,28 +54,28 @@ export default function MemberDetails() {
                 workoutsResponse,
             ] = await Promise.all([
                 fetch(
-                    `http://localhost:5000/api/members/${id}`,
+                    `${API_URL}/api/members/${id}`,
                     {
                         headers,
                     }
                 ),
 
                 fetch(
-                    'http://localhost:5000/api/payments',
+                    `${API_URL}/api/payments`,
                     {
                         headers,
                     }
                 ),
 
                 fetch(
-                    'http://localhost:5000/api/attendance',
+                    `${API_URL}/api/attendance`,
                     {
                         headers,
                     }
                 ),
 
                 fetch(
-                    'http://localhost:5000/api/workouts',
+                     `${API_URL}/api/workouts`,
                     {
                         headers,
                     }

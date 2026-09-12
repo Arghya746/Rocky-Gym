@@ -1,5 +1,6 @@
 import { useState } from 'react';
 import { useNavigate } from 'react-router-dom';
+import API_URL from '../config/api';
 
 export default function AdminLogin() {
   const navigate = useNavigate();
@@ -18,7 +19,7 @@ export default function AdminLogin() {
       setError('');
 
       const response = await fetch(
-        'http://localhost:5000/api/admin/login',
+        `${API_URL}/api/admin/login`,
         {
           method: 'POST',
 
@@ -57,7 +58,10 @@ export default function AdminLogin() {
       navigate('/admin');
 
     } catch (error) {
-      console.error('Admin Login Error:', error);
+      console.error(
+        'Admin Login Error:',
+        error
+      );
 
       setError(
         error.message || 'Unable to login.'
@@ -67,7 +71,6 @@ export default function AdminLogin() {
       setLoading(false);
     }
   };
-
 
   return (
     <div className="admin-login">
@@ -85,7 +88,6 @@ export default function AdminLogin() {
         <p>
           Access your Alpha Gym management dashboard.
         </p>
-
 
         <form onSubmit={handleLogin}>
 
@@ -110,7 +112,6 @@ export default function AdminLogin() {
 
           </div>
 
-
           {/* PASSWORD */}
 
           <div className="admin-login-field">
@@ -132,7 +133,6 @@ export default function AdminLogin() {
 
           </div>
 
-
           {/* ERROR */}
 
           {error && (
@@ -140,7 +140,6 @@ export default function AdminLogin() {
               {error}
             </div>
           )}
-
 
           {/* BUTTON */}
 
@@ -155,7 +154,6 @@ export default function AdminLogin() {
           </button>
 
         </form>
-
 
         <div className="admin-login-status">
           <span>●</span>

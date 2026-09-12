@@ -1,3 +1,4 @@
+import API_URL from '../config/api';
 import { useEffect, useState } from 'react';
 import { useNavigate } from 'react-router-dom';
 import AdminLogout from '../components/AdminLogout';
@@ -187,7 +188,7 @@ export default function AdminDashboard() {
       setError('');
 
       const response = await fetch(
-        'http://localhost:5000/api/contacts'
+        `${API_URL}/api/contacts`
       );
 
       const data = await response.json();
@@ -232,7 +233,7 @@ export default function AdminDashboard() {
       }
 
       const response = await fetch(
-        'http://localhost:5000/api/dashboard/stats',
+        `${API_URL}/api/dashboard/stats`,
         {
           headers: {
             Authorization: `Bearer ${token}`,
@@ -278,7 +279,7 @@ export default function AdminDashboard() {
       }
 
       const response = await fetch(
-        'http://localhost:5000/api/members',
+        `${API_URL}/api/members`,
         {
           headers: {
             Authorization: `Bearer ${token}`,
@@ -343,7 +344,7 @@ export default function AdminDashboard() {
       }
 
       const response = await fetch(
-        'http://localhost:5000/api/members',
+        `${API_URL}/api/members`,
         {
           method: 'POST',
           headers: {
@@ -472,7 +473,7 @@ export default function AdminDashboard() {
       }
 
       const response = await fetch(
-        `http://localhost:5000/api/members/${editingMember._id}`,
+        `${API_URL}/api/members/${editingMember._id}`,
         {
           method: 'PUT',
           headers: {
@@ -563,7 +564,7 @@ export default function AdminDashboard() {
       }
 
       const response = await fetch(
-        `http://localhost:5000/api/members/${memberId}`,
+        `${API_URL}/api/members/${memberId}`,
         {
           method: 'DELETE',
           headers: {
@@ -640,7 +641,7 @@ export default function AdminDashboard() {
       }
 
       const response = await fetch(
-        'http://localhost:5000/api/payments',
+        `${API_URL}/api/payments`,
         {
           headers: {
             Authorization: `Bearer ${token}`,
@@ -705,7 +706,7 @@ export default function AdminDashboard() {
       }
 
       const response = await fetch(
-        'http://localhost:5000/api/payments',
+        `${API_URL}/api/payments`,
         {
           method: 'POST',
           headers: {
@@ -831,7 +832,7 @@ export default function AdminDashboard() {
       }
 
       const response = await fetch(
-        `http://localhost:5000/api/payments/${editingPayment._id}`,
+      `${API_URL}/api/payments/${editingPayment._id}`,
         {
           method: 'PUT',
           headers: {
@@ -920,7 +921,7 @@ export default function AdminDashboard() {
       }
 
       const response = await fetch(
-        `http://localhost:5000/api/payments/${paymentId}`,
+        `${API_URL}/api/payments/${paymentId}`,
         {
           method: 'DELETE',
           headers: {
@@ -980,7 +981,7 @@ const fetchAttendance = async () => {
     }
 
     const response = await fetch(
-      'http://localhost:5000/api/attendance',
+      `${API_URL}/api/attendance`,
       {
         headers: {
           Authorization: `Bearer ${token}`,
@@ -1047,7 +1048,7 @@ const handleMarkAttendance = async (e) => {
     }
 
     const response = await fetch(
-      'http://localhost:5000/api/attendance',
+      `${API_URL}/api/attendance`,
       {
         method: 'POST',
 
@@ -1142,7 +1143,7 @@ const handleAttendanceChange = (e) => {
       }
 
       const response = await fetch(
-        `http://localhost:5000/api/attendance/${editingAttendance._id}`,
+        `${API_URL}/api/attendance/${editingAttendance._id}`,
         {
           method: 'PUT',
           headers: {
@@ -1231,7 +1232,7 @@ const handleAttendanceChange = (e) => {
       }
 
       const response = await fetch(
-        `http://localhost:5000/api/attendance/${attendanceId}`,
+        `${API_URL}/api/attendance/${attendanceId}`,
         {
           method: 'DELETE',
           headers: {
@@ -1289,7 +1290,7 @@ const handleAttendanceChange = (e) => {
       }
 
       const response = await fetch(
-        'http://localhost:5000/api/workouts',
+        `${API_URL}/api/workouts`,
         {
           headers: {
             Authorization: `Bearer ${token}`,
@@ -1401,7 +1402,7 @@ const handleAttendanceChange = (e) => {
       }
 
       const response = await fetch(
-        'http://localhost:5000/api/workouts',
+        `${API_URL}/api/workouts`,
         {
           method: 'POST',
           headers: {
@@ -1549,7 +1550,7 @@ const handleAttendanceChange = (e) => {
       }
 
       const response = await fetch(
-        `http://localhost:5000/api/workouts/${editingWorkout._id}`,
+        `${API_URL}/api/workouts/${editingWorkout._id}`,
         {
           method: 'PUT',
           headers: {
@@ -1653,7 +1654,7 @@ const handleAttendanceChange = (e) => {
       }
 
       const response = await fetch(
-        `http://localhost:5000/api/workouts/${workoutId}`,
+        `${API_URL}/api/workouts/${workoutId}`,
         {
           method: 'DELETE',
           headers: {
@@ -1717,7 +1718,7 @@ const handleAttendanceChange = (e) => {
       }
 
       const response = await fetch(
-        `http://localhost:5000/api/contacts/${contactId}`,
+        `${API_URL}/api/contacts/${contactId}`,
         {
           method: 'DELETE',
           headers: {

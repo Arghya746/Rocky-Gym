@@ -15,7 +15,7 @@ export default function PaymentReceipt() {
                 const token = localStorage.getItem('adminToken');
 
                 const response = await fetch(
-                    `http://localhost:5000/api/payments/${id}`,
+                   `${API_URL}/api/payments/${id}`,
                     {
                         headers: {
                             Authorization: `Bearer ${token}`,
