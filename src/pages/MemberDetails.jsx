@@ -1,6 +1,7 @@
 
 import { useEffect, useState } from 'react';
 import { useNavigate, useParams } from 'react-router-dom';
+import API_URL from '../config/api';
 
 export default function MemberDetails() {
     const { id } = useParams();
