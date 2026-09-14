@@ -1,5 +1,10 @@
+
 import React, { useEffect, useState } from 'react';
 import API_URL from '../config/api';
+
+// =====================================================
+// DEFAULT PERMISSIONS
+// =====================================================
 
 const defaultPermissions = {
     members: {
@@ -36,6 +41,10 @@ const defaultPermissions = {
     },
 };
 
+// =====================================================
+// LABELS
+// =====================================================
+
 const permissionLabels = {
     members: 'MEMBERS',
     payments: 'PAYMENTS',
@@ -43,6 +52,10 @@ const permissionLabels = {
     workouts: 'WORKOUTS',
     enquiries: 'ENQUIRIES',
 };
+
+// =====================================================
+// COMPONENT
+// =====================================================
 
 const StaffManagement = () => {
     const [staff, setStaff] = useState([]);
@@ -53,17 +66,37 @@ const StaffManagement = () => {
 
     const [loading, setLoading] = useState(true);
     const [saving, setSaving] = useState(false);
+
     const [message, setMessage] = useState('');
     const [error, setError] = useState('');
 
-    // =====================================
+    // =================================================
+    // NORMALIZE STAFF
+    // =================================================
+
+    const normalizeStaff = (staffMember) => {
+        if (!staffMember) {
+            return null;
+        }
+
+        return {
+            ...staffMember,
+
+            _id:
+                staffMember._id ||
+                staffMember.id,
+        };
+    };
+
+    // =================================================
     // FETCH STAFF
-    // =====================================
+    // =================================================
 
     const fetchStaff = async () => {
         try {
             setLoading(true);
             setError('');
+            setMessage('');
 
             const token =
                 localStorage.getItem('adminToken');
@@ -77,6 +110,8 @@ const StaffManagement = () => {
             const response = await fetch(
                 `${API_URL}/api/admin/staff`,
                 {
+                    method: 'GET',
+
                     headers: {
                         Authorization:
                             `Bearer ${token}`,
@@ -84,7 +119,8 @@ const StaffManagement = () => {
                 }
             );
 
-            const data = await response.json();
+            const data =
+                await response.json();
 
             if (!response.ok) {
                 throw new Error(
@@ -93,11 +129,19 @@ const StaffManagement = () => {
                 );
             }
 
-            setStaff(data.staff || []);
+            const staffList =
+                (data.staff || [])
+                    .map(normalizeStaff)
+                    .filter(
+                        (member) => member?._id
+                    );
 
-            if (data.staff?.length > 0) {
-                selectStaff(data.staff[0]);
+            setStaff(staffList);
+
+            if (staffList.length > 0) {
+                selectStaff(staffList[0]);
             }
+
         } catch (error) {
             console.error(
                 'Fetch staff error:',
@@ -108,45 +152,66 @@ const StaffManagement = () => {
                 error.message ||
                 'Unable to load staff.'
             );
+
         } finally {
             setLoading(false);
         }
     };
 
-    // =====================================
+    // =================================================
     // SELECT STAFF
-    // =====================================
+    // =================================================
 
     const selectStaff = (staffMember) => {
-        setSelectedStaff(staffMember);
+        const normalizedStaff =
+            normalizeStaff(staffMember);
+
+        if (!normalizedStaff?._id) {
+            console.error(
+                'Invalid staff member:',
+                staffMember
+            );
+
+            setError(
+                'Staff account ID could not be found.'
+            );
+
+            return;
+        }
+
+        setSelectedStaff(
+            normalizedStaff
+        );
+
+        const staffPermissions =
+            normalizedStaff.permissions || {};
 
         setPermissions({
             ...defaultPermissions,
-            ...(staffMember.permissions || {}),
 
             members: {
                 ...defaultPermissions.members,
-                ...(staffMember.permissions?.members || {}),
+                ...(staffPermissions.members || {}),
             },
 
             payments: {
                 ...defaultPermissions.payments,
-                ...(staffMember.permissions?.payments || {}),
+                ...(staffPermissions.payments || {}),
             },
 
             attendance: {
                 ...defaultPermissions.attendance,
-                ...(staffMember.permissions?.attendance || {}),
+                ...(staffPermissions.attendance || {}),
             },
 
             workouts: {
                 ...defaultPermissions.workouts,
-                ...(staffMember.permissions?.workouts || {}),
+                ...(staffPermissions.workouts || {}),
             },
 
             enquiries: {
                 ...defaultPermissions.enquiries,
-                ...(staffMember.permissions?.enquiries || {}),
+                ...(staffPermissions.enquiries || {}),
             },
         });
 
@@ -154,9 +219,9 @@ const StaffManagement = () => {
         setError('');
     };
 
-    // =====================================
-    // HANDLE PERMISSION CHANGE
-    // =====================================
+    // =================================================
+    // CHANGE PERMISSION
+    // =================================================
 
     const handlePermissionChange = (
         section,
@@ -174,14 +239,19 @@ const StaffManagement = () => {
         }));
 
         setMessage('');
+        setError('');
     };
 
-    // =====================================
+    // =================================================
     // SAVE PERMISSIONS
-    // =====================================
+    // =================================================
 
     const savePermissions = async () => {
-        if (!selectedStaff) {
+        if (!selectedStaff?._id) {
+            setError(
+                'Staff account ID not found.'
+            );
+
             return;
         }
 
@@ -199,8 +269,11 @@ const StaffManagement = () => {
                 );
             }
 
+            const staffId =
+                selectedStaff._id;
+
             const response = await fetch(
-                `${API_URL}/api/admin/staff/${selectedStaff._id}/permissions`,
+                `${API_URL}/api/admin/staff/${staffId}/permissions`,
                 {
                     method: 'PUT',
 
@@ -218,7 +291,8 @@ const StaffManagement = () => {
                 }
             );
 
-            const data = await response.json();
+            const data =
+                await response.json();
 
             if (!response.ok) {
                 throw new Error(
@@ -227,19 +301,56 @@ const StaffManagement = () => {
                 );
             }
 
-            setSelectedStaff(data.staff);
+            const updatedStaff =
+                normalizeStaff(data.staff);
+
+            setSelectedStaff(
+                updatedStaff
+            );
 
             setStaff((currentStaff) =>
                 currentStaff.map((member) =>
-                    member._id === selectedStaff._id
-                        ? data.staff
+                    member._id === staffId
+                        ? updatedStaff
                         : member
                 )
             );
 
+            setPermissions({
+                ...defaultPermissions,
+
+                ...(updatedStaff.permissions || {}),
+
+                members: {
+                    ...defaultPermissions.members,
+                    ...(updatedStaff.permissions?.members || {}),
+                },
+
+                payments: {
+                    ...defaultPermissions.payments,
+                    ...(updatedStaff.permissions?.payments || {}),
+                },
+
+                attendance: {
+                    ...defaultPermissions.attendance,
+                    ...(updatedStaff.permissions?.attendance || {}),
+                },
+
+                workouts: {
+                    ...defaultPermissions.workouts,
+                    ...(updatedStaff.permissions?.workouts || {}),
+                },
+
+                enquiries: {
+                    ...defaultPermissions.enquiries,
+                    ...(updatedStaff.permissions?.enquiries || {}),
+                },
+            });
+
             setMessage(
                 'Permissions updated successfully.'
             );
+
         } catch (error) {
             console.error(
                 'Save permissions error:',
@@ -250,17 +361,22 @@ const StaffManagement = () => {
                 error.message ||
                 'Unable to save permissions.'
             );
+
         } finally {
             setSaving(false);
         }
     };
 
-    // =====================================
-    // TOGGLE STAFF STATUS
-    // =====================================
+    // =================================================
+    // TOGGLE STATUS
+    // =================================================
 
     const toggleStatus = async () => {
-        if (!selectedStaff) {
+        if (!selectedStaff?._id) {
+            setError(
+                'Staff account ID not found.'
+            );
+
             return;
         }
 
@@ -283,8 +399,11 @@ const StaffManagement = () => {
                 );
             }
 
+            const staffId =
+                selectedStaff._id;
+
             const response = await fetch(
-                `${API_URL}/api/admin/staff/${selectedStaff._id}/status`,
+                `${API_URL}/api/admin/staff/${staffId}/status`,
                 {
                     method: 'PUT',
 
@@ -302,7 +421,8 @@ const StaffManagement = () => {
                 }
             );
 
-            const data = await response.json();
+            const data =
+                await response.json();
 
             if (!response.ok) {
                 throw new Error(
@@ -311,12 +431,17 @@ const StaffManagement = () => {
                 );
             }
 
-            setSelectedStaff(data.staff);
+            const updatedStaff =
+                normalizeStaff(data.staff);
+
+            setSelectedStaff(
+                updatedStaff
+            );
 
             setStaff((currentStaff) =>
                 currentStaff.map((member) =>
-                    member._id === selectedStaff._id
-                        ? data.staff
+                    member._id === staffId
+                        ? updatedStaff
                         : member
                 )
             );
@@ -328,6 +453,7 @@ const StaffManagement = () => {
                         : 'deactivated'
                 } successfully.`
             );
+
         } catch (error) {
             console.error(
                 'Update staff status error:',
@@ -338,27 +464,30 @@ const StaffManagement = () => {
                 error.message ||
                 'Unable to update staff status.'
             );
+
         } finally {
             setSaving(false);
         }
     };
 
-    // =====================================
-    // INITIAL LOAD
-    // =====================================
+    // =================================================
+    // LOAD STAFF
+    // =================================================
 
     useEffect(() => {
         fetchStaff();
     }, []);
 
-    // =====================================
+    // =================================================
     // LOADING
-    // =====================================
+    // =================================================
 
     if (loading) {
         return (
             <section className="admin-enquiries">
+
                 <div className="admin-section-heading">
+
                     <div>
                         <span className="section-tag">
                             ADMINISTRATION
@@ -368,22 +497,35 @@ const StaffManagement = () => {
                             STAFF <span>MANAGEMENT.</span>
                         </h2>
                     </div>
+
                 </div>
 
-                <div className="admin-add-member-card">
-                    Loading staff management...
+                <div className="staff-loading-card">
+                    <div className="staff-loading-dot"></div>
+
+                    <div>
+                        <strong>
+                            LOADING STAFF MANAGEMENT
+                        </strong>
+
+                        <span>
+                            Please wait...
+                        </span>
+                    </div>
                 </div>
+
             </section>
         );
     }
 
-    // =====================================
+    // =================================================
     // UI
-    // =====================================
+    // =================================================
 
     return (
-        <section className="admin-enquiries">
+        <section className="admin-enquiries staff-management-section">
 
+            {/* HEADER */}
             <div className="admin-section-heading">
 
                 <div>
@@ -406,119 +548,158 @@ const StaffManagement = () => {
 
             </div>
 
+            {/* MESSAGES */}
+
             {error && (
-                <div className="admin-error">
+                <div className="admin-error staff-message">
                     {error}
                 </div>
             )}
 
             {message && (
-                <div className="admin-success">
+                <div className="admin-success staff-message">
                     {message}
                 </div>
             )}
 
+            {/* EMPTY */}
+
             {staff.length === 0 ? (
 
-                <div className="admin-add-member-card">
-                    No receptionist accounts found.
+                <div className="staff-empty-card">
+
+                    <span className="section-tag">
+                        STAFF ACCOUNTS
+                    </span>
+
+                    <h3>
+                        NO RECEPTIONIST <span>FOUND.</span>
+                    </h3>
+
+                    <p>
+                        No receptionist accounts are currently available.
+                    </p>
+
                 </div>
 
             ) : (
 
                 <div className="staff-management-wrapper">
 
-                    {/* =========================
-                        STAFF LIST
-                    ========================= */}
+                    {/* =================================
+                        LEFT — STAFF ACCOUNTS
+                    ================================= */}
 
-                    <div className="staff-list">
+                    <aside className="staff-list">
 
-                        <div className="admin-form-heading">
+                        <div className="staff-list-header">
 
-                            <span className="section-tag">
-                                STAFF ACCOUNTS
+                            <div>
+                                <span className="section-tag">
+                                    STAFF ACCOUNTS
+                                </span>
+
+                                <h3>
+                                    RECEPTIONIST <span>ACCESS.</span>
+                                </h3>
+                            </div>
+
+                            <span className="staff-list-count">
+                                {staff.length}
                             </span>
-
-                            <h3>
-                                RECEPTIONIST <span>ACCESS.</span>
-                            </h3>
 
                         </div>
 
-                        {staff.map((member) => (
+                        <div className="staff-account-list">
 
-                            <button
-                                key={member._id}
-                                type="button"
-                                className={
-                                    `staff-card ${
-                                        selectedStaff?._id === member._id
-                                            ? 'active'
-                                            : ''
-                                    }`
-                                }
-                                onClick={() =>
-                                    selectStaff(member)
-                                }
-                            >
+                            {staff.map((member) => (
 
-                                <div>
-
-                                    <strong>
-                                        {member.name}
-                                    </strong>
-
-                                    <small>
-                                        {member.email}
-                                    </small>
-
-                                </div>
-
-                                <span
+                                <button
+                                    key={member._id}
+                                    type="button"
                                     className={
-                                        member.status === 'active'
-                                            ? 'staff-status active'
-                                            : 'staff-status inactive'
+                                        `staff-card ${
+                                            selectedStaff?._id === member._id
+                                                ? 'active'
+                                                : ''
+                                        }`
+                                    }
+                                    onClick={() =>
+                                        selectStaff(member)
                                     }
                                 >
-                                    {member.status}
-                                </span>
 
-                            </button>
+                                    <div className="staff-card-main">
 
-                        ))}
+                                        <div className="staff-avatar">
+                                            {(member.name || 'R')
+                                                .charAt(0)
+                                                .toUpperCase()}
+                                        </div>
 
-                    </div>
+                                        <div className="staff-card-info">
 
-                    {/* =========================
-                        PERMISSION PANEL
-                    ========================= */}
+                                            <strong>
+                                                {member.name}
+                                            </strong>
+
+                                            <small>
+                                                {member.email}
+                                            </small>
+
+                                        </div>
+
+                                    </div>
+
+                                    <span
+                                        className={
+                                            member.status === 'active'
+                                                ? 'staff-status active'
+                                                : 'staff-status inactive'
+                                        }
+                                    >
+                                        <i></i>
+                                        {member.status}
+                                    </span>
+
+                                </button>
+
+                            ))}
+
+                        </div>
+
+                    </aside>
+
+                    {/* =================================
+                        RIGHT — ACCESS CONTROL
+                    ================================= */}
 
                     {selectedStaff && (
 
                         <div className="staff-permission-panel">
 
-                            <div className="admin-form-heading">
+                            {/* PANEL HEADER */}
 
-                                <span className="section-tag">
-                                    ACCESS CONTROL
-                                </span>
+                            <div className="staff-panel-header">
 
-                                <h3>
-                                    {selectedStaff.name}{' '}
-                                    <span>PERMISSIONS.</span>
-                                </h3>
+                                <div className="staff-panel-title">
 
-                            </div>
+                                    <span className="section-tag">
+                                        ACCESS CONTROL
+                                    </span>
 
-                            <div className="staff-status-row">
+                                    <h3>
+                                        {selectedStaff.name}{' '}
+                                        <span>PERMISSIONS.</span>
+                                    </h3>
 
-                                <div>
+                                    <p>
+                                        Manage access levels and account permissions.
+                                    </p>
 
-                                    <strong>
-                                        ACCOUNT STATUS
-                                    </strong>
+                                </div>
+
+                                <div className="staff-panel-status">
 
                                     <span
                                         className={
@@ -527,21 +708,78 @@ const StaffManagement = () => {
                                                 : 'staff-status inactive'
                                         }
                                     >
+                                        <i></i>
                                         {selectedStaff.status}
                                     </span>
 
                                 </div>
 
+                            </div>
+
+                            {/* ACCOUNT BAR */}
+
+                            <div className="staff-account-bar">
+
+                                <div className="staff-account-identity">
+
+                                    <div className="staff-avatar large">
+                                        {(selectedStaff.name || 'R')
+                                            .charAt(0)
+                                            .toUpperCase()}
+                                    </div>
+
+                                    <div>
+                                        <strong>
+                                            {selectedStaff.name}
+                                        </strong>
+
+                                        <span>
+                                            {selectedStaff.email}
+                                        </span>
+                                    </div>
+
+                                </div>
+
                                 <button
                                     type="button"
-                                    className="admin-edit-btn"
+                                    className={
+                                        `staff-status-button ${
+                                            selectedStaff.status === 'active'
+                                                ? 'danger'
+                                                : 'success'
+                                        }`
+                                    }
                                     onClick={toggleStatus}
                                     disabled={saving}
                                 >
                                     {selectedStaff.status === 'active'
-                                        ? 'DEACTIVATE'
-                                        : 'ACTIVATE'}
+                                        ? 'DEACTIVATE ACCOUNT'
+                                        : 'ACTIVATE ACCOUNT'}
                                 </button>
+
+                            </div>
+
+                            {/* PERMISSIONS */}
+
+                            <div className="staff-permissions-heading">
+
+                                <div>
+                                    <span className="section-tag">
+                                        ACCESS LEVELS
+                                    </span>
+
+                                    <h4>
+                                        PERMISSION <span>CONTROL.</span>
+                                    </h4>
+                                </div>
+
+                                <span>
+                                    {Object.values(permissions)
+                                        .flatMap(Object.values)
+                                        .filter(Boolean)
+                                        .length}{' '}
+                                    ENABLED
+                                </span>
 
                             </div>
 
@@ -554,16 +792,24 @@ const StaffManagement = () => {
 
                                         <div
                                             className="permission-section"
-                                            key={section}
+                                            key={`permission-${section}`}
                                         >
 
-                                            <h4>
-                                                {
-                                                    permissionLabels[
-                                                        section
-                                                    ]
-                                                }
-                                            </h4>
+                                            <div className="permission-section-header">
+
+                                                <h4>
+                                                    {permissionLabels[section]}
+                                                </h4>
+
+                                                <span>
+                                                    {Object.values(sectionPermissions)
+                                                        .filter(Boolean)
+                                                        .length}
+                                                    /
+                                                    {Object.keys(sectionPermissions).length}
+                                                </span>
+
+                                            </div>
 
                                             <div className="permission-options">
 
@@ -573,13 +819,21 @@ const StaffManagement = () => {
                                                     ([permission, value]) => (
 
                                                         <label
-                                                            className="permission-option"
-                                                            key={permission}
+                                                            className={
+                                                                `permission-option ${
+                                                                    value
+                                                                        ? 'enabled'
+                                                                        : ''
+                                                                }`
+                                                            }
+                                                            key={`${section}-${permission}`}
                                                         >
 
                                                             <input
                                                                 type="checkbox"
-                                                                checked={value}
+                                                                checked={
+                                                                    Boolean(value)
+                                                                }
                                                                 onChange={() =>
                                                                     handlePermissionChange(
                                                                         section,
@@ -588,7 +842,11 @@ const StaffManagement = () => {
                                                                 }
                                                             />
 
-                                                            <span>
+                                                            <span className="permission-check">
+                                                                {value ? '✓' : ''}
+                                                            </span>
+
+                                                            <span className="permission-label">
                                                                 {permission
                                                                     .charAt(0)
                                                                     .toUpperCase() +
@@ -609,11 +867,23 @@ const StaffManagement = () => {
 
                             </div>
 
+                            {/* SAVE */}
+
                             <div className="staff-save-row">
+
+                                <div className="staff-save-info">
+
+                                    <span className="staff-save-indicator"></span>
+
+                                    <span>
+                                        Changes are saved to this staff account.
+                                    </span>
+
+                                </div>
 
                                 <button
                                     type="button"
-                                    className="admin-add-btn"
+                                    className="staff-save-button"
                                     onClick={savePermissions}
                                     disabled={saving}
                                 >
@@ -637,4 +907,3 @@ const StaffManagement = () => {
 };
 
 export default StaffManagement;
-
