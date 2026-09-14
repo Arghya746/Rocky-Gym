@@ -5259,76 +5259,161 @@ footer {
     padding: 20px 18px;
   }
 }
-/* =========================
-   MEMBER PROFILE - FINAL SPACING OVERRIDE
-========================= */
+/* =========================================================
+   STAFF MANAGEMENT TEST / FIX
+   ========================================================= */
 
-.member-info-grid {
-  display: grid !important;
-  grid-template-columns: repeat(2, minmax(0, 1fr)) !important;
-  gap: 1px !important;
+.staff-management-wrapper {
+    display: grid !important;
+    grid-template-columns: 300px 1fr !important;
+    gap: 25px !important;
+    align-items: start !important;
 }
 
-.member-info-item {
-  display: flex !important;
-  flex-direction: column !important;
-  align-items: flex-start !important;
-  justify-content: center !important;
-  gap: 16px !important;
-  min-height: 120px !important;
-  padding: 28px 30px !important;
-  background: var(--card) !important;
+.staff-list,
+.staff-permission-panel {
+    background: #15151c !important;
+    border: 1px solid rgba(255, 255, 255, 0.12) !important;
+    border-radius: 12px !important;
+    padding: 20px !important;
 }
 
-.member-info-item span {
-  display: block !important;
-  width: 100% !important;
-  margin: 0 !important;
-  padding: 0 !important;
-  color: var(--muted) !important;
-  font-family: var(--mono) !important;
-  font-size: 9px !important;
-  font-weight: 700 !important;
-  letter-spacing: 1.2px !important;
-  line-height: 1.5 !important;
-  text-transform: uppercase !important;
+.staff-card {
+    width: 100% !important;
+    display: flex !important;
+    align-items: center !important;
+    justify-content: space-between !important;
+
+    padding: 15px !important;
+    margin-bottom: 10px !important;
+
+    background: #1c1c25 !important;
+    color: #fff !important;
+
+    border: 1px solid rgba(255, 255, 255, 0.08) !important;
+    border-radius: 9px !important;
+
+    cursor: pointer !important;
 }
 
-.member-info-item strong {
-  display: block !important;
-  width: 100% !important;
-  margin: 0 !important;
-  padding: 0 !important;
-  color: var(--text) !important;
-  font-size: 15px !important;
-  font-weight: 600 !important;
-  line-height: 1.5 !important;
+.staff-card:hover,
+.staff-card.active {
+    border-color: #ff4d00 !important;
+    background: rgba(255, 77, 0, 0.10) !important;
 }
 
-@media (max-width: 700px) {
-  .member-info-grid {
-    grid-template-columns: 1fr !important;
-  }
-
-  .member-info-item {
-    min-height: 105px !important;
-    gap: 13px !important;
-    padding: 23px 22px !important;
-  }
+.staff-card strong {
+    color: #fff !important;
+    display: block !important;
 }
 
-@media (max-width: 480px) {
-  .member-info-item {
-    min-height: 100px !important;
+.staff-card small {
+    color: #9b9ba8 !important;
+    display: block !important;
+    margin-top: 4px !important;
+}
+
+.staff-status {
+    display: inline-flex !important;
+    padding: 5px 9px !important;
+    border-radius: 999px !important;
+    font-size: 9px !important;
+    font-weight: 700 !important;
+}
+
+.staff-status.active {
+    color: #00e676 !important;
+    background: rgba(0, 230, 118, 0.10) !important;
+}
+
+.staff-status.inactive {
+    color: #ff5b5b !important;
+    background: rgba(255, 80, 80, 0.10) !important;
+}
+
+.staff-status-row {
+    display: flex !important;
+    align-items: center !important;
+    justify-content: space-between !important;
+
+    padding: 14px !important;
+    margin-bottom: 15px !important;
+
+    background: #1c1c25 !important;
+    border: 1px solid rgba(255,255,255,.08) !important;
+    border-radius: 9px !important;
+}
+
+.permission-grid {
+    display: grid !important;
+    grid-template-columns: repeat(2, 1fr) !important;
     gap: 12px !important;
-    padding: 21px 18px !important;
-  }
+}
 
-  .member-info-item span {
-    font-size: 8px !important;
-  }
+.permission-section {
+    padding: 15px !important;
+    background: #1c1c25 !important;
+    border: 1px solid rgba(255,255,255,.08) !important;
+    border-radius: 9px !important;
+}
 
-  .member-info-item strong {
-    font-size: 14px !important;
-  }
+.permission-section h4 {
+    color: #ff4d00 !important;
+    margin-bottom: 10px !important;
+}
+
+.permission-options {
+    display: flex !important;
+    flex-wrap: wrap !important;
+    gap: 7px !important;
+}
+
+.permission-option {
+    display: inline-flex !important;
+    align-items: center !important;
+    gap: 6px !important;
+
+    padding: 7px 9px !important;
+
+    color: #fff !important;
+    background: rgba(255,255,255,.04) !important;
+
+    border: 1px solid rgba(255,255,255,.08) !important;
+    border-radius: 6px !important;
+}
+
+.permission-option input {
+    accent-color: #ff4d00 !important;
+}
+
+.staff-status-row .admin-edit-btn {
+    background: transparent !important;
+    color: #ff8585 !important;
+    border: 1px solid rgba(255,82,82,.35) !important;
+    padding: 8px 13px !important;
+    border-radius: 7px !important;
+}
+
+.staff-save-row {
+    display: flex !important;
+    justify-content: flex-end !important;
+    margin-top: 15px !important;
+}
+
+.staff-save-row .admin-add-btn {
+    background: #ff4d00 !important;
+    color: #fff !important;
+    border: none !important;
+    padding: 11px 18px !important;
+    border-radius: 7px !important;
+}
+
+@media (max-width: 800px) {
+    .staff-management-wrapper {
+        grid-template-columns: 1fr !important;
+    }
+
+    .permission-grid {
+        grid-template-columns: 1fr !important;
+    }
 }
