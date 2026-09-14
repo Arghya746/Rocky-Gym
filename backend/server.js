@@ -11,6 +11,7 @@ const paymentRoutes = require('./routes/paymentRoutes');
 const attendanceRoutes = require('./routes/attendanceRoutes');
 const workoutRoutes = require('./routes/workoutRoutes');
 const dashboardRoutes = require('./routes/dashboardRoutes');
+const staffRoutes = require('./routes/staffRoutes');
 const app = express();
 
 
@@ -40,6 +41,7 @@ app.use('/api/payments', paymentRoutes);
 app.use('/api/attendance', attendanceRoutes);
 app.use('/api/workouts', workoutRoutes);
 app.use('/api/dashboard', dashboardRoutes);
+app.use('/api/admin/staff', staffRoutes);
 // ===============================
 // TEST ROUTE
 // ===============================

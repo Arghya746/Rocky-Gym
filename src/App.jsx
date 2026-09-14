@@ -27,6 +27,8 @@ import TrainersSection from './components/TrainersSection';
 
 import ProtectedRoute from './components/ProtectedRoute';
 
+
+
 // ADMIN PAGES
 import AdminLogin from './pages/AdminLogin';
 import AdminDashboard from './pages/AdminDashboard';

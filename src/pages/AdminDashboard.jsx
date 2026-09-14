@@ -2,9 +2,82 @@ import API_URL from '../config/api';
 import { useEffect, useState } from 'react';
 import { useNavigate } from 'react-router-dom';
 import AdminLogout from '../components/AdminLogout';
+import StaffManagement from '../components/StaffManagement';
 
 export default function AdminDashboard() { 
   const navigate = useNavigate();
+
+  // =========================================================
+  // ROLE & PERMISSIONS
+  // =========================================================
+
+  const defaultReceptionistPermissions = {
+    members: {
+      view: true,
+      add: true,
+      edit: true,
+      delete: false,
+    },
+
+    payments: {
+      view: true,
+      add: true,
+      edit: true,
+      delete: false,
+    },
+
+    attendance: {
+      view: true,
+      add: true,
+      edit: true,
+      delete: false,
+    },
+
+    workouts: {
+      view: true,
+      add: true,
+      edit: true,
+      delete: false,
+    },
+
+    enquiries: {
+      view: true,
+      delete: false,
+    },
+  };
+
+  const [adminData, setAdminData] = useState(() => {
+    try {
+      const storedAdmin =
+        localStorage.getItem('adminData');
+
+      return storedAdmin
+        ? JSON.parse(storedAdmin)
+        : null;
+    } catch {
+      return null;
+    }
+  });
+
+  const isOwner =
+    adminData?.role === 'admin';
+
+  const effectivePermissions =
+    adminData?.permissions ||
+    (isOwner
+      ? null
+      : defaultReceptionistPermissions);
+
+  const can = (section, action) => {
+    if (isOwner) {
+      return true;
+    }
+
+    return (
+      effectivePermissions?.[section]?.[action] ===
+      true
+    );
+  };
 
   const [contacts, setContacts] = useState([]);
   const [members, setMembers] = useState([]);
@@ -129,9 +202,6 @@ export default function AdminDashboard() {
   });
        // =========================================================
 
-
-
-
   // =========================================================
   // WORKOUT STATES
   // =========================================================
@@ -182,40 +252,63 @@ export default function AdminDashboard() {
   // CONTACTS
   // =========================================================
 
-  const fetchContacts = async () => {
+  
+const fetchContacts = async () => {
+
+    if (!can('enquiries', 'view')) {
+        return;
+    }
+
     try {
-      setLoading(true);
-      setError('');
+        setLoading(true);
+        setError('');
 
-      const response = await fetch(
-        `${API_URL}/api/contacts`
-      );
+        const token =
+            localStorage.getItem('adminToken');
 
-      const data = await response.json();
+        if (!token) {
+            throw new Error(
+                'Admin token not found.'
+            );
+        }
 
-      if (!response.ok) {
-        throw new Error(
-          data.message ||
-            'Failed to fetch enquiries.'
+        const response = await fetch(
+            `${API_URL}/api/contacts`,
+            {
+                headers: {
+                    Authorization:
+                        `Bearer ${token}`,
+                },
+            }
         );
-      }
 
-      setContacts(data.contacts || []);
+        const data = await response.json();
+
+        if (!response.ok) {
+            throw new Error(
+                data.message ||
+                'Failed to fetch enquiries.'
+            );
+        }
+
+        setContacts(data.contacts || []);
 
     } catch (error) {
-      console.error(
-        'Fetch contacts error:',
-        error
-      );
+        console.error(
+            'Fetch contacts error:',
+            error
+        );
 
-      setError(
-        'Unable to load enquiries.'
-      );
+        setError(
+            error.message ||
+            'Unable to load enquiries.'
+        );
 
     } finally {
-      setLoading(false);
+        setLoading(false);
     }
-  };
+};
+
 
   // =========================================================
   // DASHBOARD STATS
@@ -265,6 +358,10 @@ export default function AdminDashboard() {
   // =========================================================
 
   const fetchMembers = async () => {
+      if (!can('members', 'view')) {
+    return;
+  }
+
     try {
       setMembersLoading(true);
       setMembersError('');
@@ -328,6 +425,11 @@ export default function AdminDashboard() {
 
   const handleAddMember = async (e) => {
     e.preventDefault();
+
+        if (!can('members', 'add')) {
+      alert('You do not have permission to add members.');
+      return;
+    }
 
     try {
       setAddingMember(true);
@@ -424,6 +526,11 @@ export default function AdminDashboard() {
   // =========================================================
 
   const handleEditMember = (member) => {
+    
+    if (!can('members', 'edit')) {
+      alert('You do not have permission to edit members.');
+      return;
+    }
     setEditingMember(member);
 
     setMemberForm({
@@ -457,6 +564,11 @@ export default function AdminDashboard() {
 
   const handleUpdateMember = async (e) => {
     e.preventDefault();
+
+    if (!can('members', 'edit')) {
+      alert('You do not have permission to edit members.');
+      return;
+    }
 
     try {
       setUpdatingMember(true);
@@ -545,6 +657,11 @@ export default function AdminDashboard() {
   const handleDeleteMember = async (
     memberId
   ) => {
+    if (!can('members', 'delete')) {
+      alert('You do not have permission to delete members.');
+      return;
+    }
+
     const confirmed = window.confirm(
       'Are you sure you want to delete this member?'
     );
@@ -627,6 +744,9 @@ export default function AdminDashboard() {
   // =========================================================
 
   const fetchPayments = async () => {
+     if (!can('payments', 'view')) {
+    return;
+  }
     try {
       setPaymentsLoading(true);
       setPaymentsError('');
@@ -690,6 +810,11 @@ export default function AdminDashboard() {
 
   const handleAddPayment = async (e) => {
     e.preventDefault();
+
+    if (!can('payments', 'add')) {
+    alert('You do not have permission to add payments.');
+    return;
+}
 
     try {
       setAddingPayment(true);
@@ -780,6 +905,11 @@ export default function AdminDashboard() {
   // =========================================================
 
   const handleEditPayment = (payment) => {
+    if (!can('payments', 'edit')) {
+    alert('You do not have permission to edit payments.');
+    return;
+}
+    
     setEditingPayment(payment);
 
     setPaymentForm({
@@ -816,6 +946,11 @@ export default function AdminDashboard() {
 
   const handleUpdatePayment = async (e) => {
     e.preventDefault();
+
+    if (!can('payments', 'edit')) {
+    alert('You do not have permission to edit payments.');
+    return;
+}
 
     try {
       setUpdatingPayment(true);
@@ -902,6 +1037,10 @@ export default function AdminDashboard() {
   const handleDeletePayment = async (
     paymentId
   ) => {
+    if (!can('payments', 'delete')) {
+    alert('You do not have permission to delete payments.');
+    return;
+}
     const confirmed = window.confirm(
       'Are you sure you want to delete this payment?'
     );
@@ -967,6 +1106,9 @@ export default function AdminDashboard() {
 // =========================
 
 const fetchAttendance = async () => {
+   if (!can('attendance', 'view')) {
+    return;
+  }
   try {
     setAttendanceLoading(true);
     setAttendanceError('');
@@ -1024,6 +1166,10 @@ const fetchAttendance = async () => {
 
 const handleMarkAttendance = async (e) => {
   e.preventDefault();
+   if (!can('attendance', 'add')) {
+    alert('You do not have permission to mark attendance.');
+    return;
+  }
 
   try {
     setAttendanceError('');
@@ -1128,6 +1274,11 @@ const handleAttendanceChange = (e) => {
   ) => {
     e.preventDefault();
 
+    if (!can('attendance', 'edit')) {
+    alert('You do not have permission to edit attendance.');
+    return;
+  }
+
     try {
       setUpdatingAttendance(true);
       setEditAttendanceError('');
@@ -1213,6 +1364,10 @@ const handleAttendanceChange = (e) => {
   const handleDeleteAttendance = async (
     attendanceId
   ) => {
+    if (!can('attendance', 'delete')) {
+    alert('You do not have permission to delete attendance.');
+    return;
+  }
     const confirmed = window.confirm(
       'Are you sure you want to delete this attendance record?'
     );
@@ -1279,6 +1434,9 @@ const handleAttendanceChange = (e) => {
   // =========================================================
 
   const fetchWorkouts = async () => {
+     if (!can('workouts', 'view')) {
+    return;
+  }
     try {
       const token =
         localStorage.getItem('adminToken');
@@ -1387,6 +1545,10 @@ const handleAttendanceChange = (e) => {
   const handleAddWorkout = async (e) => {
     e.preventDefault();
 
+     if (!can('workouts', 'add')) {
+    alert('You do not have permission to add workouts.');
+    return;
+  }
     try {
       setAddingWorkout(true);
       setWorkoutFormError('');
@@ -1485,6 +1647,10 @@ const handleAttendanceChange = (e) => {
   };
 
   const handleEditWorkout = (workout) => {
+     if (!can('workouts', 'edit')) {
+    alert('You do not have permission to edit workouts.');
+    return;
+  }
     setEditingWorkout(workout);
 
     setWorkoutForm({
@@ -1534,6 +1700,11 @@ const handleAttendanceChange = (e) => {
 
   const handleUpdateWorkout = async (e) => {
     e.preventDefault();
+
+    if (!can('workouts', 'edit')) {
+    alert('You do not have permission to edit workouts.');
+    return;
+  }
 
     try {
       setUpdatingWorkout(true);
@@ -1635,6 +1806,10 @@ const handleAttendanceChange = (e) => {
   const handleDeleteWorkout = async (
     workoutId
   ) => {
+    if (!can('workouts', 'delete')) {
+    alert('You do not have permission to delete workouts.');
+    return;
+  }
     const confirmed = window.confirm(
       'Are you sure you want to delete this workout?'
     );
@@ -1699,6 +1874,10 @@ const handleAttendanceChange = (e) => {
   const handleDeleteContact = async (
     contactId
   ) => {
+     if (!can('enquiries', 'delete')) {
+    alert('You do not have permission to delete enquiries.');
+    return;
+  }
     const confirmed = window.confirm(
       'Are you sure you want to delete this enquiry?'
     );
@@ -1912,31 +2091,10 @@ const handleAttendanceChange = (e) => {
           </span>
 
           <strong>
-            {stats.totalPayments}
-          </strong>
-
-        </div>
-
-        <div className="admin-stat-card">
-
-          <span>
-            TOTAL ENQUIRIES
-          </span>
-
-          <strong>
-            {contacts.length}
-          </strong>
-
-        </div>
-
-        <div className="admin-stat-card">
-
-          <span>
-            SYSTEM STATUS
-          </span>
-
-          <strong>
-            ONLINE
+            ₹
+            {Number(
+              stats.totalPayments
+            ).toLocaleString('en-IN')}
           </strong>
 
         </div>
@@ -1947,2359 +2105,2323 @@ const handleAttendanceChange = (e) => {
           MEMBER MANAGEMENT
       ===================================================== */}
 
-      <section className="admin-enquiries">
+<section className="admin-enquiries">
 
-        <div className="admin-section-heading">
+  <div className="admin-section-heading">
 
-          <div>
+    <div>
 
-            <span className="section-tag">
-              GYM MEMBERS
-            </span>
+      <span className="section-tag">
+        GYM MEMBERS
+      </span>
 
-            <h2>
-              MEMBER <span>MANAGEMENT.</span>
-            </h2>
-
-          </div>
-
-          <div className="admin-section-actions">
-
-            <span className="admin-count">
-              {filteredMembers.length} / {members.length} MEMBERS
-            </span>
-
-            <button
-              type="button"
-              className="admin-add-btn"
-              onClick={() => {
-
-                setShowAddMember(
-                  (current) => !current
-                );
-
-                setEditingMember(null);
-
-                setMemberFormError('');
-                setEditMemberError('');
-                setMemberSuccess('');
-
-              }}
-            >
-              {showAddMember
-                ? '✕ CLOSE'
-                : '+ ADD MEMBER'}
-            </button>
-
-          </div>
-
-        </div>
-
-        {/* =========================
-            MEMBER FORM
-        ========================= */}
-
-        {showAddMember && (
-
-          <div className="admin-add-member-card">
-
-            <div className="admin-form-heading">
-
-              <span className="section-tag">
-                {editingMember
-                  ? 'EDIT MEMBER'
-                  : 'NEW MEMBER'}
-              </span>
-
-              <h3>
-
-                {editingMember
-                  ? 'EDIT '
-                  : 'ADD '}
-
-                <span>
-                  MEMBER.
-                </span>
-
-              </h3>
-
-            </div>
-
-            <form
-              className="admin-member-form"
-              onSubmit={
-                editingMember
-                  ? handleUpdateMember
-                  : handleAddMember
-              }
-            >
-
-              <div className="admin-login-field">
-
-                <label htmlFor="member-name">
-                  FULL NAME
-                </label>
-
-                <input
-                  id="member-name"
-                  name="name"
-                  type="text"
-                  placeholder="Enter member name"
-                  value={memberForm.name}
-                  onChange={handleMemberChange}
-                  required
-                />
-
-              </div>
-
-              <div className="admin-login-field">
-
-                <label htmlFor="member-phone">
-                  PHONE
-                </label>
-
-                <input
-                  id="member-phone"
-                  name="phone"
-                  type="tel"
-                  placeholder="9876543210"
-                  value={memberForm.phone}
-                  onChange={handleMemberChange}
-                  required
-                />
-
-              </div>
-
-              <div className="admin-login-field">
-
-                <label htmlFor="member-email">
-                  EMAIL
-                </label>
-
-                <input
-                  id="member-email"
-                  name="email"
-                  type="email"
-                  placeholder="member@example.com"
-                  value={memberForm.email}
-                  onChange={handleMemberChange}
-                />
-
-              </div>
-
-              <div className="admin-login-field">
-
-                <label htmlFor="member-age">
-                  AGE
-                </label>
-
-                <input
-                  id="member-age"
-                  name="age"
-                  type="number"
-                  min="1"
-                  max="100"
-                  placeholder="25"
-                  value={memberForm.age}
-                  onChange={handleMemberChange}
-                />
-
-              </div>
-
-              <div className="admin-login-field">
-
-                <label htmlFor="member-gender">
-                  GENDER
-                </label>
-
-                <select
-                  id="member-gender"
-                  name="gender"
-                  value={memberForm.gender}
-                  onChange={handleMemberChange}
-                >
-
-                  <option value="Male">
-                    Male
-                  </option>
-
-                  <option value="Female">
-                    Female
-                  </option>
-
-                  <option value="Other">
-                    Other
-                  </option>
-
-                </select>
-
-              </div>
-
-              <div className="admin-login-field">
-
-                <label htmlFor="membership-plan">
-                  MEMBERSHIP PLAN
-                </label>
-
-                <select
-                  id="membership-plan"
-                  name="membershipPlan"
-                  value={
-                    memberForm.membershipPlan
-                  }
-                  onChange={handleMemberChange}
-                >
-
-                  <option value="Monthly">
-                    Monthly
-                  </option>
-
-                  <option value="Quarterly">
-                    Quarterly
-                  </option>
-
-                  <option value="Half-Yearly">
-                    Half-Yearly
-                  </option>
-
-                  <option value="Yearly">
-                    Yearly
-                  </option>
-
-                </select>
-
-              </div>
-
-              <div className="admin-login-field">
-
-                <label htmlFor="start-date">
-                  MEMBERSHIP START DATE
-                </label>
-
-                <input
-                  id="start-date"
-                  name="membershipStartDate"
-                  type="date"
-                  value={
-                    memberForm.membershipStartDate
-                  }
-                  onChange={handleMemberChange}
-                  required
-                />
-
-              </div>
-
-              <div className="admin-login-field">
-
-                <label htmlFor="end-date">
-                  MEMBERSHIP END DATE
-                </label>
-
-                <input
-                  id="end-date"
-                  name="membershipEndDate"
-                  type="date"
-                  value={
-                    memberForm.membershipEndDate
-                  }
-                  onChange={handleMemberChange}
-                  required
-                />
-
-              </div>
-
-              <div className="admin-login-field">
-
-                <label htmlFor="member-amount">
-                  MEMBERSHIP AMOUNT
-                </label>
-
-                <input
-                  id="member-amount"
-                  name="amount"
-                  type="number"
-                  min="0"
-                  placeholder="1500"
-                  value={memberForm.amount}
-                  onChange={handleMemberChange}
-                  required
-                />
-
-              </div>
-
-              {memberFormError && (
-
-                <div className="admin-login-error">
-                  {memberFormError}
-                </div>
-
-              )}
-
-              {editMemberError && (
-
-                <div className="admin-login-error">
-                  {editMemberError}
-                </div>
-
-              )}
-
-              {memberSuccess && (
-
-                <div className="admin-member-success">
-                  {memberSuccess}
-                </div>
-
-              )}
-
-              <div className="admin-form-actions">
-
-                <button
-                  type="button"
-                  className="admin-cancel-btn"
-                  onClick={() => {
-
-                    setShowAddMember(false);
-                    setEditingMember(null);
-
-                    setMemberFormError('');
-                    setEditMemberError('');
-                    setMemberSuccess('');
-
-                  }}
-                >
-                  CANCEL
-                </button>
-
-                <button
-                  type="submit"
-                  className="admin-add-submit-btn"
-                  disabled={
-                    addingMember ||
-                    updatingMember
-                  }
-                >
-
-                  {addingMember ||
-                  updatingMember
-                    ? editingMember
-                      ? 'UPDATING MEMBER...'
-                      : 'ADDING MEMBER...'
-                    : editingMember
-                      ? 'UPDATE MEMBER →'
-                      : 'ADD MEMBER →'}
-
-                </button>
-
-              </div>
-
-            </form>
-
-          </div>
-
-        )}
-
-        {/* =========================
-            MEMBER SEARCH & FILTER
-        ========================= */}
-
-        {!membersLoading &&
-          !membersError &&
-          members.length > 0 && (
-            <div className="admin-member-filters">
-              <input
-                type="text"
-                placeholder="Search by name or phone..."
-                value={memberSearch}
-                onChange={(e) =>
-                  setMemberSearch(e.target.value)
-                }
-              />
-
-              <select
-                value={memberStatusFilter}
-                onChange={(e) =>
-                  setMemberStatusFilter(e.target.value)
-                }
-              >
-                <option value="All">All Members</option>
-                <option value="Active">Active</option>
-                <option value="Expired">Expired</option>
-              </select>
-            </div>
-          )}
-
-        {membersLoading && (
-
-          <div className="admin-message">
-            Loading members...
-          </div>
-
-        )}
-
-        {!membersLoading &&
-          membersError && (
-
-            <div className="admin-message admin-error">
-              {membersError}
-            </div>
-
-          )}
-
-        {!membersLoading &&
-          !membersError &&
-          members.length === 0 && (
-
-            <div className="admin-message">
-              No members found.
-            </div>
-
-          )}
-
-        {!membersLoading &&
-          !membersError &&
-          filteredMembers.length > 0 && (
-
-            <div className="admin-table-wrapper">
-
-              <table className="admin-table">
-
-                <thead>
-
-                  <tr>
-                    <th>#</th>
-                    <th>NAME</th>
-                    <th>PHONE</th>
-                    <th>PLAN</th>
-                    <th>AMOUNT</th>
-                    <th>START</th>
-                    <th>END</th>
-                    <th>STATUS</th>
-                    <th>ACTION</th>
-                  </tr>
-
-                </thead>
-
-                <tbody>
-
-                  {filteredMembers.map(
-                    (member, index) => (
-
-                      <tr
-                        key={
-                          member._id ||
-                          index
-                        }
-                      >
-
-                        <td>
-                          {String(
-                            index + 1
-                          ).padStart(2, '0')}
-                        </td>
-
-                        <td>
-                          <strong>
-                            {member.name}
-                          </strong>
-                        </td>
-
-                        <td>
-                          {member.phone}
-                        </td>
-
-                        <td>
-
-                          <span className="goal-badge">
-                            {
-                              member.membershipPlan
-                            }
-                          </span>
-
-                        </td>
-
-                        <td>
-                          ₹
-                          {Number(
-                            member.amount
-                          ).toLocaleString(
-                            'en-IN'
-                          )}
-                        </td>
-
-                        <td>
-                          {member.membershipStartDate
-                            ? new Date(
-                                member.membershipStartDate
-                              ).toLocaleDateString(
-                                'en-IN'
-                              )
-                            : '-'}
-                        </td>
-
-                        <td>
-                          {member.membershipEndDate
-                            ? new Date(
-                                member.membershipEndDate
-                              ).toLocaleDateString(
-                                'en-IN'
-                              )
-                            : '-'}
-                        </td>
-
-                        <td>
-
-                          <span className="goal-badge">
-                            {member.status}
-                          </span>
-
-                        </td>
-
-                        <td>
-
-                          <button
-                            type="button"
-                            className="admin-view-btn"
-                            onClick={() =>
-                              navigate(`/admin/members/${member._id}`)
-                            }
-                          >
-                            VIEW
-                          </button>
-
-                          <button
-                            type="button"
-                            className="admin-edit-btn"
-                            onClick={() =>
-                              handleEditMember(
-                                member
-                              )
-                            }
-                          >
-                            EDIT
-                          </button>
-
-                          <button
-                            type="button"
-                            className="admin-delete-btn"
-                            onClick={() =>
-                              handleDeleteMember(
-                                member._id
-                              )
-                            }
-                          >
-                            DELETE
-                          </button>
-
-                        </td>
-
-                      </tr>
-
-                    )
-                  )}
-
-                </tbody>
-
-              </table>
-
-            </div>
-
-          )}
-
-      </section>
-
-        {!membersLoading &&
-          !membersError &&
-          members.length > 0 &&
-          filteredMembers.length === 0 && (
-            <div className="admin-message">
-              No members match your search or filter.
-            </div>
-          )}
-
-
-      {/* =====================================================
-          PAYMENT MANAGEMENT
-      ===================================================== */}
-
-      <section className="admin-enquiries">
-
-        <div className="admin-section-heading">
-
-          <div>
-
-            <span className="section-tag">
-              FINANCE
-            </span>
-
-            <h2>
-              PAYMENT <span>MANAGEMENT.</span>
-            </h2>
-
-          </div>
-
-          <div className="admin-section-actions">
-
-            <span className="admin-count">
-              {payments.length} PAYMENTS
-            </span>
-
-            <button
-              type="button"
-              className="admin-add-btn"
-              onClick={() => {
-
-                setShowAddPayment(
-                  (current) => !current
-                );
-
-                setEditingPayment(null);
-
-                setPaymentFormError('');
-                setEditPaymentError('');
-                setPaymentSuccess('');
-
-              }}
-            >
-              {showAddPayment
-                ? '✕ CLOSE'
-                : '+ ADD PAYMENT'}
-            </button>
-
-          </div>
-
-        </div>
-
-        {/* =========================
-            PAYMENT FORM
-        ========================= */}
-
-        {showAddPayment && (
-
-          <div className="admin-add-member-card">
-
-            <div className="admin-form-heading">
-
-              <span className="section-tag">
-                {editingPayment
-                  ? 'EDIT PAYMENT'
-                  : 'NEW PAYMENT'}
-              </span>
-
-              <h3>
-
-                {editingPayment
-                  ? 'EDIT '
-                  : 'ADD '}
-
-                <span>
-                  PAYMENT.
-                </span>
-
-              </h3>
-
-            </div>
-
-            <form
-              className="admin-member-form"
-              onSubmit={
-                editingPayment
-                  ? handleUpdatePayment
-                  : handleAddPayment
-              }
-            >
-
-              <div className="admin-login-field">
-
-                <label htmlFor="payment-member">
-                  MEMBER
-                </label>
-
-                <select
-                  id="payment-member"
-                  name="member"
-                  value={paymentForm.member}
-                  onChange={handlePaymentChange}
-                  required
-                >
-
-                  <option value="">
-                    Select member
-                  </option>
-
-                  {members.map(
-                    (member) => (
-
-                      <option
-                        key={member._id}
-                        value={member._id}
-                      >
-                        {member.name} — {member.phone}
-                      </option>
-
-                    )
-                  )}
-
-                </select>
-
-              </div>
-
-              <div className="admin-login-field">
-
-                <label htmlFor="invoice-number">
-                  INVOICE NUMBER
-                </label>
-
-                <input
-                  id="invoice-number"
-                  name="invoiceNumber"
-                  type="text"
-                  placeholder="INV-001"
-                  value={
-                    paymentForm.invoiceNumber
-                  }
-                  onChange={handlePaymentChange}
-                  required
-                />
-
-              </div>
-
-              <div className="admin-login-field">
-
-                <label htmlFor="payment-amount">
-                  AMOUNT
-                </label>
-
-                <input
-                  id="payment-amount"
-                  name="amount"
-                  type="number"
-                  min="0"
-                  placeholder="1500"
-                  value={
-                    paymentForm.amount
-                  }
-                  onChange={handlePaymentChange}
-                  required
-                />
-
-              </div>
-
-              <div className="admin-login-field">
-
-                <label htmlFor="payment-method">
-                  PAYMENT METHOD
-                </label>
-
-                <select
-                  id="payment-method"
-                  name="paymentMethod"
-                  value={
-                    paymentForm.paymentMethod
-                  }
-                  onChange={handlePaymentChange}
-                >
-
-                  <option value="Cash">
-                    Cash
-                  </option>
-
-                  <option value="UPI">
-                    UPI
-                  </option>
-
-                  <option value="Card">
-                    Card
-                  </option>
-
-                  <option value="Bank Transfer">
-                    Bank Transfer
-                  </option>
-
-                </select>
-
-              </div>
-
-              <div className="admin-login-field">
-
-                <label htmlFor="payment-date">
-                  PAYMENT DATE
-                </label>
-
-                <input
-                  id="payment-date"
-                  name="paymentDate"
-                  type="date"
-                  value={
-                    paymentForm.paymentDate
-                  }
-                  onChange={handlePaymentChange}
-                />
-
-              </div>
-
-              <div className="admin-login-field">
-
-                <label htmlFor="payment-status">
-                  STATUS
-                </label>
-
-                <select
-                  id="payment-status"
-                  name="status"
-                  value={
-                    paymentForm.status
-                  }
-                  onChange={handlePaymentChange}
-                >
-
-                  <option value="Paid">
-                    Paid
-                  </option>
-
-                  <option value="Pending">
-                    Pending
-                  </option>
-
-                  <option value="Failed">
-                    Failed
-                  </option>
-
-                </select>
-
-              </div>
-
-              <div className="admin-login-field">
-
-                <label htmlFor="payment-notes">
-                  NOTES
-                </label>
-
-                <input
-                  id="payment-notes"
-                  name="notes"
-                  type="text"
-                  placeholder="Optional payment notes"
-                  value={
-                    paymentForm.notes
-                  }
-                  onChange={handlePaymentChange}
-                />
-
-              </div>
-
-              {paymentFormError && (
-
-                <div className="admin-login-error">
-                  {paymentFormError}
-                </div>
-
-              )}
-
-              {editPaymentError && (
-
-                <div className="admin-login-error">
-                  {editPaymentError}
-                </div>
-
-              )}
-
-              {paymentSuccess && (
-
-                <div className="admin-member-success">
-                  {paymentSuccess}
-                </div>
-
-              )}
-
-              <div className="admin-form-actions">
-
-                <button
-                  type="button"
-                  className="admin-cancel-btn"
-                  onClick={() => {
-
-                    setShowAddPayment(false);
-                    setEditingPayment(null);
-
-                    setPaymentFormError('');
-                    setEditPaymentError('');
-                    setPaymentSuccess('');
-
-                  }}
-                >
-                  CANCEL
-                </button>
-
-                <button
-                  type="submit"
-                  className="admin-add-submit-btn"
-                  disabled={
-                    addingPayment ||
-                    updatingPayment
-                  }
-                >
-
-                  {addingPayment ||
-                  updatingPayment
-                    ? editingPayment
-                      ? 'UPDATING PAYMENT...'
-                      : 'ADDING PAYMENT...'
-                    : editingPayment
-                      ? 'UPDATE PAYMENT →'
-                      : 'ADD PAYMENT →'}
-
-                </button>
-
-              </div>
-
-            </form>
-
-          </div>
-
-        )}
-
-        {paymentsLoading && (
-
-          <div className="admin-message">
-            Loading payments...
-          </div>
-
-        )}
-
-        {!paymentsLoading &&
-          paymentsError && (
-
-            <div className="admin-message admin-error">
-              {paymentsError}
-            </div>
-
-          )}
-
-        {!paymentsLoading &&
-          !paymentsError &&
-          payments.length === 0 && (
-
-            <div className="admin-message">
-              No payments found.
-            </div>
-
-          )}
-
-        {!paymentsLoading &&
-          !paymentsError &&
-          payments.length > 0 && (
-
-            <div className="admin-table-wrapper">
-
-              <table className="admin-table">
-
-                <thead>
-
-                  <tr>
-                    <th>#</th>
-                    <th>MEMBER</th>
-                    <th>INVOICE</th>
-                    <th>AMOUNT</th>
-                    <th>METHOD</th>
-                    <th>DATE</th>
-                    <th>STATUS</th>
-                    <th>ACTION</th>
-                  </tr>
-
-                </thead>
-
-                <tbody>
-
-                  {payments.map(
-                    (payment, index) => (
-
-                      <tr
-                        key={
-                          payment._id ||
-                          index
-                        }
-                      >
-
-                        <td>
-                          {String(
-                            index + 1
-                          ).padStart(2, '0')}
-                        </td>
-
-                        <td>
-
-                          <strong>
-                            {payment.member?.name ||
-                              'Unknown Member'}
-                          </strong>
-
-                        </td>
-
-                        <td>
-                          {payment.invoiceNumber}
-                        </td>
-
-                        <td>
-                          ₹
-                          {Number(
-                            payment.amount
-                          ).toLocaleString(
-                            'en-IN'
-                          )}
-                        </td>
-
-                        <td>
-
-                          <span className="goal-badge">
-                            {
-                              payment.paymentMethod
-                            }
-                          </span>
-
-                        </td>
-
-                        <td>
-                          {payment.paymentDate
-                            ? new Date(
-                                payment.paymentDate
-                              ).toLocaleDateString(
-                                'en-IN'
-                              )
-                            : '-'}
-                        </td>
-
-                        <td>
-
-                          <span className="goal-badge">
-                            {payment.status}
-                          </span>
-
-                        </td>
-
-                        <td>
-
-                          <button
-                            type="button"
-                            className="admin-view-btn"
-                            onClick={() =>
-                              navigate(
-                                `/admin/payments/${payment._id}/receipt`
-                              )
-                            }
-                          >
-                            RECEIPT
-                          </button>
-
-                          <button
-                            type="button"
-                            className="admin-edit-btn"
-                            onClick={() =>
-                              handleEditPayment(payment)
-                            }
-                          >
-                            EDIT
-                          </button>
-
-                          <button
-                            type="button"
-                            className="admin-delete-btn"
-                            onClick={() =>
-                              handleDeletePayment(payment._id)
-                            }
-                          >
-                            DELETE
-                          </button>
-
-                        </td>
-
-                      </tr>
-
-                    )
-                  )}
-
-                </tbody>
-
-              </table>
-
-            </div>
-
-          )}
-          
-
-      </section>
-
-      {/* =====================================================
-          ATTENDANCE MANAGEMENT
-      ===================================================== */}
-
-      <section className="admin-enquiries">
-
-        <div className="admin-section-heading">
-
-          <div>
-
-            <span className="section-tag">
-              GYM ACTIVITY
-            </span>
-
-            <h2>
-              ATTENDANCE <span>MANAGEMENT.</span>
-            </h2>
-
-          </div>
-
-          <div className="admin-section-actions">
-
-            <span className="admin-count">
-              {attendance.length} RECORDS
-            </span>
-
-            <button
-              type="button"
-              className="admin-add-btn"
-              onClick={() => {
-
-                setShowAddAttendance(
-                  (current) => !current
-                );
-
-                setEditingAttendance(null);
-
-                setAttendanceFormError('');
-                setEditAttendanceError('');
-                setAttendanceSuccess('');
-
-              }}
-            >
-              {showAddAttendance
-                ? '✕ CLOSE'
-                : '+ MARK ATTENDANCE'}
-            </button>
-
-          </div>
-
-        </div>
-
-        {/* =========================
-            ATTENDANCE FORM
-        ========================= */}
-
-        {showAddAttendance && (
-
-          <div className="admin-add-member-card">
-
-            <div className="admin-form-heading">
-
-              <span className="section-tag">
-                {editingAttendance
-                  ? 'EDIT ATTENDANCE'
-                  : 'NEW ATTENDANCE'}
-              </span>
-
-              <h3>
-
-                {editingAttendance
-                  ? 'EDIT '
-                  : 'MARK '}
-
-                <span>
-                  ATTENDANCE.
-                </span>
-
-              </h3>
-
-            </div>
-
-            <form
-  className="admin-member-form"
-  onSubmit={
-    editingAttendance
-      ? handleUpdateAttendance
-      : handleMarkAttendance
-  }
->
-
-              {/* MEMBER */}
-
-              <div className="admin-login-field">
-
-                <label htmlFor="attendance-member">
-                  MEMBER
-                </label>
-
-                <select
-                  id="attendance-member"
-                  name="member"
-                  value={
-                    attendanceForm.member
-                  }
-                  onChange={
-                    handleAttendanceChange
-                  }
-                  required
-                >
-
-                  <option value="">
-                    Select member
-                  </option>
-
-                  {members.map(
-                    (member) => (
-
-                      <option
-                        key={member._id}
-                        value={member._id}
-                      >
-                        {member.name} — {member.phone}
-                      </option>
-
-                    )
-                  )}
-
-                </select>
-
-              </div>
-
-              {/* DATE */}
-
-              <div className="admin-login-field">
-
-                <label htmlFor="attendance-date">
-                  DATE
-                </label>
-
-                <input
-                  id="attendance-date"
-                  name="date"
-                  type="date"
-                  value={
-                    attendanceForm.date
-                  }
-                  onChange={
-                    handleAttendanceChange
-                  }
-                  required
-                />
-
-              </div>
-
-              {/* CHECK IN */}
-
-              <div className="admin-login-field">
-
-                <label htmlFor="check-in-time">
-                  CHECK-IN TIME
-                </label>
-
-                <input
-                  id="check-in-time"
-                  name="checkInTime"
-                  type="time"
-                  value={
-                    attendanceForm.checkInTime
-                  }
-                  onChange={
-                    handleAttendanceChange
-                  }
-                />
-
-              </div>
-
-              {/* CHECK OUT */}
-
-              <div className="admin-login-field">
-
-                <label htmlFor="check-out-time">
-                  CHECK-OUT TIME
-                </label>
-
-                <input
-                  id="check-out-time"
-                  name="checkOutTime"
-                  type="time"
-                  value={
-                    attendanceForm.checkOutTime
-                  }
-                  onChange={
-                    handleAttendanceChange
-                  }
-                />
-
-              </div>
-
-              {/* STATUS */}
-
-              <div className="admin-login-field">
-
-                <label htmlFor="attendance-status">
-                  STATUS
-                </label>
-
-                <select
-                  id="attendance-status"
-                  name="status"
-                  value={
-                    attendanceForm.status
-                  }
-                  onChange={
-                    handleAttendanceChange
-                  }
-                >
-
-                  <option value="Present">
-                    Present
-                  </option>
-
-                  <option value="Absent">
-                    Absent
-                  </option>
-
-                </select>
-
-              </div>
-
-              {/* ERRORS */}
-
-              {attendanceFormError && (
-
-                <div className="admin-login-error">
-                  {attendanceFormError}
-                </div>
-
-              )}
-
-              {editAttendanceError && (
-
-                <div className="admin-login-error">
-                  {editAttendanceError}
-                </div>
-
-              )}
-
-              {/* SUCCESS */}
-
-              {attendanceSuccess && (
-
-                <div className="admin-member-success">
-                  {attendanceSuccess}
-                </div>
-
-              )}
-
-              {/* ACTIONS */}
-
-              <div className="admin-form-actions">
-
-                <button
-                  type="button"
-                  className="admin-cancel-btn"
-                  onClick={() => {
-
-                    setShowAddAttendance(false);
-                    setEditingAttendance(null);
-
-                    setAttendanceFormError('');
-                    setEditAttendanceError('');
-                    setAttendanceSuccess('');
-
-                  }}
-                >
-                  CANCEL
-                </button>
-
-                <button
-                  type="submit"
-                  className="admin-add-submit-btn"
-                  disabled={
-                    addingAttendance ||
-                    updatingAttendance
-                  }
-                >
-
-                  {addingAttendance ||
-                  updatingAttendance
-                    ? editingAttendance
-                      ? 'UPDATING ATTENDANCE...'
-                      : 'MARKING ATTENDANCE...'
-                    : editingAttendance
-                      ? 'UPDATE ATTENDANCE →'
-                      : 'MARK ATTENDANCE →'}
-
-                </button>
-
-              </div>
-
-            </form>
-
-          </div>
-
-        )}
-      
-
-
-
-        {/* =========================
-            ATTENDANCE LOADING
-        ========================= */}
-
-        {attendanceLoading && (
-
-          <div className="admin-message">
-            Loading attendance...
-          </div>
-
-        )}
-
-        {!attendanceLoading &&
-          attendanceError && (
-
-            <div className="admin-message admin-error">
-              {attendanceError}
-            </div>
-
-          )}
-
-        {!attendanceLoading &&
-          !attendanceError &&
-          attendance.length === 0 && (
-
-            <div className="admin-message">
-              No attendance records found.
-            </div>
-
-          )}
-
-        {/* =========================
-            ATTENDANCE TABLE
-        ========================= */}
-
-        {!attendanceLoading &&
-          !attendanceError &&
-          attendance.length > 0 && (
-
-            <div className="admin-table-wrapper">
-
-              <table className="admin-table">
-
-                <thead>
-
-                  <tr>
-                    <th>#</th>
-                    <th>MEMBER</th>
-                    <th>DATE</th>
-                    <th>CHECK-IN</th>
-                    <th>CHECK-OUT</th>
-                    <th>STATUS</th>
-                    <th>ACTION</th>
-                  </tr>
-
-                </thead>
-
-                <tbody>
-
-                  {attendance.map(
-                    (record, index) => (
-
-                      <tr
-                        key={
-                          record._id ||
-                          index
-                        }
-                      >
-
-                        <td>
-                          {String(
-                            index + 1
-                          ).padStart(2, '0')}
-                        </td>
-
-                        <td>
-
-                          <strong>
-                            {record.member?.name ||
-                              'Unknown Member'}
-                          </strong>
-
-                        </td>
-
-                        <td>
-                          {record.date
-                            ? new Date(
-                                record.date
-                              ).toLocaleDateString(
-                                'en-IN'
-                              )
-                            : '-'}
-                        </td>
-
-                        <td>
-                          {record.checkInTime
-                            ? new Date(
-                                record.checkInTime
-                              ).toLocaleTimeString(
-                                'en-IN',
-                                {
-                                  hour: '2-digit',
-                                  minute: '2-digit',
-                                }
-                              )
-                            : '-'}
-                        </td>
-
-                        <td>
-                          {record.checkOutTime
-                            ? new Date(
-                                record.checkOutTime
-                              ).toLocaleTimeString(
-                                'en-IN',
-                                {
-                                  hour: '2-digit',
-                                  minute: '2-digit',
-                                }
-                              )
-                            : '-'}
-                        </td>
-
-                        <td>
-
-                          <span className="goal-badge">
-                            {record.status}
-                          </span>
-
-                        </td>
-
-                        <td>
-
-                          <button
-                            type="button"
-                            className="admin-edit-btn"
-                            onClick={() =>
-                              handleEditAttendance(
-                                record
-                              )
-                            }
-                          >
-                            EDIT
-                          </button>
-
-                          <button
-                            type="button"
-                            className="admin-delete-btn"
-                            onClick={() =>
-                              handleDeleteAttendance(
-                                record._id
-                              )
-                            }
-                          >
-                            DELETE
-                          </button>
-
-                        </td>
-
-                      </tr>
-
-                    )
-                  )}
-
-                </tbody>
-
-              </table>
-
-            </div>
-
-          )}
-
-      </section>
-
-
-      {/* =====================================================
-          WORKOUT MANAGEMENT
-      ===================================================== */}
-
-      <section className="admin-enquiries">
-
-        <div className="admin-section-heading">
-
-          <div>
-
-            <span className="section-tag">
-              TRAINING
-            </span>
-
-            <h2>
-              WORKOUT <span>MANAGEMENT.</span>
-            </h2>
-
-          </div>
-
-          <div className="admin-section-actions">
-
-            <span className="admin-count">
-              {workouts.length} WORKOUTS
-            </span>
-
-            <button
-              type="button"
-              className="admin-add-btn"
-              onClick={() => {
-
-                setShowAddWorkout(
-                  (current) => !current
-                );
-
-                setEditingWorkout(null);
-                resetWorkoutForm();
-
-                setWorkoutFormError('');
-                setEditWorkoutError('');
-                setWorkoutSuccess('');
-
-              }}
-            >
-              {showAddWorkout
-                ? '✕ CLOSE'
-                : '+ ADD WORKOUT'}
-            </button>
-
-          </div>
-
-        </div>
-
-        {/* =========================
-            WORKOUT FORM
-        ========================= */}
-
-        {showAddWorkout && (
-
-          <div className="admin-add-member-card">
-
-            <div className="admin-form-heading">
-
-              <span className="section-tag">
-                {editingWorkout
-                  ? 'EDIT WORKOUT'
-                  : 'NEW WORKOUT'}
-              </span>
-
-              <h3>
-                {editingWorkout
-                  ? 'EDIT '
-                  : 'ADD '}
-
-                <span>
-                  WORKOUT.
-                </span>
-              </h3>
-
-            </div>
-
-            <form
-              className="admin-member-form"
-              onSubmit={
-                editingWorkout
-                  ? handleUpdateWorkout
-                  : handleAddWorkout
-              }
-            >
-
-              <div className="admin-login-field">
-
-                <label htmlFor="workout-member">
-                  MEMBER
-                </label>
-
-                <select
-                  id="workout-member"
-                  name="member"
-                  value={workoutForm.member}
-                  onChange={handleWorkoutChange}
-                  required
-                >
-
-                  <option value="">
-                    Select member
-                  </option>
-
-                  {members.map(
-                    (member) => (
-
-                      <option
-                        key={member._id}
-                        value={member._id}
-                      >
-                        {member.name} — {member.phone}
-                      </option>
-
-                    )
-                  )}
-
-                </select>
-
-              </div>
-
-              <div className="admin-login-field">
-
-                <label htmlFor="workout-name">
-                  WORKOUT NAME
-                </label>
-
-                <input
-                  id="workout-name"
-                  name="workoutName"
-                  type="text"
-                  placeholder="Beginner Strength Program"
-                  value={
-                    workoutForm.workoutName
-                  }
-                  onChange={handleWorkoutChange}
-                  required
-                />
-
-              </div>
-
-              <div className="admin-login-field">
-
-                <label htmlFor="workout-type">
-                  WORKOUT TYPE
-                </label>
-
-                <select
-                  id="workout-type"
-                  name="workoutType"
-                  value={
-                    workoutForm.workoutType
-                  }
-                  onChange={handleWorkoutChange}
-                >
-                  <option value="Strength">
-                    Strength
-                  </option>
-                  <option value="Cardio">
-                    Cardio
-                  </option>
-                  <option value="Flexibility">
-                    Flexibility
-                  </option>
-                  <option value="HIIT">
-                    HIIT
-                  </option>
-                  <option value="General">
-                    General
-                  </option>
-                </select>
-
-              </div>
-
-              <div className="admin-login-field">
-
-                <label>
-                  EXERCISES
-                </label>
-
-                <div
-                  style={{
-                    display: 'grid',
-                    gap: '12px',
-                  }}
-                >
-
-                  {workoutForm.exercises.map(
-                    (exercise, index) => (
-
-                      <div
-                        key={index}
-                        style={{
-                          display: 'grid',
-                          gap: '10px',
-                          padding: '16px',
-                          border:
-                            '1px solid rgba(255,255,255,0.12)',
-                        }}
-                      >
-
-                        <strong>
-                          EXERCISE {String(
-                            index + 1
-                          ).padStart(2, '0')}
-                        </strong>
-
-                        <input
-                          type="text"
-                          placeholder="Exercise name"
-                          value={
-                            exercise.name
-                          }
-                          onChange={(e) =>
-                            handleExerciseChange(
-                              index,
-                              'name',
-                              e.target.value
-                            )
-                          }
-                          required
-                        />
-
-                        <div
-                          style={{
-                            display: 'grid',
-                            gridTemplateColumns:
-                              'repeat(3, minmax(0, 1fr))',
-                            gap: '10px',
-                          }}
-                        >
-
-                          <input
-                            type="number"
-                            min="0"
-                            placeholder="Sets"
-                            value={
-                              exercise.sets
-                            }
-                            onChange={(e) =>
-                              handleExerciseChange(
-                                index,
-                                'sets',
-                                e.target.value
-                              )
-                            }
-                          />
-
-                          <input
-                            type="number"
-                            min="0"
-                            placeholder="Reps"
-                            value={
-                              exercise.reps
-                            }
-                            onChange={(e) =>
-                              handleExerciseChange(
-                                index,
-                                'reps',
-                                e.target.value
-                              )
-                            }
-                          />
-
-                          <input
-                            type="number"
-                            min="0"
-                            placeholder="Duration (min)"
-                            value={
-                              exercise.duration
-                            }
-                            onChange={(e) =>
-                              handleExerciseChange(
-                                index,
-                                'duration',
-                                e.target.value
-                              )
-                            }
-                          />
-
-                        </div>
-
-                        <input
-                          type="text"
-                          placeholder="Exercise notes (optional)"
-                          value={
-                            exercise.notes
-                          }
-                          onChange={(e) =>
-                            handleExerciseChange(
-                              index,
-                              'notes',
-                              e.target.value
-                            )
-                          }
-                        />
-
-                        {workoutForm.exercises.length >
-                          1 && (
-
-                          <button
-                            type="button"
-                            className="admin-delete-btn"
-                            onClick={() =>
-                              handleRemoveExercise(
-                                index
-                              )
-                            }
-                          >
-                            REMOVE EXERCISE
-                          </button>
-
-                        )}
-
-                      </div>
-
-                    )
-                  )}
-
-                  <button
-                    type="button"
-                    className="admin-edit-btn"
-                    onClick={handleAddExercise}
-                  >
-                    + ADD EXERCISE
-                  </button>
-
-                </div>
-
-              </div>
-
-              <div className="admin-login-field">
-
-                <label htmlFor="workout-start-date">
-                  START DATE
-                </label>
-
-                <input
-                  id="workout-start-date"
-                  name="startDate"
-                  type="date"
-                  value={
-                    workoutForm.startDate
-                  }
-                  onChange={handleWorkoutChange}
-                  required
-                />
-
-              </div>
-
-              <div className="admin-login-field">
-
-                <label htmlFor="workout-end-date">
-                  END DATE
-                </label>
-
-                <input
-                  id="workout-end-date"
-                  name="endDate"
-                  type="date"
-                  value={
-                    workoutForm.endDate
-                  }
-                  onChange={handleWorkoutChange}
-                  required
-                />
-
-              </div>
-
-              <div className="admin-login-field">
-
-                <label htmlFor="workout-status">
-                  STATUS
-                </label>
-
-                <select
-                  id="workout-status"
-                  name="status"
-                  value={
-                    workoutForm.status
-                  }
-                  onChange={handleWorkoutChange}
-                >
-                  <option value="Active">
-                    Active
-                  </option>
-                  <option value="Completed">
-                    Completed
-                  </option>
-                </select>
-
-              </div>
-
-              <div className="admin-login-field">
-
-                <label htmlFor="workout-notes">
-                  NOTES
-                </label>
-
-                <input
-                  id="workout-notes"
-                  name="notes"
-                  type="text"
-                  placeholder="Workout notes"
-                  value={
-                    workoutForm.notes
-                  }
-                  onChange={handleWorkoutChange}
-                />
-
-              </div>
-
-              {workoutFormError && (
-
-                <div className="admin-login-error">
-                  {workoutFormError}
-                </div>
-
-              )}
-
-              {editWorkoutError && (
-
-                <div className="admin-login-error">
-                  {editWorkoutError}
-                </div>
-
-              )}
-
-              {workoutSuccess && (
-
-                <div className="admin-member-success">
-                  {workoutSuccess}
-                </div>
-
-              )}
-
-              <div className="admin-form-actions">
-
-                <button
-                  type="button"
-                  className="admin-cancel-btn"
-                  onClick={() => {
-
-                    setShowAddWorkout(false);
-                    setEditingWorkout(null);
-                    resetWorkoutForm();
-
-                    setWorkoutFormError('');
-                    setEditWorkoutError('');
-                    setWorkoutSuccess('');
-
-                  }}
-                >
-                  CANCEL
-                </button>
-
-                <button
-                  type="submit"
-                  className="admin-add-submit-btn"
-                  disabled={
-                    addingWorkout ||
-                    updatingWorkout
-                  }
-                >
-                  {addingWorkout ||
-                  updatingWorkout
-                    ? editingWorkout
-                      ? 'UPDATING WORKOUT...'
-                      : 'ADDING WORKOUT...'
-                    : editingWorkout
-                      ? 'UPDATE WORKOUT →'
-                      : 'ADD WORKOUT →'}
-                </button>
-
-              </div>
-
-            </form>
-
-          </div>
-
-        )}
-
-        {workouts.length === 0 && (
-
-          <div className="admin-message">
-            No workouts found.
-          </div>
-
-        )}
-
-        {workouts.length > 0 && (
-
-          <div className="admin-table-wrapper">
-
-            <table className="admin-table">
-
-              <thead>
-
-                <tr>
-                  <th>#</th>
-                  <th>MEMBER</th>
-                  <th>WORKOUT</th>
-                  <th>TYPE</th>
-                  <th>EXERCISES</th>
-                  <th>START</th>
-                  <th>END</th>
-                  <th>STATUS</th>
-                  <th>ACTION</th>
-                </tr>
-
-              </thead>
-
-              <tbody>
-
-                {workouts.map(
-                  (workout, index) => (
-
-                    <tr
-                      key={
-                        workout._id ||
-                        index
-                      }
-                    >
-
-                      <td>
-                        {String(
-                          index + 1
-                        ).padStart(2, '0')}
-                      </td>
-
-                      <td>
-                        <strong>
-                          {workout.member?.name ||
-                            'Unknown Member'}
-                        </strong>
-                      </td>
-
-                      <td>
-                        {workout.workoutName}
-                      </td>
-
-                      <td>
-                        <span className="goal-badge">
-                          {workout.workoutType}
-                        </span>
-                      </td>
-
-                      <td>
-                        {workout.exercises?.length ||
-                          0}
-                      </td>
-
-                      <td>
-                        {workout.startDate
-                          ? new Date(
-                              workout.startDate
-                            ).toLocaleDateString(
-                              'en-IN'
-                            )
-                          : '-'}
-                      </td>
-
-                      <td>
-                        {workout.endDate
-                          ? new Date(
-                              workout.endDate
-                            ).toLocaleDateString(
-                              'en-IN'
-                            )
-                          : '-'}
-                      </td>
-
-                      <td>
-                        <span className="goal-badge">
-                          {workout.status}
-                        </span>
-                      </td>
-
-                      <td>
-
-                        <button
-                          type="button"
-                          className="admin-edit-btn"
-                          onClick={() =>
-                            handleEditWorkout(
-                              workout
-                            )
-                          }
-                        >
-                          EDIT
-                        </button>
-
-                        <button
-                          type="button"
-                          className="admin-delete-btn"
-                          onClick={() =>
-                            handleDeleteWorkout(
-                              workout._id
-                            )
-                          }
-                        >
-                          DELETE
-                        </button>
-
-                      </td>
-
-                    </tr>
-
-                  )
-                )}
-
-              </tbody>
-
-            </table>
-
-          </div>
-
-        )}
-
-      </section>
-
-      {/* =====================================================
-          MEMBER ENQUIRIES
-      ===================================================== */}
-
-      <section className="admin-enquiries">
-
-        <div className="admin-section-heading">
-
-          <div>
-
-            <span className="section-tag">
-              CONTACT REQUESTS
-            </span>
-
-            <h2>
-              MEMBER <span>ENQUIRIES.</span>
-            </h2>
-
-          </div>
-
-          <span className="admin-count">
-            {contacts.length} RECORDS
-          </span>
-
-        </div>
-
-        {loading && (
-
-          <div className="admin-message">
-            Loading enquiries...
-          </div>
-
-        )}
-
-        {!loading &&
-          error && (
-
-            <div className="admin-message admin-error">
-              {error}
-            </div>
-
-          )}
-
-        {!loading &&
-          !error &&
-          contacts.length === 0 && (
-
-            <div className="admin-message">
-              No enquiries found.
-            </div>
-
-          )}
-
-        {!loading &&
-          !error &&
-          contacts.length > 0 && (
-
-            <div className="admin-table-wrapper">
-
-              <table className="admin-table">
-
-                <thead>
-
-                  <tr>
-                    <th>#</th>
-                    <th>NAME</th>
-                    <th>PHONE</th>
-                    <th>GOAL</th>
-                    <th>MESSAGE</th>
-                    <th>DATE</th>
-                    <th>ACTION</th>
-                  </tr>
-
-                </thead>
-
-                <tbody>
-
-                  {contacts.map(
-                    (contact, index) => (
-
-                      <tr
-                        key={
-                          contact._id ||
-                          index
-                        }
-                      >
-
-                        <td>
-                          {String(
-                            index + 1
-                          ).padStart(2, '0')}
-                        </td>
-
-                        <td>
-
-                          <strong>
-                            {contact.name}
-                          </strong>
-
-                        </td>
-
-                        <td>
-                          {contact.phone}
-                        </td>
-
-                        <td>
-
-                          <span className="goal-badge">
-                            {contact.goal}
-                          </span>
-
-                        </td>
-
-                        <td className="message-cell">
-
-                          {contact.message ||
-                            'No message'}
-
-                        </td>
-
-                        <td>
-
-                          {contact.createdAt
-                            ? new Date(
-                                contact.createdAt
-                              ).toLocaleDateString(
-                                'en-IN'
-                              )
-                            : '-'}
-
-                        </td>
-
-                        <td>
-
-                          <button
-                            type="button"
-                            className="admin-delete-btn"
-                            onClick={() =>
-                              handleDeleteContact(
-                                contact._id
-                              )
-                            }
-                          >
-                            DELETE
-                          </button>
-
-                        </td>
-
-                      </tr>
-
-                    )
-                  )}
-
-                </tbody>
-
-              </table>
-
-            </div>
-
-          )}
-
-      </section>
+      <h2>
+        MEMBER <span>MANAGEMENT.</span>
+      </h2>
 
     </div>
-  );
+
+    <div className="admin-section-actions">
+
+      <span className="admin-count">
+        {filteredMembers.length} / {members.length} MEMBERS
+      </span>
+
+      {can('members', 'add') && (
+        <button
+          type="button"
+          className="admin-add-btn"
+          onClick={() => {
+
+            setShowAddMember(
+              (current) => !current
+            );
+
+            setEditingMember(null);
+
+            setMemberFormError('');
+            setEditMemberError('');
+            setMemberSuccess('');
+
+          }}
+        >
+          {showAddMember
+            ? '✕ CLOSE'
+            : '+ ADD MEMBER'}
+        </button>
+      )}
+
+    </div>
+
+  </div>
+
+
+  {/* =========================
+      MEMBER FORM
+  ========================= */}
+
+  {showAddMember && (
+
+    <div className="admin-add-member-card">
+
+      <div className="admin-form-heading">
+
+        <span className="section-tag">
+          {editingMember
+            ? 'EDIT MEMBER'
+            : 'NEW MEMBER'}
+        </span>
+
+        <h3>
+          {editingMember
+            ? 'EDIT '
+            : 'ADD '}
+
+          <span>
+            MEMBER.
+          </span>
+        </h3>
+
+      </div>
+
+
+      <form
+        className="admin-member-form"
+        onSubmit={
+          editingMember
+            ? handleUpdateMember
+            : handleAddMember
+        }
+      >
+
+        <div className="admin-login-field">
+
+          <label htmlFor="member-name">
+            FULL NAME
+          </label>
+
+          <input
+            id="member-name"
+            name="name"
+            type="text"
+            placeholder="Enter member name"
+            value={memberForm.name}
+            onChange={handleMemberChange}
+            required
+          />
+
+        </div>
+
+
+        <div className="admin-login-field">
+
+          <label htmlFor="member-phone">
+            PHONE
+          </label>
+
+          <input
+            id="member-phone"
+            name="phone"
+            type="tel"
+            placeholder="9876543210"
+            value={memberForm.phone}
+            onChange={handleMemberChange}
+            required
+          />
+
+        </div>
+
+
+        <div className="admin-login-field">
+
+          <label htmlFor="member-email">
+            EMAIL
+          </label>
+
+          <input
+            id="member-email"
+            name="email"
+            type="email"
+            placeholder="member@example.com"
+            value={memberForm.email}
+            onChange={handleMemberChange}
+          />
+
+        </div>
+
+
+        <div className="admin-login-field">
+
+          <label htmlFor="member-age">
+            AGE
+          </label>
+
+          <input
+            id="member-age"
+            name="age"
+            type="number"
+            min="1"
+            max="100"
+            placeholder="25"
+            value={memberForm.age}
+            onChange={handleMemberChange}
+          />
+
+        </div>
+
+
+        <div className="admin-login-field">
+
+          <label htmlFor="member-gender">
+            GENDER
+          </label>
+
+          <select
+            id="member-gender"
+            name="gender"
+            value={memberForm.gender}
+            onChange={handleMemberChange}
+          >
+
+            <option value="Male">
+              Male
+            </option>
+
+            <option value="Female">
+              Female
+            </option>
+
+            <option value="Other">
+              Other
+            </option>
+
+          </select>
+
+        </div>
+
+
+        <div className="admin-login-field">
+
+          <label htmlFor="membership-plan">
+            MEMBERSHIP PLAN
+          </label>
+
+          <select
+            id="membership-plan"
+            name="membershipPlan"
+            value={memberForm.membershipPlan}
+            onChange={handleMemberChange}
+          >
+
+            <option value="Monthly">
+              Monthly
+            </option>
+
+            <option value="Quarterly">
+              Quarterly
+            </option>
+
+            <option value="Half-Yearly">
+              Half-Yearly
+            </option>
+
+            <option value="Yearly">
+              Yearly
+            </option>
+
+          </select>
+
+        </div>
+
+
+        <div className="admin-login-field">
+
+          <label htmlFor="start-date">
+            MEMBERSHIP START DATE
+          </label>
+
+          <input
+            id="start-date"
+            name="membershipStartDate"
+            type="date"
+            value={memberForm.membershipStartDate}
+            onChange={handleMemberChange}
+            required
+          />
+
+        </div>
+
+
+        <div className="admin-login-field">
+
+          <label htmlFor="end-date">
+            MEMBERSHIP END DATE
+          </label>
+
+          <input
+            id="end-date"
+            name="membershipEndDate"
+            type="date"
+            value={memberForm.membershipEndDate}
+            onChange={handleMemberChange}
+            required
+          />
+
+        </div>
+
+
+        <div className="admin-login-field">
+
+          <label htmlFor="member-amount">
+            MEMBERSHIP AMOUNT
+          </label>
+
+          <input
+            id="member-amount"
+            name="amount"
+            type="number"
+            min="0"
+            placeholder="1500"
+            value={memberForm.amount}
+            onChange={handleMemberChange}
+            required
+          />
+
+        </div>
+
+
+        {memberFormError && (
+          <div className="admin-login-error">
+            {memberFormError}
+          </div>
+        )}
+
+
+        {editMemberError && (
+          <div className="admin-login-error">
+            {editMemberError}
+          </div>
+        )}
+
+
+        {memberSuccess && (
+          <div className="admin-member-success">
+            {memberSuccess}
+          </div>
+        )}
+
+
+        <div className="admin-form-actions">
+
+          <button
+            type="button"
+            className="admin-cancel-btn"
+            onClick={() => {
+
+              setShowAddMember(false);
+              setEditingMember(null);
+
+              setMemberFormError('');
+              setEditMemberError('');
+              setMemberSuccess('');
+
+            }}
+          >
+            CANCEL
+          </button>
+
+
+          <button
+            type="submit"
+            className="admin-add-submit-btn"
+            disabled={
+              addingMember ||
+              updatingMember
+            }
+          >
+
+            {addingMember || updatingMember
+              ? editingMember
+                ? 'UPDATING MEMBER...'
+                : 'ADDING MEMBER...'
+              : editingMember
+                ? 'UPDATE MEMBER →'
+                : 'ADD MEMBER →'}
+
+          </button>
+
+        </div>
+
+      </form>
+
+    </div>
+
+  )}
+
+
+  {/* =========================
+      MEMBER SEARCH & FILTER
+  ========================= */}
+
+  {!membersLoading &&
+    !membersError &&
+    members.length > 0 && (
+
+      <div className="admin-member-filters">
+
+        <input
+          type="text"
+          placeholder="Search by name or phone..."
+          value={memberSearch}
+          onChange={(e) =>
+            setMemberSearch(e.target.value)
+          }
+        />
+
+        <select
+          value={memberStatusFilter}
+          onChange={(e) =>
+            setMemberStatusFilter(e.target.value)
+          }
+        >
+
+          <option value="All">
+            All Members
+          </option>
+
+          <option value="Active">
+            Active
+          </option>
+
+          <option value="Expired">
+            Expired
+          </option>
+
+        </select>
+
+      </div>
+
+    )}
+
+
+  {membersLoading && (
+    <div className="admin-message">
+      Loading members...
+    </div>
+  )}
+
+
+  {!membersLoading && membersError && (
+    <div className="admin-message admin-error">
+      {membersError}
+    </div>
+  )}
+
+
+  {!membersLoading &&
+    !membersError &&
+    members.length === 0 && (
+
+      <div className="admin-message">
+        No members found.
+      </div>
+
+    )}
+
+
+  {!membersLoading &&
+    !membersError &&
+    filteredMembers.length > 0 && (
+
+      <div className="admin-table-wrapper">
+
+        <table className="admin-table">
+
+          <thead>
+
+            <tr>
+              <th>#</th>
+              <th>NAME</th>
+              <th>PHONE</th>
+              <th>PLAN</th>
+              <th>AMOUNT</th>
+              <th>START</th>
+              <th>END</th>
+              <th>STATUS</th>
+              <th>ACTION</th>
+            </tr>
+
+          </thead>
+
+
+          <tbody>
+
+            {filteredMembers.map(
+              (member, index) => (
+
+                <tr
+                  key={
+                    member._id ||
+                    index
+                  }
+                >
+
+                  <td>
+                    {String(
+                      index + 1
+                    ).padStart(2, '0')}
+                  </td>
+
+                  <td>
+                    <strong>
+                      {member.name}
+                    </strong>
+                  </td>
+
+                  <td>
+                    {member.phone}
+                  </td>
+
+                  <td>
+                    <span className="goal-badge">
+                      {member.membershipPlan}
+                    </span>
+                  </td>
+
+                  <td>
+                    ₹
+                    {Number(
+                      member.amount
+                    ).toLocaleString('en-IN')}
+                  </td>
+
+                  <td>
+                    {member.membershipStartDate
+                      ? new Date(
+                          member.membershipStartDate
+                        ).toLocaleDateString('en-IN')
+                      : '-'}
+                  </td>
+
+                  <td>
+                    {member.membershipEndDate
+                      ? new Date(
+                          member.membershipEndDate
+                        ).toLocaleDateString('en-IN')
+                      : '-'}
+                  </td>
+
+                  <td>
+                    <span className="goal-badge">
+                      {member.status}
+                    </span>
+                  </td>
+
+                  <td>
+
+                    <button
+                      type="button"
+                      className="admin-view-btn"
+                      onClick={() =>
+                        navigate(
+                          `/admin/members/${member._id}`
+                        )
+                      }
+                    >
+                      VIEW
+                    </button>
+
+
+                    {can('members', 'edit') && (
+                      <button
+                        type="button"
+                        className="admin-edit-btn"
+                        onClick={() =>
+                          handleEditMember(member)
+                        }
+                      >
+                        EDIT
+                      </button>
+                    )}
+
+
+                    {can('members', 'delete') && (
+                      <button
+                        type="button"
+                        className="admin-delete-btn"
+                        onClick={() =>
+                          handleDeleteMember(
+                            member._id
+                          )
+                        }
+                      >
+                        DELETE
+                      </button>
+                    )}
+
+                  </td>
+
+                </tr>
+
+              )
+            )}
+
+          </tbody>
+
+        </table>
+
+      </div>
+
+    )}
+
+
+</section>
+
+
+{!membersLoading &&
+  !membersError &&
+  members.length > 0 &&
+  filteredMembers.length === 0 && (
+
+    <div className="admin-message">
+      No members match your search or filter.
+    </div>
+
+  )}
+
+
+{/* =====================================================
+    PAYMENT MANAGEMENT
+===================================================== */}
+
+<section className="admin-enquiries">
+
+  <div className="admin-section-heading">
+
+    <div>
+
+      <span className="section-tag">
+        FINANCE
+      </span>
+
+      <h2>
+        PAYMENT <span>MANAGEMENT.</span>
+      </h2>
+
+    </div>
+
+
+    <div className="admin-section-actions">
+
+      <span className="admin-count">
+        {payments.length} PAYMENTS
+      </span>
+
+
+      {can('payments', 'add') && (
+        <button
+          type="button"
+          className="admin-add-btn"
+          onClick={() => {
+
+            setShowAddPayment(
+              (current) => !current
+            );
+
+            setEditingPayment(null);
+
+            setPaymentFormError('');
+            setEditPaymentError('');
+            setPaymentSuccess('');
+
+          }}
+        >
+          {showAddPayment
+            ? '✕ CLOSE'
+            : '+ ADD PAYMENT'}
+        </button>
+      )}
+
+    </div>
+
+  </div>
+
+
+  {/* =========================
+      PAYMENT FORM
+  ========================= */}
+
+  {showAddPayment && (
+
+    <div className="admin-add-member-card">
+
+      <div className="admin-form-heading">
+
+        <span className="section-tag">
+          {editingPayment
+            ? 'EDIT PAYMENT'
+            : 'NEW PAYMENT'}
+        </span>
+
+        <h3>
+          {editingPayment
+            ? 'EDIT '
+            : 'ADD '}
+
+          <span>
+            PAYMENT.
+          </span>
+        </h3>
+
+      </div>
+
+
+      <form
+        className="admin-member-form"
+        onSubmit={
+          editingPayment
+            ? handleUpdatePayment
+            : handleAddPayment
+        }
+      >
+
+        <div className="admin-login-field">
+
+          <label htmlFor="payment-member">
+            MEMBER
+          </label>
+
+          <select
+            id="payment-member"
+            name="member"
+            value={paymentForm.member}
+            onChange={handlePaymentChange}
+            required
+          >
+
+            <option value="">
+              Select member
+            </option>
+
+            {members.map(
+              (member) => (
+
+                <option
+                  key={member._id}
+                  value={member._id}
+                >
+                  {member.name} — {member.phone}
+                </option>
+
+              )
+            )}
+
+          </select>
+
+        </div>
+
+
+        <div className="admin-login-field">
+
+          <label htmlFor="invoice-number">
+            INVOICE NUMBER
+          </label>
+
+          <input
+            id="invoice-number"
+            name="invoiceNumber"
+            type="text"
+            placeholder="INV-001"
+            value={paymentForm.invoiceNumber}
+            onChange={handlePaymentChange}
+            required
+          />
+
+        </div>
+
+
+        <div className="admin-login-field">
+
+          <label htmlFor="payment-amount">
+            AMOUNT
+          </label>
+
+          <input
+            id="payment-amount"
+            name="amount"
+            type="number"
+            min="0"
+            placeholder="1500"
+            value={paymentForm.amount}
+            onChange={handlePaymentChange}
+            required
+          />
+
+        </div>
+
+
+        <div className="admin-login-field">
+
+          <label htmlFor="payment-method">
+            PAYMENT METHOD
+          </label>
+
+          <select
+            id="payment-method"
+            name="paymentMethod"
+            value={paymentForm.paymentMethod}
+            onChange={handlePaymentChange}
+          >
+
+            <option value="Cash">
+              Cash
+            </option>
+
+            <option value="UPI">
+              UPI
+            </option>
+
+            <option value="Card">
+              Card
+            </option>
+
+            <option value="Bank Transfer">
+              Bank Transfer
+            </option>
+
+          </select>
+
+        </div>
+
+
+        <div className="admin-login-field">
+
+          <label htmlFor="payment-date">
+            PAYMENT DATE
+          </label>
+
+          <input
+            id="payment-date"
+            name="paymentDate"
+            type="date"
+            value={paymentForm.paymentDate}
+            onChange={handlePaymentChange}
+          />
+
+        </div>
+
+
+        <div className="admin-login-field">
+
+          <label htmlFor="payment-status">
+            STATUS
+          </label>
+
+          <select
+            id="payment-status"
+            name="status"
+            value={paymentForm.status}
+            onChange={handlePaymentChange}
+          >
+
+            <option value="Paid">
+              Paid
+            </option>
+
+            <option value="Pending">
+              Pending
+            </option>
+
+            <option value="Failed">
+              Failed
+            </option>
+
+          </select>
+
+        </div>
+
+
+        <div className="admin-login-field">
+
+          <label htmlFor="payment-notes">
+            NOTES
+          </label>
+
+          <input
+            id="payment-notes"
+            name="notes"
+            type="text"
+            placeholder="Optional payment notes"
+            value={paymentForm.notes}
+            onChange={handlePaymentChange}
+          />
+
+        </div>
+
+
+        {paymentFormError && (
+          <div className="admin-login-error">
+            {paymentFormError}
+          </div>
+        )}
+
+
+        {editPaymentError && (
+          <div className="admin-login-error">
+            {editPaymentError}
+          </div>
+        )}
+
+
+        {paymentSuccess && (
+          <div className="admin-member-success">
+            {paymentSuccess}
+          </div>
+        )}
+
+
+        <div className="admin-form-actions">
+
+          <button
+            type="button"
+            className="admin-cancel-btn"
+            onClick={() => {
+
+              setShowAddPayment(false);
+              setEditingPayment(null);
+
+              setPaymentFormError('');
+              setEditPaymentError('');
+              setPaymentSuccess('');
+
+            }}
+          >
+            CANCEL
+          </button>
+
+
+          <button
+            type="submit"
+            className="admin-add-submit-btn"
+            disabled={
+              addingPayment ||
+              updatingPayment
+            }
+          >
+
+            {addingPayment || updatingPayment
+              ? editingPayment
+                ? 'UPDATING PAYMENT...'
+                : 'ADDING PAYMENT...'
+              : editingPayment
+                ? 'UPDATE PAYMENT →'
+                : 'ADD PAYMENT →'}
+
+          </button>
+
+        </div>
+
+      </form>
+
+    </div>
+
+  )}
+
+
+  {paymentsLoading && (
+    <div className="admin-message">
+      Loading payments...
+    </div>
+  )}
+
+
+  {!paymentsLoading && paymentsError && (
+    <div className="admin-message admin-error">
+      {paymentsError}
+    </div>
+  )}
+
+
+  {!paymentsLoading &&
+    !paymentsError &&
+    payments.length === 0 && (
+
+      <div className="admin-message">
+        No payments found.
+      </div>
+
+    )}
+
+
+  {!paymentsLoading &&
+    !paymentsError &&
+    payments.length > 0 && (
+
+      <div className="admin-table-wrapper">
+
+        <table className="admin-table">
+
+          <thead>
+
+            <tr>
+              <th>#</th>
+              <th>MEMBER</th>
+              <th>INVOICE</th>
+              <th>AMOUNT</th>
+              <th>METHOD</th>
+              <th>DATE</th>
+              <th>STATUS</th>
+              <th>ACTION</th>
+            </tr>
+
+          </thead>
+
+
+          <tbody>
+
+            {payments.map(
+              (payment, index) => (
+
+                <tr
+                  key={
+                    payment._id ||
+                    index
+                  }
+                >
+
+                  <td>
+                    {String(
+                      index + 1
+                    ).padStart(2, '0')}
+                  </td>
+
+                  <td>
+                    <strong>
+                      {payment.member?.name ||
+                        'Unknown Member'}
+                    </strong>
+                  </td>
+
+                  <td>
+                    {payment.invoiceNumber}
+                  </td>
+
+                  <td>
+                    ₹
+                    {Number(
+                      payment.amount
+                    ).toLocaleString('en-IN')}
+                  </td>
+
+                  <td>
+                    <span className="goal-badge">
+                      {payment.paymentMethod}
+                    </span>
+                  </td>
+
+                  <td>
+                    {payment.paymentDate
+                      ? new Date(
+                          payment.paymentDate
+                        ).toLocaleDateString('en-IN')
+                      : '-'}
+                  </td>
+
+                  <td>
+                    <span className="goal-badge">
+                      {payment.status}
+                    </span>
+                  </td>
+
+                  <td>
+
+                    <button
+                      type="button"
+                      className="admin-view-btn"
+                      onClick={() =>
+                        navigate(
+                          `/admin/payments/${payment._id}/receipt`
+                        )
+                      }
+                    >
+                      RECEIPT
+                    </button>
+
+
+                    {can('payments', 'edit') && (
+                      <button
+                        type="button"
+                        className="admin-edit-btn"
+                        onClick={() =>
+                          handleEditPayment(payment)
+                        }
+                      >
+                        EDIT
+                      </button>
+                    )}
+
+
+                    {can('payments', 'delete') && (
+                      <button
+                        type="button"
+                        className="admin-delete-btn"
+                        onClick={() =>
+                          handleDeletePayment(
+                            payment._id
+                          )
+                        }
+                      >
+                        DELETE
+                      </button>
+                    )}
+
+                  </td>
+
+                </tr>
+
+              )
+            )}
+
+          </tbody>
+
+        </table>
+
+      </div>
+
+    )}
+
+</section>
+
+
+{/* =====================================================
+    ATTENDANCE MANAGEMENT
+===================================================== */}
+
+<section className="admin-enquiries">
+
+  <div className="admin-section-heading">
+
+    <div>
+
+      <span className="section-tag">
+        GYM ACTIVITY
+      </span>
+
+      <h2>
+        ATTENDANCE <span>MANAGEMENT.</span>
+      </h2>
+
+    </div>
+
+
+    <div className="admin-section-actions">
+
+      <span className="admin-count">
+        {attendance.length} RECORDS
+      </span>
+
+
+      {can('attendance', 'add') && (
+        <button
+          type="button"
+          className="admin-add-btn"
+          onClick={() => {
+
+            setShowAddAttendance(
+              (current) => !current
+            );
+
+            setEditingAttendance(null);
+
+            setAttendanceFormError('');
+            setEditAttendanceError('');
+            setAttendanceSuccess('');
+
+          }}
+        >
+          {showAddAttendance
+            ? '✕ CLOSE'
+            : '+ MARK ATTENDANCE'}
+        </button>
+      )}
+
+    </div>
+
+  </div>
+
+
+  {/* =========================
+      ATTENDANCE FORM
+  ========================= */}
+
+  {showAddAttendance && (
+
+    <div className="admin-add-member-card">
+
+      <div className="admin-form-heading">
+
+        <span className="section-tag">
+          {editingAttendance
+            ? 'EDIT ATTENDANCE'
+            : 'NEW ATTENDANCE'}
+        </span>
+
+        <h3>
+          {editingAttendance
+            ? 'EDIT '
+            : 'MARK '}
+
+          <span>
+            ATTENDANCE.
+          </span>
+        </h3>
+
+      </div>
+
+
+      <form
+        className="admin-member-form"
+        onSubmit={
+          editingAttendance
+            ? handleUpdateAttendance
+            : handleMarkAttendance
+        }
+      >
+
+        <div className="admin-login-field">
+
+          <label htmlFor="attendance-member">
+            MEMBER
+          </label>
+
+          <select
+            id="attendance-member"
+            name="member"
+            value={attendanceForm.member}
+            onChange={handleAttendanceChange}
+            required
+          >
+
+            <option value="">
+              Select member
+            </option>
+
+            {members.map(
+              (member) => (
+
+                <option
+                  key={member._id}
+                  value={member._id}
+                >
+                  {member.name} — {member.phone}
+                </option>
+
+              )
+            )}
+
+          </select>
+
+        </div>
+
+
+        <div className="admin-login-field">
+
+          <label htmlFor="attendance-date">
+            DATE
+          </label>
+
+          <input
+            id="attendance-date"
+            name="date"
+            type="date"
+            value={attendanceForm.date}
+            onChange={handleAttendanceChange}
+            required
+          />
+
+        </div>
+
+
+        <div className="admin-login-field">
+
+          <label htmlFor="check-in-time">
+            CHECK-IN TIME
+          </label>
+
+          <input
+            id="check-in-time"
+            name="checkInTime"
+            type="time"
+            value={attendanceForm.checkInTime}
+            onChange={handleAttendanceChange}
+          />
+
+        </div>
+
+
+        <div className="admin-login-field">
+
+          <label htmlFor="check-out-time">
+            CHECK-OUT TIME
+          </label>
+
+          <input
+            id="check-out-time"
+            name="checkOutTime"
+            type="time"
+            value={attendanceForm.checkOutTime}
+            onChange={handleAttendanceChange}
+          />
+
+        </div>
+
+
+        <div className="admin-login-field">
+
+          <label htmlFor="attendance-status">
+            STATUS
+          </label>
+
+          <select
+            id="attendance-status"
+            name="status"
+            value={attendanceForm.status}
+            onChange={handleAttendanceChange}
+          >
+
+            <option value="Present">
+              Present
+            </option>
+
+            <option value="Absent">
+              Absent
+            </option>
+
+          </select>
+
+        </div>
+
+
+        {attendanceFormError && (
+          <div className="admin-login-error">
+            {attendanceFormError}
+          </div>
+        )}
+
+
+        {editAttendanceError && (
+          <div className="admin-login-error">
+            {editAttendanceError}
+          </div>
+        )}
+
+
+        {attendanceSuccess && (
+          <div className="admin-member-success">
+            {attendanceSuccess}
+          </div>
+        )}
+
+
+        <div className="admin-form-actions">
+
+          <button
+            type="button"
+            className="admin-cancel-btn"
+            onClick={() => {
+
+              setShowAddAttendance(false);
+              setEditingAttendance(null);
+
+              setAttendanceFormError('');
+              setEditAttendanceError('');
+              setAttendanceSuccess('');
+
+            }}
+          >
+            CANCEL
+          </button>
+
+
+          <button
+            type="submit"
+            className="admin-add-submit-btn"
+            disabled={
+              addingAttendance ||
+              updatingAttendance
+            }
+          >
+
+            {addingAttendance || updatingAttendance
+              ? editingAttendance
+                ? 'UPDATING ATTENDANCE...'
+                : 'MARKING ATTENDANCE...'
+              : editingAttendance
+                ? 'UPDATE ATTENDANCE →'
+                : 'MARK ATTENDANCE →'}
+
+          </button>
+
+        </div>
+
+      </form>
+
+    </div>
+
+  )}
+
+
+  {attendanceLoading && (
+    <div className="admin-message">
+      Loading attendance...
+    </div>
+  )}
+
+
+  {!attendanceLoading && attendanceError && (
+    <div className="admin-message admin-error">
+      {attendanceError}
+    </div>
+  )}
+
+
+  {!attendanceLoading &&
+    !attendanceError &&
+    attendance.length === 0 && (
+
+      <div className="admin-message">
+        No attendance records found.
+      </div>
+
+    )}
+
+
+  {!attendanceLoading &&
+    !attendanceError &&
+    attendance.length > 0 && (
+
+      <div className="admin-table-wrapper">
+
+        <table className="admin-table">
+
+          <thead>
+
+            <tr>
+              <th>#</th>
+              <th>MEMBER</th>
+              <th>DATE</th>
+              <th>CHECK-IN</th>
+              <th>CHECK-OUT</th>
+              <th>STATUS</th>
+              <th>ACTION</th>
+            </tr>
+
+          </thead>
+
+
+          <tbody>
+
+            {attendance.map(
+              (record, index) => (
+
+                <tr
+                  key={
+                    record._id ||
+                    index
+                  }
+                >
+
+                  <td>
+                    {String(
+                      index + 1
+                    ).padStart(2, '0')}
+                  </td>
+
+                  <td>
+                    <strong>
+                      {record.member?.name ||
+                        'Unknown Member'}
+                    </strong>
+                  </td>
+
+                  <td>
+                    {record.date
+                      ? new Date(
+                          record.date
+                        ).toLocaleDateString('en-IN')
+                      : '-'}
+                  </td>
+
+                  <td>
+                    {record.checkInTime
+                      ? new Date(
+                          record.checkInTime
+                        ).toLocaleTimeString(
+                          'en-IN',
+                          {
+                            hour: '2-digit',
+                            minute: '2-digit',
+                          }
+                        )
+                      : '-'}
+                  </td>
+
+                  <td>
+                    {record.checkOutTime
+                      ? new Date(
+                          record.checkOutTime
+                        ).toLocaleTimeString(
+                          'en-IN',
+                          {
+                            hour: '2-digit',
+                            minute: '2-digit',
+                          }
+                        )
+                      : '-'}
+                  </td>
+
+                  <td>
+                    <span className="goal-badge">
+                      {record.status}
+                    </span>
+                  </td>
+
+                  <td>
+
+                    {can('attendance', 'edit') && (
+                      <button
+                        type="button"
+                        className="admin-edit-btn"
+                        onClick={() =>
+                          handleEditAttendance(record)
+                        }
+                      >
+                        EDIT
+                      </button>
+                    )}
+
+
+                    {can('attendance', 'delete') && (
+                      <button
+                        type="button"
+                        className="admin-delete-btn"
+                        onClick={() =>
+                          handleDeleteAttendance(
+                            record._id
+                          )
+                        }
+                      >
+                        DELETE
+                      </button>
+                    )}
+
+                  </td>
+
+                </tr>
+
+              )
+            )}
+
+          </tbody>
+
+        </table>
+
+      </div>
+
+    )}
+
+</section>
+
+
+{/* =====================================================
+    WORKOUT MANAGEMENT
+===================================================== */}
+
+<section className="admin-enquiries">
+
+  <div className="admin-section-heading">
+
+    <div>
+
+      <span className="section-tag">
+        TRAINING
+      </span>
+
+      <h2>
+        WORKOUT <span>MANAGEMENT.</span>
+      </h2>
+
+    </div>
+
+
+    <div className="admin-section-actions">
+
+      <span className="admin-count">
+        {workouts.length} WORKOUTS
+      </span>
+
+
+      {can('workouts', 'add') && (
+        <button
+          type="button"
+          className="admin-add-btn"
+          onClick={() => {
+
+            setShowAddWorkout(
+              (current) => !current
+            );
+
+            setEditingWorkout(null);
+            resetWorkoutForm();
+
+            setWorkoutFormError('');
+            setEditWorkoutError('');
+            setWorkoutSuccess('');
+
+          }}
+        >
+          {showAddWorkout
+            ? '✕ CLOSE'
+            : '+ ADD WORKOUT'}
+        </button>
+      )}
+
+    </div>
+
+  </div>
+
+
+  {/* =========================
+      WORKOUT FORM
+  ========================= */}
+
+  {showAddWorkout && (
+
+    <div className="admin-add-member-card">
+
+      <div className="admin-form-heading">
+
+        <span className="section-tag">
+          {editingWorkout
+            ? 'EDIT WORKOUT'
+            : 'NEW WORKOUT'}
+        </span>
+
+        <h3>
+          {editingWorkout
+            ? 'EDIT '
+            : 'ADD '}
+
+          <span>
+            WORKOUT.
+          </span>
+        </h3>
+
+      </div>
+
+
+      <form
+        className="admin-member-form"
+        onSubmit={
+          editingWorkout
+            ? handleUpdateWorkout
+            : handleAddWorkout
+        }
+      >
+
+        <div className="admin-login-field">
+
+          <label htmlFor="workout-member">
+            MEMBER
+          </label>
+
+          <select
+            id="workout-member"
+            name="member"
+            value={workoutForm.member}
+            onChange={handleWorkoutChange}
+            required
+          >
+
+            <option value="">
+              Select member
+            </option>
+
+            {members.map(
+              (member) => (
+
+                <option
+                  key={member._id}
+                  value={member._id}
+                >
+                  {member.name} — {member.phone}
+                </option>
+
+              )
+            )}
+
+          </select>
+
+        </div>
+
+
+        <div className="admin-login-field">
+
+          <label htmlFor="workout-name">
+            WORKOUT NAME
+          </label>
+
+          <input
+            id="workout-name"
+            name="workoutName"
+            type="text"
+            placeholder="Beginner Strength Program"
+            value={workoutForm.workoutName}
+            onChange={handleWorkoutChange}
+            required
+          />
+
+        </div>
+
+
+        <div className="admin-login-field">
+
+          <label htmlFor="workout-type">
+            WORKOUT TYPE
+          </label>
+
+          <select
+            id="workout-type"
+            name="workoutType"
+            value={workoutForm.workoutType}
+            onChange={handleWorkoutChange}
+          >
+
+            <option value="Strength">
+              Strength
+            </option>
+
+            <option value="Cardio">
+              Cardio
+            </option>
+
+            <option value="Flexibility">
+              Flexibility
+            </option>
+
+            <option value="HIIT">
+              HIIT
+            </option>
+
+            <option value="General">
+              General
+            </option>
+
+          </select>
+
+        </div>
+
+
+        <div className="admin-login-field">
+
+          <label>
+            EXERCISES
+          </label>
+
+
+          <div
+            style={{
+              display: 'grid',
+              gap: '12px',
+            }}
+          >
+
+            {workoutForm.exercises.map(
+              (exercise, index) => (
+
+                <div
+                  key={index}
+                  style={{
+                    display: 'grid',
+                    gap: '10px',
+                    padding: '16px',
+                    border:
+                      '1px solid rgba(255,255,255,0.12)',
+                  }}
+                >
+
+                  <strong>
+                    EXERCISE {String(
+                      index + 1
+                    ).padStart(2, '0')}
+                  </strong>
+
+
+                  <input
+                    type="text"
+                    placeholder="Exercise name"
+                    value={exercise.name}
+                    onChange={(e) =>
+                      handleExerciseChange(
+                        index,
+                        'name',
+                        e.target.value
+                      )
+                    }
+                    required
+                  />
+
+
+                  <div
+                    style={{
+                      display: 'grid',
+                      gridTemplateColumns:
+                        'repeat(3, minmax(0, 1fr))',
+                      gap: '10px',
+                    }}
+                  >
+
+                    <input
+                      type="number"
+                      min="0"
+                      placeholder="Sets"
+                      value={exercise.sets}
+                      onChange={(e) =>
+                        handleExerciseChange(
+                          index,
+                          'sets',
+                          e.target.value
+                        )
+                      }
+                    />
+
+                    <input
+                      type="number"
+                      min="0"
+                      placeholder="Reps"
+                      value={exercise.reps}
+                      onChange={(e) =>
+                        handleExerciseChange(
+                          index,
+                          'reps',
+                          e.target.value
+                        )
+                      }
+                    />
+
+                    <input
+                      type="number"
+                      min="0"
+                      placeholder="Duration (min)"
+                      value={exercise.duration}
+                      onChange={(e) =>
+                        handleExerciseChange(
+                          index,
+                          'duration',
+                          e.target.value
+                        )
+                      }
+                    />
+
+                  </div>
+
+
+                  <input
+                    type="text"
+                    placeholder="Exercise notes (optional)"
+                    value={exercise.notes}
+                    onChange={(e) =>
+                      handleExerciseChange(
+                        index,
+                        'notes',
+                        e.target.value
+                      )
+                    }
+                  />
+
+
+                  {workoutForm.exercises.length > 1 && (
+                    <button
+                      type="button"
+                      className="admin-delete-btn"
+                      onClick={() =>
+                        handleRemoveExercise(index)
+                      }
+                    >
+                      REMOVE EXERCISE
+                    </button>
+                  )}
+
+                </div>
+
+              )
+            )}
+
+
+            <button
+              type="button"
+              className="admin-edit-btn"
+              onClick={handleAddExercise}
+            >
+              + ADD EXERCISE
+            </button>
+
+          </div>
+
+        </div>
+
+
+        <div className="admin-login-field">
+
+          <label htmlFor="workout-start-date">
+            START DATE
+          </label>
+
+          <input
+            id="workout-start-date"
+            name="startDate"
+            type="date"
+            value={workoutForm.startDate}
+            onChange={handleWorkoutChange}
+            required
+          />
+
+        </div>
+
+
+        <div className="admin-login-field">
+
+          <label htmlFor="workout-end-date">
+            END DATE
+          </label>
+
+          <input
+            id="workout-end-date"
+            name="endDate"
+            type="date"
+            value={workoutForm.endDate}
+            onChange={handleWorkoutChange}
+            required
+          />
+
+        </div>
+
+
+        <div className="admin-login-field">
+
+          <label htmlFor="workout-status">
+            STATUS
+          </label>
+
+          <select
+            id="workout-status"
+            name="status"
+            value={workoutForm.status}
+            onChange={handleWorkoutChange}
+          >
+
+            <option value="Active">
+              Active
+            </option>
+
+            <option value="Completed">
+              Completed
+            </option>
+
+          </select>
+
+        </div>
+
+
+        <div className="admin-login-field">
+
+          <label htmlFor="workout-notes">
+            NOTES
+          </label>
+
+          <input
+            id="workout-notes"
+            name="notes"
+            type="text"
+            placeholder="Workout notes"
+            value={workoutForm.notes}
+            onChange={handleWorkoutChange}
+          />
+
+        </div>
+
+
+        {workoutFormError && (
+          <div className="admin-login-error">
+            {workoutFormError}
+          </div>
+        )}
+
+
+        {editWorkoutError && (
+          <div className="admin-login-error">
+            {editWorkoutError}
+          </div>
+        )}
+
+
+        {workoutSuccess && (
+          <div className="admin-member-success">
+            {workoutSuccess}
+          </div>
+        )}
+
+
+        <div className="admin-form-actions">
+
+          <button
+            type="button"
+            className="admin-cancel-btn"
+            onClick={() => {
+
+              setShowAddWorkout(false);
+              setEditingWorkout(null);
+              resetWorkoutForm();
+
+              setWorkoutFormError('');
+              setEditWorkoutError('');
+              setWorkoutSuccess('');
+
+            }}
+          >
+            CANCEL
+          </button>
+
+
+          <button
+            type="submit"
+            className="admin-add-submit-btn"
+            disabled={
+              addingWorkout ||
+              updatingWorkout
+            }
+          >
+
+            {addingWorkout || updatingWorkout
+              ? editingWorkout
+                ? 'UPDATING WORKOUT...'
+                : 'ADDING WORKOUT...'
+              : editingWorkout
+                ? 'UPDATE WORKOUT →'
+                : 'ADD WORKOUT →'}
+
+          </button>
+
+        </div>
+
+      </form>
+
+    </div>
+
+  )}
+
+
+  {workouts.length === 0 && (
+    <div className="admin-message">
+      No workouts found.
+    </div>
+  )}
+
+
+  {workouts.length > 0 && (
+
+    <div className="admin-table-wrapper">
+
+      <table className="admin-table">
+
+        <thead>
+
+          <tr>
+            <th>#</th>
+            <th>MEMBER</th>
+            <th>WORKOUT</th>
+            <th>TYPE</th>
+            <th>EXERCISES</th>
+            <th>START</th>
+            <th>END</th>
+            <th>STATUS</th>
+            <th>ACTION</th>
+          </tr>
+
+        </thead>
+
+
+        <tbody>
+
+          {workouts.map(
+            (workout, index) => (
+
+              <tr
+                key={
+                  workout._id ||
+                  index
+                }
+              >
+
+                <td>
+                  {String(
+                    index + 1
+                  ).padStart(2, '0')}
+                </td>
+
+                <td>
+                  <strong>
+                    {workout.member?.name ||
+                      'Unknown Member'}
+                  </strong>
+                </td>
+
+                <td>
+                  {workout.workoutName}
+                </td>
+
+                <td>
+                  <span className="goal-badge">
+                    {workout.workoutType}
+                  </span>
+                </td>
+
+                <td>
+                  {workout.exercises?.length || 0}
+                </td>
+
+                <td>
+                  {workout.startDate
+                    ? new Date(
+                        workout.startDate
+                      ).toLocaleDateString('en-IN')
+                    : '-'}
+                </td>
+
+                <td>
+                  {workout.endDate
+                    ? new Date(
+                        workout.endDate
+                      ).toLocaleDateString('en-IN')
+                    : '-'}
+                </td>
+
+                <td>
+                  <span className="goal-badge">
+                    {workout.status}
+                  </span>
+                </td>
+
+                <td>
+
+                  {can('workouts', 'edit') && (
+                    <button
+                      type="button"
+                      className="admin-edit-btn"
+                      onClick={() =>
+                        handleEditWorkout(workout)
+                      }
+                    >
+                      EDIT
+                    </button>
+                  )}
+
+
+                  {can('workouts', 'delete') && (
+                    <button
+                      type="button"
+                      className="admin-delete-btn"
+                      onClick={() =>
+                        handleDeleteWorkout(
+                          workout._id
+                        )
+                      }
+                    >
+                      DELETE
+                    </button>
+                  )}
+
+                </td>
+
+              </tr>
+
+            )
+          )}
+
+        </tbody>
+
+      </table>
+
+    </div>
+
+  )}
+
+</section>
+
+
+{/* =====================================================
+    MEMBER ENQUIRIES
+===================================================== */}
+
+<section className="admin-enquiries">
+
+  <div className="admin-section-heading">
+
+    <div>
+
+      <span className="section-tag">
+        CONTACT REQUESTS
+      </span>
+
+      <h2>
+        MEMBER <span>ENQUIRIES.</span>
+      </h2>
+
+    </div>
+
+
+    <span className="admin-count">
+      {contacts.length} RECORDS
+    </span>
+
+  </div>
+
+
+  {loading && (
+    <div className="admin-message">
+      Loading enquiries...
+    </div>
+  )}
+
+
+  {!loading && error && (
+    <div className="admin-message admin-error">
+      {error}
+    </div>
+  )}
+
+
+  {!loading &&
+    !error &&
+    contacts.length === 0 && (
+
+      <div className="admin-message">
+        No enquiries found.
+      </div>
+
+    )}
+
+
+  {!loading &&
+    !error &&
+    contacts.length > 0 && (
+
+      <div className="admin-table-wrapper">
+
+        <table className="admin-table">
+
+          <thead>
+
+            <tr>
+              <th>#</th>
+              <th>NAME</th>
+              <th>PHONE</th>
+              <th>GOAL</th>
+              <th>MESSAGE</th>
+              <th>DATE</th>
+              <th>ACTION</th>
+            </tr>
+
+          </thead>
+
+
+          <tbody>
+
+            {contacts.map(
+              (contact, index) => (
+
+                <tr
+                  key={
+                    contact._id ||
+                    index
+                  }
+                >
+
+                  <td>
+                    {String(
+                      index + 1
+                    ).padStart(2, '0')}
+                  </td>
+
+                  <td>
+                    <strong>
+                      {contact.name}
+                    </strong>
+                  </td>
+
+                  <td>
+                    {contact.phone}
+                  </td>
+
+                  <td>
+                    <span className="goal-badge">
+                      {contact.goal}
+                    </span>
+                  </td>
+
+                  <td className="message-cell">
+                    {contact.message ||
+                      'No message'}
+                  </td>
+
+                  <td>
+                    {contact.createdAt
+                      ? new Date(
+                          contact.createdAt
+                        ).toLocaleDateString('en-IN')
+                      : '-'}
+                  </td>
+
+                  <td>
+
+                    {can('enquiries', 'delete') && (
+                      <button
+                        type="button"
+                        className="admin-delete-btn"
+                        onClick={() =>
+                          handleDeleteContact(
+                            contact._id
+                          )
+                        }
+                      >
+                        DELETE
+                      </button>
+                    )}
+
+                  </td>
+
+                </tr>
+
+              )
+            )}
+
+          </tbody>
+
+        </table>
+
+      </div>
+
+    )}
+
+</section>
+{/* =====================================================
+    STAFF MANAGEMENT
+===================================================== */}
+
+{isOwner && (
+  <StaffManagement />   
+)}
+
+</div>
+);
 }

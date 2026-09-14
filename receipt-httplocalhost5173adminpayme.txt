@@ -1,4 +1,0 @@
-receipt-http://localhost:5173/admin/payments/6aa2b3a17e63ec482d97fa98/receipt
-members-http://localhost:5173/admin/members/6aa2afff00e4752755f18f57
-admin-http://localhost:5173/admin
-login-http://localhost:5173/admin/login

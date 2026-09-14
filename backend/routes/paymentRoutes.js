@@ -8,29 +8,56 @@ const {
     deletePayment,
 } = require('../controllers/paymentController');
 
-const protect = require('../middleware/authMiddleware');
+const {
+    protect,
+    requirePermission,
+} = require('../middleware/authMiddleware');
 
 const router = express.Router();
 
 
-// ===============================
-// PAYMENT ROUTES
-// ===============================
+// =====================================
+// PAYMENTS
+// =====================================
+
+// View payments
+router.get(
+    '/',
+    protect,
+    requirePermission('payments.view'),
+    getPayments
+);
 
 // Add payment
-router.post('/', protect, addPayment);
+router.post(
+    '/',
+    protect,
+    requirePermission('payments.add'),
+    addPayment
+);
 
-// Get all payments
-router.get('/', protect, getPayments);
+// View single payment
+router.get(
+    '/:id',
+    protect,
+    requirePermission('payments.view'),
+    getPaymentById
+);
 
-// Get single payment
-router.get('/:id', protect, getPaymentById);
-
-// Update payment
-router.put('/:id', protect, updatePayment);
+// Edit payment
+router.put(
+    '/:id',
+    protect,
+    requirePermission('payments.edit'),
+    updatePayment
+);
 
 // Delete payment
-router.delete('/:id', protect, deletePayment);
-
+router.delete(
+    '/:id',
+    protect,
+    requirePermission('payments.delete'),
+    deletePayment
+);
 
 module.exports = router;

@@ -8,14 +8,56 @@ const {
     deleteWorkout,
 } = require('../controllers/workoutController');
 
-const protect = require('../middleware/authMiddleware');
+const {
+    protect,
+    requirePermission,
+} = require('../middleware/authMiddleware');
 
 const router = express.Router();
 
-router.post('/', protect, addWorkout);
-router.get('/', protect, getWorkouts);
-router.get('/:id', protect, getWorkoutById);
-router.put('/:id', protect, updateWorkout);
-router.delete('/:id', protect, deleteWorkout);
+
+// =====================================
+// WORKOUTS
+// =====================================
+
+// View workouts
+router.get(
+    '/',
+    protect,
+    requirePermission('workouts.view'),
+    getWorkouts
+);
+
+// Add workout
+router.post(
+    '/',
+    protect,
+    requirePermission('workouts.add'),
+    addWorkout
+);
+
+// View single workout
+router.get(
+    '/:id',
+    protect,
+    requirePermission('workouts.view'),
+    getWorkoutById
+);
+
+// Edit workout
+router.put(
+    '/:id',
+    protect,
+    requirePermission('workouts.edit'),
+    updateWorkout
+);
+
+// Delete workout
+router.delete(
+    '/:id',
+    protect,
+    requirePermission('workouts.delete'),
+    deleteWorkout
+);
 
 module.exports = router;

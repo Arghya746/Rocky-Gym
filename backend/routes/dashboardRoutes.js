@@ -4,10 +4,24 @@ const {
     getDashboardStats,
 } = require('../controllers/dashboardController');
 
-const protect = require('../middleware/authMiddleware');
+const {
+    protect,
+    requirePermission,
+} = require('../middleware/authMiddleware');
 
 const router = express.Router();
 
-router.get('/stats', protect, getDashboardStats);
+
+// =====================================
+// DASHBOARD
+// =====================================
+
+// View dashboard statistics
+router.get(
+    '/stats',
+    protect,
+    requirePermission('members.view'),
+    getDashboardStats
+);
 
 module.exports = router;

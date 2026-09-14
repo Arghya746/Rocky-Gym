@@ -8,29 +8,56 @@ const {
     deleteMember,
 } = require('../controllers/memberController');
 
-const protect = require('../middleware/authMiddleware');
+const {
+    protect,
+    requirePermission,
+} = require('../middleware/authMiddleware');
 
 const router = express.Router();
 
 
-// ===============================
-// MEMBER ROUTES
-// ===============================
+// =====================================
+// MEMBERS
+// =====================================
+
+// View members
+router.get(
+    '/',
+    protect,
+    requirePermission('members.view'),
+    getMembers
+);
 
 // Add member
-router.post('/', protect, addMember);
+router.post(
+    '/',
+    protect,
+    requirePermission('members.add'),
+    addMember
+);
 
-// Get all members
-router.get('/', protect, getMembers);
+// View single member
+router.get(
+    '/:id',
+    protect,
+    requirePermission('members.view'),
+    getMemberById
+);
 
-// Get single member
-router.get('/:id', protect, getMemberById);
-
-// Update member
-router.put('/:id', protect, updateMember);
+// Edit member
+router.put(
+    '/:id',
+    protect,
+    requirePermission('members.edit'),
+    updateMember
+);
 
 // Delete member
-router.delete('/:id', protect, deleteMember);
-
+router.delete(
+    '/:id',
+    protect,
+    requirePermission('members.delete'),
+    deleteMember
+);
 
 module.exports = router;
