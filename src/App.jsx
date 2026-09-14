@@ -27,11 +27,9 @@ import TrainersSection from './components/TrainersSection';
 
 import ProtectedRoute from './components/ProtectedRoute';
 
-
-
 // ADMIN PAGES
-import AdminLogin from './pages/AdminLogin';
 import AdminDashboard from './pages/AdminDashboard';
+import AdminLogin from './pages/AdminLogin';
 import MemberDetails from './pages/MemberDetails';
 import PaymentReceipt from './pages/PaymentReceipt';
 
@@ -148,6 +146,55 @@ function App() {
     () =>
       localStorage.getItem('fitness-theme') || 'dark'
   );
+
+
+  /* ================================
+     ADMIN SEO PROTECTION
+  ================================ */
+
+  useEffect(() => {
+
+    const isAdminRoute =
+      window.location.pathname.startsWith('/admin');
+
+    let robotsMeta =
+      document.querySelector(
+        'meta[name="robots"]'
+      );
+
+    if (!robotsMeta) {
+
+      robotsMeta =
+        document.createElement('meta');
+
+      robotsMeta.setAttribute(
+        'name',
+        'robots'
+      );
+
+      document.head.appendChild(
+        robotsMeta
+      );
+
+    }
+
+    if (isAdminRoute) {
+
+      robotsMeta.setAttribute(
+        'content',
+        'noindex, nofollow, noarchive'
+      );
+
+    } else {
+
+      robotsMeta.setAttribute(
+        'content',
+        'index, follow'
+      );
+
+    }
+
+  }, []);
 
 
   /* ================================
@@ -345,3 +392,4 @@ function App() {
 
 
 export default App;
+
