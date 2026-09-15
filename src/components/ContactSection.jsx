@@ -1,4 +1,5 @@
 import { useState } from 'react';
+import API_URL from '../config/api';
 
 export default function ContactSection() {
   const [formState, setFormState] = useState({
@@ -224,13 +225,18 @@ export default function ContactSection() {
             RIGHT SIDE — CONTACT FORM
         ========================================= */}
 
-        <form className="contact-form" onSubmit={handleSubmit}>
+        <form
+          className="contact-form"
+          onSubmit={handleSubmit}
+        >
 
           <div className="input-row">
 
             {/* NAME */}
             <div className="input-group">
-              <label htmlFor="name">YOUR NAME</label>
+              <label htmlFor="name">
+                YOUR NAME
+              </label>
 
               <input
                 id="name"
@@ -243,9 +249,12 @@ export default function ContactSection() {
               />
             </div>
 
+
             {/* PHONE */}
             <div className="input-group">
-              <label htmlFor="phone">PHONE</label>
+              <label htmlFor="phone">
+                PHONE
+              </label>
 
               <input
                 id="phone"
@@ -265,7 +274,9 @@ export default function ContactSection() {
 
           {/* GOAL */}
           <div className="input-group">
-            <label htmlFor="goal">GOAL</label>
+            <label htmlFor="goal">
+              GOAL
+            </label>
 
             <select
               id="goal"
@@ -283,7 +294,9 @@ export default function ContactSection() {
 
           {/* MESSAGE */}
           <div className="input-group">
-            <label htmlFor="message">MESSAGE</label>
+            <label htmlFor="message">
+              MESSAGE
+            </label>
 
             <textarea
               id="message"
@@ -297,7 +310,10 @@ export default function ContactSection() {
 
 
           {/* SUBMIT */}
-          <button type="submit" className="submit-btn">
+          <button
+            type="submit"
+            className="submit-btn"
+          >
             BOOK FREE TRIAL
           </button>
 
@@ -322,7 +338,9 @@ export default function ContactSection() {
 
         <div className="map-heading">
 
-          <div className="section-tag">FIND US</div>
+          <div className="section-tag">
+            FIND US
+          </div>
 
           <h3>
             OUR <span>LOCATIONS.</span>
