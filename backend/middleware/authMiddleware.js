@@ -2,15 +2,16 @@ const jwt = require('jsonwebtoken');
 const Admin = require('../models/Admin');
 
 
-// =====================================
+// ===============================
 // PROTECT ROUTES
-// =====================================
-
+// ===============================
 const protect = async(req, res, next) => {
     try {
+
         const authHeader =
             req.headers.authorization;
 
+        // No token
         if (!authHeader ||
             !authHeader.startsWith('Bearer ')
         ) {
@@ -19,15 +20,20 @@ const protect = async(req, res, next) => {
             });
         }
 
+        // Get token
         const token =
             authHeader.split(' ')[1];
 
-        const decoded = jwt.verify(
-            token,
-            process.env.JWT_SECRET
-        );
+        // Verify token
+        const decoded =
+            jwt.verify(
+                token,
+                process.env.JWT_SECRET
+            );
 
-        const admin = await Admin.findById(decoded.id);
+        // Find admin in database
+        const admin =
+            await Admin.findById(decoded.id);
 
         if (!admin) {
             return res.status(401).json({
@@ -35,17 +41,21 @@ const protect = async(req, res, next) => {
             });
         }
 
+        // Check account status
         if (admin.status !== 'active') {
             return res.status(403).json({
                 message: 'Your account has been deactivated.',
             });
         }
 
+        // Attach admin to request
         req.admin = admin;
 
+        // Continue
         next();
 
     } catch (error) {
+
         console.error(
             'Auth Error:',
             error.message
@@ -58,11 +68,11 @@ const protect = async(req, res, next) => {
 };
 
 
-// =====================================
+// ===============================
 // ROLE AUTHORIZATION
-// =====================================
-
+// ===============================
 const authorize = (...allowedRoles) => {
+
     return (req, res, next) => {
 
         if (!req.admin) {
@@ -84,11 +94,11 @@ const authorize = (...allowedRoles) => {
 };
 
 
-// =====================================
-// PERMISSION AUTHORIZATION
-// =====================================
-
+// ===============================
+// PERMISSION CHECK
+// ===============================
 const requirePermission = (permission) => {
+
     return (req, res, next) => {
 
         if (!req.admin) {
@@ -97,15 +107,19 @@ const requirePermission = (permission) => {
             });
         }
 
-        // Owner/Admin has full access
+        // Admin / Owner has full access
         if (req.admin.role === 'admin') {
             return next();
         }
 
-        // Receptionist permission check
+        // Get receptionist permissions
         const permissions =
             req.admin.permissions || {};
 
+        // Example:
+        // members.view
+        // payments.add
+        // attendance.edit
         const parts =
             permission.split('.');
 
@@ -113,9 +127,13 @@ const requirePermission = (permission) => {
             permissions;
 
         for (const part of parts) {
-            current = current && current[part];
+
+            current =
+                current &&
+                current[part];
         }
 
+        // Permission denied
         if (current !== true) {
             return res.status(403).json({
                 message: 'Access denied. You do not have permission.',
@@ -127,11 +145,17 @@ const requirePermission = (permission) => {
 };
 
 
+// ===============================
+// EXPORTS
+// ===============================
+
 module.exports = protect;
 
-module.exports.protect = protect;
+module.exports.protect =
+    protect;
 
-module.exports.authorize = authorize;
+module.exports.authorize =
+    authorize;
 
 module.exports.requirePermission =
     requirePermission;
