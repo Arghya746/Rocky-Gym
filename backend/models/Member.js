@@ -1,6 +1,11 @@
 const mongoose = require('mongoose');
 
 const memberSchema = new mongoose.Schema({
+
+    // =========================================
+    // PERSONAL INFORMATION
+    // =========================================
+
     name: {
         type: String,
         required: true,
@@ -28,10 +33,27 @@ const memberSchema = new mongoose.Schema({
         enum: ['Male', 'Female', 'Other'],
     },
 
+
+    // =========================================
+    // MEMBERSHIP
+    // =========================================
+
     membershipPlan: {
         type: String,
-        enum: ['Monthly', 'Quarterly', 'Half-Yearly', 'Yearly'],
+        enum: [
+            'Monthly',
+            'Quarterly',
+            'Half-Yearly',
+            'Yearly',
+        ],
         required: true,
+    },
+
+    // Selected promotional offer
+    membershipOffer: {
+        type: mongoose.Schema.Types.ObjectId,
+        ref: 'Offer',
+        default: null,
     },
 
     membershipStartDate: {
@@ -51,11 +73,19 @@ const memberSchema = new mongoose.Schema({
 
     status: {
         type: String,
-        enum: ['Active', 'Expired'],
+        enum: [
+            'Active',
+            'Expired',
+        ],
         default: 'Active',
     },
+
 }, {
     timestamps: true,
 });
 
-module.exports = mongoose.model('Member', memberSchema);
+module.exports =
+    mongoose.model(
+        'Member',
+        memberSchema
+    );

@@ -1,88 +1,20 @@
-import API_URL from '../config/api';
+/* updated from user-supplied AdminDashboard code */
 import { useEffect, useState } from 'react';
 import { useNavigate } from 'react-router-dom';
 import AdminLogout from '../components/AdminLogout';
-import StaffManagement from '../components/StaffManagement';
-
+import API_URL from '../config/api';
 export default function AdminDashboard() { 
   const navigate = useNavigate();
-
-  // =========================================================
-  // ROLE & PERMISSIONS
-  // =========================================================
-
-  const defaultReceptionistPermissions = {
-    members: {
-      view: true,
-      add: true,
-      edit: true,
-      delete: false,
-    },
-
-    payments: {
-      view: true,
-      add: true,
-      edit: true,
-      delete: false,
-    },
-
-    attendance: {
-      view: true,
-      add: true,
-      edit: true,
-      delete: false,
-    },
-
-    workouts: {
-      view: true,
-      add: true,
-      edit: true,
-      delete: false,
-    },
-
-    enquiries: {
-      view: true,
-      delete: false,
-    },
-  };
-
-  const [adminData, setAdminData] = useState(() => {
-    try {
-      const storedAdmin =
-        localStorage.getItem('adminData');
-
-      return storedAdmin
-        ? JSON.parse(storedAdmin)
-        : null;
-    } catch {
-      return null;
-    }
-  });
-
-  const isOwner =
-    adminData?.role === 'admin';
-
-  const effectivePermissions =
-    adminData?.permissions ||
-    (isOwner
-      ? null
-      : defaultReceptionistPermissions);
-
-  const can = (section, action) => {
-    if (isOwner) {
-      return true;
-    }
-
-    return (
-      effectivePermissions?.[section]?.[action] ===
-      true
-    );
-  };
 
   const [contacts, setContacts] = useState([]);
   const [members, setMembers] = useState([]);
   const [payments, setPayments] = useState([]);
   const [attendance, setAttendance] = useState([]);
+  const [plans, setPlans] = useState([]);
+  const [offers, setOffers] = useState([]);
+  const [offersLoading, setOffersLoading] = useState(true);
+  const [offersError, setOffersError] = useState('');
+  const [creatingOffers, setCreatingOffers] = useState(false);
 
   // =========================
   // DASHBOARD STATS
@@ -202,6 +134,51 @@ export default function AdminDashboard() {
   });
        // =========================================================
 
+
+
+
+  // =========================================================
+  // STAFF MANAGEMENT STATES
+  // =========================================================
+
+  const [staff, setStaff] = useState([]);
+  const [selectedStaff, setSelectedStaff] = useState(null);
+  const [permissions, setPermissions] = useState({
+    members: {
+      view: true,
+      add: true,
+      edit: true,
+      delete: false,
+    },
+    payments: {
+      view: true,
+      add: true,
+      edit: true,
+      delete: false,
+    },
+    attendance: {
+      view: true,
+      add: true,
+      edit: true,
+      delete: false,
+    },
+    workouts: {
+      view: true,
+      add: true,
+      edit: true,
+      delete: false,
+    },
+    enquiries: {
+      view: true,
+      delete: false,
+    },
+  });
+
+  const [staffSuccess, setStaffSuccess] = useState('');
+  const [staffError, setStaffError] = useState('');
+  const [savingPermissions, setSavingPermissions] = useState(false);
+
+
   // =========================================================
   // WORKOUT STATES
   // =========================================================
@@ -249,65 +226,306 @@ export default function AdminDashboard() {
   });
 
   // =========================================================
-  // CONTACTS
+  // STAFF MANAGEMENT
+
   // =========================================================
 
-  
-const fetchContacts = async () => {
+  const normalizeStaffPermissions = (staffMember) => ({
+    members: {
+      view: staffMember?.permissions?.members?.view ?? true,
+      add: staffMember?.permissions?.members?.add ?? true,
+      edit: staffMember?.permissions?.members?.edit ?? true,
+      delete: staffMember?.permissions?.members?.delete ?? false,
+    },
+    payments: {
+      view: staffMember?.permissions?.payments?.view ?? true,
+      add: staffMember?.permissions?.payments?.add ?? true,
+      edit: staffMember?.permissions?.payments?.edit ?? true,
+      delete: staffMember?.permissions?.payments?.delete ?? false,
+    },
+    attendance: {
+      view: staffMember?.permissions?.attendance?.view ?? true,
+      add: staffMember?.permissions?.attendance?.add ?? true,
+      edit: staffMember?.permissions?.attendance?.edit ?? true,
+      delete: staffMember?.permissions?.attendance?.delete ?? false,
+    },
+    workouts: {
+      view: staffMember?.permissions?.workouts?.view ?? true,
+      add: staffMember?.permissions?.workouts?.add ?? true,
+      edit: staffMember?.permissions?.workouts?.edit ?? true,
+      delete: staffMember?.permissions?.workouts?.delete ?? false,
+    },
+    enquiries: {
+      view: staffMember?.permissions?.enquiries?.view ?? true,
+      delete: staffMember?.permissions?.enquiries?.delete ?? false,
+    },
+  });
 
-    if (!can('enquiries', 'view')) {
-        return;
+  const fetchStaff = async () => {
+    try {
+      setStaffError('');
+
+      const token = localStorage.getItem('adminToken');
+
+      if (!token) {
+        throw new Error('Admin session expired. Please login again.');
+      }
+
+      const response = await fetch(
+        `${API_URL}/api/admin/staff`,
+        {
+          headers: {
+            Authorization: `Bearer ${token}`,
+          },
+        }
+      );
+
+      const data = await response.json();
+
+      if (!response.ok) {
+        throw new Error(
+          data.message || 'Failed to fetch staff accounts.'
+        );
+      }
+
+      const staffList = Array.isArray(data)
+        ? data
+        : data.staff || data.admins || [];
+
+      setStaff(staffList);
+
+      if (staffList.length > 0) {
+        setSelectedStaff((current) => {
+          const currentStaff = current
+            ? staffList.find(
+                (member) => member._id === current._id
+              )
+            : null;
+
+          return currentStaff || staffList[0];
+        });
+      } else {
+        setSelectedStaff(null);
+      }
+
+    } catch (error) {
+      console.error('Fetch staff error:', error);
+      setStaffError(
+        error.message || 'Unable to load staff accounts.'
+      );
+    }
+  };
+
+  const handlePermissionChange = (section, permission) => {
+    setPermissions((current) => ({
+      ...current,
+      [section]: {
+        ...current[section],
+        [permission]: !current[section]?.[permission],
+      },
+    }));
+
+    setStaffSuccess('');
+    setStaffError('');
+  };
+
+  const handleToggleStaffStatus = async (staffMember) => {
+    try {
+      const token = localStorage.getItem('adminToken');
+
+      if (!token) {
+        throw new Error('Admin session expired. Please login again.');
+      }
+
+      const nextStatus =
+        staffMember.status === 'active'
+          ? 'inactive'
+          : 'active';
+
+      const response = await fetch(
+        `${API_URL}/api/admin/staff/${staffMember._id}/status`,
+        {
+          method: 'PUT',
+          headers: {
+            'Content-Type': 'application/json',
+            Authorization: `Bearer ${token}`,
+          },
+          body: JSON.stringify({
+            status: nextStatus,
+          }),
+        }
+      );
+
+      const data = await response.json();
+
+      if (!response.ok) {
+        throw new Error(
+          data.message || 'Failed to update staff status.'
+        );
+      }
+
+      const updatedStaff = data.staff || {
+        ...staffMember,
+        status: nextStatus,
+      };
+
+      setStaff((currentStaff) =>
+        currentStaff.map((member) =>
+          member._id === staffMember._id
+            ? updatedStaff
+            : member
+        )
+      );
+
+      setSelectedStaff((current) =>
+        current?._id === staffMember._id
+          ? updatedStaff
+          : current
+      );
+
+      setStaffSuccess(
+        nextStatus === 'active'
+          ? 'Staff account activated successfully.'
+          : 'Staff account deactivated successfully.'
+      );
+      setStaffError('');
+
+    } catch (error) {
+      console.error('Toggle staff status error:', error);
+      setStaffError(
+        error.message || 'Unable to update staff status.'
+      );
+      setStaffSuccess('');
+    }
+  };
+
+  const handleSavePermissions = async () => {
+    if (!selectedStaff) {
+      return;
     }
 
     try {
-        setLoading(true);
-        setError('');
+      setSavingPermissions(true);
+      setStaffError('');
+      setStaffSuccess('');
 
-        const token =
-            localStorage.getItem('adminToken');
+      const token = localStorage.getItem('adminToken');
 
-        if (!token) {
-            throw new Error(
-                'Admin token not found.'
-            );
+      if (!token) {
+        throw new Error('Admin session expired. Please login again.');
+      }
+
+      const response = await fetch(
+        `${API_URL}/api/admin/staff/${selectedStaff._id}/permissions`,
+        {
+          method: 'PUT',
+          headers: {
+            'Content-Type': 'application/json',
+            Authorization: `Bearer ${token}`,
+          },
+          body: JSON.stringify({
+            permissions,
+          }),
         }
+      );
 
-        const response = await fetch(
-            `${API_URL}/api/contacts`,
-            {
-                headers: {
-                    Authorization:
-                        `Bearer ${token}`,
-                },
-            }
+      const data = await response.json();
+
+      if (!response.ok) {
+        throw new Error(
+          data.message || 'Failed to save staff permissions.'
         );
+      }
 
-        const data = await response.json();
+      const updatedStaff = data.staff || {
+        ...selectedStaff,
+        permissions,
+      };
 
-        if (!response.ok) {
-            throw new Error(
-                data.message ||
-                'Failed to fetch enquiries.'
-            );
-        }
+      setStaff((currentStaff) =>
+        currentStaff.map((member) =>
+          member._id === selectedStaff._id
+            ? updatedStaff
+            : member
+        )
+      );
 
-        setContacts(data.contacts || []);
+      setSelectedStaff(updatedStaff);
+      setPermissions(normalizeStaffPermissions(updatedStaff));
+
+      setStaffSuccess(
+        'Staff permissions saved successfully.'
+      );
 
     } catch (error) {
-        console.error(
-            'Fetch contacts error:',
-            error
-        );
+      console.error('Save staff permissions error:', error);
+      setStaffError(
+        error.message || 'Unable to save staff permissions.'
+      );
+      setStaffSuccess('');
+    } finally {
+      setSavingPermissions(false);
+    }
+  };
+  const permissionCount = Object.values(permissions).reduce(
+    (total, section) =>
+      total + Object.values(section || {}).filter(Boolean).length,
+    0
+  );
 
-        setError(
-            error.message ||
-            'Unable to load enquiries.'
+
+  // =========================================================
+  // CONTACTS
+  // =========================================================
+
+  const fetchContacts = async () => {
+    try {
+      setLoading(true);
+      setError('');
+
+      const token =
+        localStorage.getItem('adminToken');
+
+      if (!token) {
+        throw new Error(
+          'Admin token not found.'
         );
+      }
+
+      const response = await fetch(
+        `${API_URL}/api/contacts`,
+        {
+          headers: {
+            Authorization: `Bearer ${token}`,
+          },
+        }
+      );
+
+      const data = await response.json();
+
+      if (!response.ok) {
+        throw new Error(
+          data.message ||
+            'Failed to fetch enquiries.'
+        );
+      }
+
+      setContacts(data.contacts || []);
+
+    } catch (error) {
+      console.error(
+        'Fetch contacts error:',
+        error
+      );
+
+      setError(
+        'Unable to load enquiries.'
+      );
 
     } finally {
-        setLoading(false);
+      setLoading(false);
     }
-};
+  };
 
 
   // =========================================================
@@ -350,18 +568,16 @@ const fetchContacts = async () => {
         'Fetch dashboard stats error:',
         error
       );
+
     }
   };
+
 
   // =========================================================
   // MEMBERS
   // =========================================================
 
   const fetchMembers = async () => {
-      if (!can('members', 'view')) {
-    return;
-  }
-
     try {
       setMembersLoading(true);
       setMembersError('');
@@ -420,117 +636,146 @@ const fetchContacts = async () => {
   };
 
   // =========================================================
-  // ADD MEMBER
-  // =========================================================
+// ADD MEMBER
+// =========================================================
 
-  const handleAddMember = async (e) => {
-    e.preventDefault();
+const handleAddMember = async (e) => {
+  e.preventDefault();
 
-        if (!can('members', 'add')) {
-      alert('You do not have permission to add members.');
-      return;
+  try {
+    setAddingMember(true);
+    setMemberFormError('');
+    setMemberSuccess('');
+
+    const token =
+      localStorage.getItem('adminToken');
+
+    if (!token) {
+      throw new Error(
+        'Admin session expired. Please login again.'
+      );
     }
 
-    try {
-      setAddingMember(true);
-      setMemberFormError('');
+    const response = await fetch(
+      `${API_URL}/api/members`,
+      {
+        method: 'POST',
+        headers: {
+          'Content-Type': 'application/json',
+          Authorization: `Bearer ${token}`,
+        },
+        body: JSON.stringify({
+          name: memberForm.name,
+          phone: memberForm.phone,
+          email: memberForm.email,
+          age: memberForm.age
+            ? Number(memberForm.age)
+            : undefined,
+          gender: memberForm.gender,
+          membershipPlan:
+            memberForm.membershipPlan,
+          membershipStartDate:
+            memberForm.membershipStartDate,
+          membershipEndDate:
+            memberForm.membershipEndDate,
+          membershipOffer:
+            memberForm.membershipOffer,
+          amount:
+            Number(memberForm.amount),
+        }),
+      }
+    );
+
+    const data = await response.json();
+
+    if (!response.ok) {
+      throw new Error(
+        data.message ||
+          'Failed to add member.'
+      );
+    }
+
+    setMemberSuccess(
+      'Member added successfully!'
+    );
+
+    setMemberForm({
+      name: '',
+      phone: '',
+      email: '',
+      age: '',
+      gender: 'Male',
+      membershipPlan: 'Monthly',
+      membershipStartDate: '',
+      membershipEndDate: '',
+      membershipOffer: '',
+      amount: '',
+    });
+
+    await fetchMembers();
+    await fetchDashboardStats();
+
+    setTimeout(() => {
+      setShowAddMember(false);
       setMemberSuccess('');
+    }, 1200);
 
-      const token =
-        localStorage.getItem('adminToken');
+  } catch (error) {
+    console.error(
+      'Add member error:',
+      error
+    );
 
-      if (!token) {
-        throw new Error(
-          'Admin session expired. Please login again.'
-        );
-      }
+    setMemberFormError(
+      error.message ||
+        'Unable to add member.'
+    );
 
-      const response = await fetch(
-        `${API_URL}/api/members`,
-        {
-          method: 'POST',
-          headers: {
-            'Content-Type': 'application/json',
-            Authorization: `Bearer ${token}`,
-          },
-          body: JSON.stringify({
-            name: memberForm.name,
-            phone: memberForm.phone,
-            email: memberForm.email,
-            age: memberForm.age
-              ? Number(memberForm.age)
-              : undefined,
-            gender: memberForm.gender,
-            membershipPlan:
-              memberForm.membershipPlan,
-            membershipStartDate:
-              memberForm.membershipStartDate,
-            membershipEndDate:
-              memberForm.membershipEndDate,
-            amount: Number(memberForm.amount),
-          }),
-        }
-      );
+  } finally {
+    setAddingMember(false);
+  }
+};
 
-      const data = await response.json();
 
-      if (!response.ok) {
-        throw new Error(
-          data.message ||
-            'Failed to add member.'
-        );
-      }
+// =========================================================
+// MEMBERSHIP OFFER CHANGE
+// =========================================================
 
-      setMemberSuccess(
-        'Member added successfully!'
-      );
+const handleOfferChange = (e) => {
+  const offerId = e.target.value;
 
-      setMemberForm({
-        name: '',
-        phone: '',
-        email: '',
-        age: '',
-        gender: 'Male',
-        membershipPlan: 'Monthly',
-        membershipStartDate: '',
-        membershipEndDate: '',
-        amount: '',
-      });
+  const selectedOffer = offers.find(
+    (offer) => offer._id === offerId
+  );
 
-      await fetchMembers();
-      await fetchDashboardStats();
+  if (!selectedOffer) {
+    setMemberForm((current) => ({
+      ...current,
+      membershipOffer: '',
+    }));
+    return;
+  }
 
-      setTimeout(() => {
-        setShowAddMember(false);
-        setMemberSuccess('');
-      }, 1200);
-
-    } catch (error) {
-      console.error(
-        'Add member error:',
-        error
-      );
-
-      setMemberFormError(
-        error.message ||
-          'Unable to add member.'
-      );
-
-    } finally {
-      setAddingMember(false);
-    }
-  };
+  setMemberForm((current) => ({
+    ...current,
+    membershipOffer:
+      selectedOffer._id,
+    membershipPlan:
+      selectedOffer.plan?.name ||
+      current.membershipPlan,
+    amount:
+      Number(current.amount || 0) -
+      Number(
+        selectedOffer.offerPrice || 0
+      ),
+  }));
+};
 
   // =========================================================
   // EDIT MEMBER
   // =========================================================
 
   const handleEditMember = (member) => {
-    
-    if (!can('members', 'edit')) {
-      alert('You do not have permission to edit members.');
-      return;
-    }
     setEditingMember(member);
 
     setMemberForm({
@@ -564,11 +809,6 @@ const fetchContacts = async () => {
 
   const handleUpdateMember = async (e) => {
     e.preventDefault();
-
-    if (!can('members', 'edit')) {
-      alert('You do not have permission to edit members.');
-      return;
-    }
 
     try {
       setUpdatingMember(true);
@@ -657,11 +897,6 @@ const fetchContacts = async () => {
   const handleDeleteMember = async (
     memberId
   ) => {
-    if (!can('members', 'delete')) {
-      alert('You do not have permission to delete members.');
-      return;
-    }
-
     const confirmed = window.confirm(
       'Are you sure you want to delete this member?'
     );
@@ -740,13 +975,281 @@ const fetchContacts = async () => {
     return matchesSearch && matchesStatus;
   });
 
-  // PAYMENTS
+  // =========================================================
+  // MEMBERSHIP PLANS & PROMOTIONAL OFFERS
   // =========================================================
 
+  const fetchPlans = async () => {
+    try {
+      const token = localStorage.getItem('adminToken');
+
+      if (!token) {
+        throw new Error('Admin token not found.');
+      }
+
+      const response = await fetch(`${API_URL}/api/plans`, {
+        headers: {
+          Authorization: `Bearer ${token}`,
+        },
+      });
+
+      const data = await response.json();
+
+      if (!response.ok) {
+        throw new Error(
+          data.message || 'Failed to fetch plans.'
+        );
+      }
+
+      setPlans(data.plans || []);
+    } catch (error) {
+      console.error('Fetch plans error:', error);
+    }
+  };
+
+  const fetchOffers = async () => {
+    try {
+      setOffersLoading(true);
+      setOffersError('');
+
+      const token = localStorage.getItem('adminToken');
+
+      if (!token) {
+        throw new Error('Admin token not found.');
+      }
+
+      const response = await fetch(`${API_URL}/api/offers`, {
+        headers: {
+          Authorization: `Bearer ${token}`,
+        },
+      });
+
+      const data = await response.json();
+
+      if (!response.ok) {
+        throw new Error(
+          data.message || 'Failed to fetch offers.'
+        );
+      }
+
+      const rawOffers = Array.isArray(data.offers)
+        ? data.offers
+        : [];
+
+      // Keep one visible copy of each promotional offer.
+      // The database currently contains duplicate offer records,
+      // so the admin dashboard displays only the four unique offers.
+      const preferredOfferOrder = [
+        '🌧 MONSOON MUSCLE',
+        '🪔 PUJA TRANSFORMATION',
+        '☀ SUMMER SHRED',
+        '❄ WINTER POWER',
+      ];
+
+      const uniqueOffers = Array.from(
+        new Map(
+          rawOffers.map((offer) => [
+            String(offer.name || '')
+              .trim()
+              .toUpperCase(),
+            offer,
+          ])
+        ).values()
+      ).sort((a, b) => {
+        const aIndex = preferredOfferOrder.indexOf(a.name);
+        const bIndex = preferredOfferOrder.indexOf(b.name);
+
+        if (aIndex === -1 && bIndex === -1) {
+          return 0;
+        }
+
+        if (aIndex === -1) {
+          return 1;
+        }
+
+        if (bIndex === -1) {
+          return -1;
+        }
+
+        return aIndex - bIndex;
+      });
+
+      setOffers(uniqueOffers);
+    } catch (error) {
+      console.error('Fetch offers error:', error);
+      setOffersError(
+        error.message || 'Unable to load offers.'
+      );
+    } finally {
+      setOffersLoading(false);
+    }
+  };
+
+  const createDefaultOffers = async () => {
+    try {
+      setCreatingOffers(true);
+
+      const token = localStorage.getItem('adminToken');
+
+      if (!token) {
+        throw new Error(
+          'Admin session expired. Please login again.'
+        );
+      }
+
+      const monthlyPlan = plans.find(
+        (plan) => plan.name === 'Monthly'
+      );
+
+      const quarterlyPlan = plans.find(
+        (plan) => plan.name === 'Quarterly'
+      );
+
+      if (!monthlyPlan || !quarterlyPlan) {
+        throw new Error(
+          'Please create Monthly and Quarterly plans first.'
+        );
+      }
+
+      const defaultOffers = [
+        {
+          name: '🌧 MONSOON MUSCLE',
+          plan: monthlyPlan._id,
+          offerPrice: 999,
+          description:
+            "Don't let the rain stop your progress. Join Alpha Gym and stay consistent this season.",
+          benefits: [
+            'Full Gym Access',
+            'Workout Guidance',
+            'Digital Attendance',
+          ],
+        },
+        {
+          name: '🪔 PUJA TRANSFORMATION',
+          plan: quarterlyPlan._id,
+          offerPrice: 2499,
+          description:
+            'Get festival ready with a dedicated transformation program at Alpha Gym.',
+          benefits: [
+            '3 Month Gym Access',
+            'Personalized Workout Plan',
+            'Progress Tracking',
+          ],
+        },
+        {
+          name: '☀ SUMMER SHRED',
+          plan: monthlyPlan._id,
+          offerPrice: 899,
+          description:
+            'Build confidence, burn fat and get ready for your strongest summer.',
+          benefits: [
+            'Cardio + Strength Training',
+            'Fat Loss Guidance',
+            'Progress Tracking',
+          ],
+        },
+        {
+          name: '❄ WINTER POWER',
+          plan: monthlyPlan._id,
+          offerPrice: 1099,
+          description:
+            'Use the winter season to build strength, muscle and serious discipline.',
+          benefits: [
+            'Strength Training',
+            'Muscle Building Plan',
+            'Trainer Guidance',
+          ],
+        },
+      ];
+
+      const today = new Date();
+      const expiryDate = new Date(today);
+      expiryDate.setFullYear(
+        expiryDate.getFullYear() + 1
+      );
+
+      const startDate = today
+        .toISOString()
+        .split('T')[0];
+
+      const endDate = expiryDate
+        .toISOString()
+        .split('T')[0];
+
+      let createdCount = 0;
+
+      for (const offer of defaultOffers) {
+        const alreadyExists = offers.some(
+          (existingOffer) => {
+            const existingPlanId =
+              existingOffer.plan?._id ||
+              existingOffer.plan;
+
+            return (
+              existingOffer.name === offer.name &&
+              String(existingPlanId) ===
+                String(offer.plan)
+            );
+          }
+        );
+
+        if (alreadyExists) {
+          continue;
+        }
+
+        const response = await fetch(
+          `${API_URL}/api/offers`,
+          {
+            method: 'POST',
+            headers: {
+              'Content-Type': 'application/json',
+              Authorization: `Bearer ${token}`,
+            },
+            body: JSON.stringify({
+              ...offer,
+              startDate,
+              endDate,
+            }),
+          }
+        );
+
+        const data = await response.json();
+
+        if (!response.ok) {
+          throw new Error(
+            data.message ||
+              `Failed to create ${offer.name}`
+          );
+        }
+
+        createdCount += 1;
+      }
+
+      await fetchOffers();
+
+      alert(
+        createdCount === 0
+          ? 'All default offers already exist.'
+          : `${createdCount} default offer${
+              createdCount === 1 ? '' : 's'
+            } created successfully.`
+      );
+    } catch (error) {
+      console.error(
+        'Create offers error:',
+        error
+      );
+
+      alert(
+        error.message ||
+          'Failed to create offers.'
+      );
+    } finally {
+      setCreatingOffers(false);
+    }
+  };
+
   const fetchPayments = async () => {
-     if (!can('payments', 'view')) {
-    return;
-  }
     try {
       setPaymentsLoading(true);
       setPaymentsError('');
@@ -810,11 +1313,6 @@ const fetchContacts = async () => {
 
   const handleAddPayment = async (e) => {
     e.preventDefault();
-
-    if (!can('payments', 'add')) {
-    alert('You do not have permission to add payments.');
-    return;
-}
 
     try {
       setAddingPayment(true);
@@ -905,11 +1403,6 @@ const fetchContacts = async () => {
   // =========================================================
 
   const handleEditPayment = (payment) => {
-    if (!can('payments', 'edit')) {
-    alert('You do not have permission to edit payments.');
-    return;
-}
-    
     setEditingPayment(payment);
 
     setPaymentForm({
@@ -947,11 +1440,6 @@ const fetchContacts = async () => {
   const handleUpdatePayment = async (e) => {
     e.preventDefault();
 
-    if (!can('payments', 'edit')) {
-    alert('You do not have permission to edit payments.');
-    return;
-}
-
     try {
       setUpdatingPayment(true);
       setEditPaymentError('');
@@ -967,7 +1455,7 @@ const fetchContacts = async () => {
       }
 
       const response = await fetch(
-      `${API_URL}/api/payments/${editingPayment._id}`,
+        `${API_URL}/api/payments/${editingPayment._id}`,
         {
           method: 'PUT',
           headers: {
@@ -1037,10 +1525,6 @@ const fetchContacts = async () => {
   const handleDeletePayment = async (
     paymentId
   ) => {
-    if (!can('payments', 'delete')) {
-    alert('You do not have permission to delete payments.');
-    return;
-}
     const confirmed = window.confirm(
       'Are you sure you want to delete this payment?'
     );
@@ -1106,9 +1590,6 @@ const fetchContacts = async () => {
 // =========================
 
 const fetchAttendance = async () => {
-   if (!can('attendance', 'view')) {
-    return;
-  }
   try {
     setAttendanceLoading(true);
     setAttendanceError('');
@@ -1122,8 +1603,8 @@ const fetchAttendance = async () => {
       );
     }
 
-    const response = await fetch(
-      `${API_URL}/api/attendance`,
+    const response = await 
+    fetch(`${API_URL}/api/attendance`, 
       {
         headers: {
           Authorization: `Bearer ${token}`,
@@ -1166,10 +1647,6 @@ const fetchAttendance = async () => {
 
 const handleMarkAttendance = async (e) => {
   e.preventDefault();
-   if (!can('attendance', 'add')) {
-    alert('You do not have permission to mark attendance.');
-    return;
-  }
 
   try {
     setAttendanceError('');
@@ -1194,7 +1671,7 @@ const handleMarkAttendance = async (e) => {
     }
 
     const response = await fetch(
-      `${API_URL}/api/attendance`,
+      'http://localhost:5000/api/attendance',
       {
         method: 'POST',
 
@@ -1274,11 +1751,6 @@ const handleAttendanceChange = (e) => {
   ) => {
     e.preventDefault();
 
-    if (!can('attendance', 'edit')) {
-    alert('You do not have permission to edit attendance.');
-    return;
-  }
-
     try {
       setUpdatingAttendance(true);
       setEditAttendanceError('');
@@ -1294,7 +1766,7 @@ const handleAttendanceChange = (e) => {
       }
 
       const response = await fetch(
-        `${API_URL}/api/attendance/${editingAttendance._id}`,
+        `http://localhost:5000/api/attendance/${editingAttendance._id}`,
         {
           method: 'PUT',
           headers: {
@@ -1364,10 +1836,6 @@ const handleAttendanceChange = (e) => {
   const handleDeleteAttendance = async (
     attendanceId
   ) => {
-    if (!can('attendance', 'delete')) {
-    alert('You do not have permission to delete attendance.');
-    return;
-  }
     const confirmed = window.confirm(
       'Are you sure you want to delete this attendance record?'
     );
@@ -1387,7 +1855,7 @@ const handleAttendanceChange = (e) => {
       }
 
       const response = await fetch(
-        `${API_URL}/api/attendance/${attendanceId}`,
+        `http://localhost:5000/api/attendance/${attendanceId}`,
         {
           method: 'DELETE',
           headers: {
@@ -1434,9 +1902,6 @@ const handleAttendanceChange = (e) => {
   // =========================================================
 
   const fetchWorkouts = async () => {
-     if (!can('workouts', 'view')) {
-    return;
-  }
     try {
       const token =
         localStorage.getItem('adminToken');
@@ -1447,8 +1912,8 @@ const handleAttendanceChange = (e) => {
         );
       }
 
-      const response = await fetch(
-        `${API_URL}/api/workouts`,
+      const response = await 
+       fetch(`${API_URL}/api/workouts`, 
         {
           headers: {
             Authorization: `Bearer ${token}`,
@@ -1545,10 +2010,6 @@ const handleAttendanceChange = (e) => {
   const handleAddWorkout = async (e) => {
     e.preventDefault();
 
-     if (!can('workouts', 'add')) {
-    alert('You do not have permission to add workouts.');
-    return;
-  }
     try {
       setAddingWorkout(true);
       setWorkoutFormError('');
@@ -1564,7 +2025,7 @@ const handleAttendanceChange = (e) => {
       }
 
       const response = await fetch(
-        `${API_URL}/api/workouts`,
+        'http://localhost:5000/api/workouts',
         {
           method: 'POST',
           headers: {
@@ -1647,10 +2108,6 @@ const handleAttendanceChange = (e) => {
   };
 
   const handleEditWorkout = (workout) => {
-     if (!can('workouts', 'edit')) {
-    alert('You do not have permission to edit workouts.');
-    return;
-  }
     setEditingWorkout(workout);
 
     setWorkoutForm({
@@ -1701,11 +2158,6 @@ const handleAttendanceChange = (e) => {
   const handleUpdateWorkout = async (e) => {
     e.preventDefault();
 
-    if (!can('workouts', 'edit')) {
-    alert('You do not have permission to edit workouts.');
-    return;
-  }
-
     try {
       setUpdatingWorkout(true);
       setEditWorkoutError('');
@@ -1721,7 +2173,7 @@ const handleAttendanceChange = (e) => {
       }
 
       const response = await fetch(
-        `${API_URL}/api/workouts/${editingWorkout._id}`,
+        `http://localhost:5000/api/workouts/${editingWorkout._id}`,
         {
           method: 'PUT',
           headers: {
@@ -1806,10 +2258,6 @@ const handleAttendanceChange = (e) => {
   const handleDeleteWorkout = async (
     workoutId
   ) => {
-    if (!can('workouts', 'delete')) {
-    alert('You do not have permission to delete workouts.');
-    return;
-  }
     const confirmed = window.confirm(
       'Are you sure you want to delete this workout?'
     );
@@ -1829,7 +2277,7 @@ const handleAttendanceChange = (e) => {
       }
 
       const response = await fetch(
-        `${API_URL}/api/workouts/${workoutId}`,
+        `http://localhost:5000/api/workouts/${workoutId}`,
         {
           method: 'DELETE',
           headers: {
@@ -1874,10 +2322,6 @@ const handleAttendanceChange = (e) => {
   const handleDeleteContact = async (
     contactId
   ) => {
-     if (!can('enquiries', 'delete')) {
-    alert('You do not have permission to delete enquiries.');
-    return;
-  }
     const confirmed = window.confirm(
       'Are you sure you want to delete this enquiry?'
     );
@@ -1897,7 +2341,7 @@ const handleAttendanceChange = (e) => {
       }
 
       const response = await fetch(
-        `${API_URL}/api/contacts/${contactId}`,
+        `http://localhost:5000/api/contacts/${contactId}`,
         {
           method: 'DELETE',
           headers: {
@@ -1946,6 +2390,9 @@ const handleAttendanceChange = (e) => {
     fetchPayments();
     fetchAttendance();
     fetchWorkouts();
+    fetchStaff();
+    fetchPlans();
+    fetchOffers();
   }, []);
 
   // =========================================================
@@ -1959,6 +2406,9 @@ const handleAttendanceChange = (e) => {
     fetchPayments();
     fetchAttendance();
     fetchWorkouts();
+    fetchStaff();
+    fetchPlans();
+    fetchOffers();
   };
 
   // =========================================================
@@ -2091,10 +2541,31 @@ const handleAttendanceChange = (e) => {
           </span>
 
           <strong>
-            ₹
-            {Number(
-              stats.totalPayments
-            ).toLocaleString('en-IN')}
+            {stats.totalPayments}
+          </strong>
+
+        </div>
+
+        <div className="admin-stat-card">
+
+          <span>
+            TOTAL ENQUIRIES
+          </span>
+
+          <strong>
+            {contacts.length}
+          </strong>
+
+        </div>
+
+        <div className="admin-stat-card">
+
+          <span>
+            SYSTEM STATUS
+          </span>
+
+          <strong>
+            ONLINE
           </strong>
 
         </div>
@@ -2105,591 +2576,1407 @@ const handleAttendanceChange = (e) => {
           MEMBER MANAGEMENT
       ===================================================== */}
 
-<section className="admin-enquiries">
+      <section className="admin-enquiries">
 
-  <div className="admin-section-heading">
+        <div className="admin-section-heading">
+
+          <div>
+
+            <span className="section-tag">
+              GYM MEMBERS
+            </span>
+
+            <h2>
+              MEMBER <span>MANAGEMENT.</span>
+            </h2>
+
+          </div>
+
+          <div className="admin-section-actions">
+
+            <span className="admin-count">
+              {filteredMembers.length} / {members.length} MEMBERS
+            </span>
+
+            <button
+              type="button"
+              className="admin-add-btn"
+              onClick={() => {
+
+                setShowAddMember(
+                  (current) => !current
+                );
+
+                setEditingMember(null);
+
+                setMemberFormError('');
+                setEditMemberError('');
+                setMemberSuccess('');
+
+              }}
+            >
+              {showAddMember
+                ? '✕ CLOSE'
+                : '+ ADD MEMBER'}
+            </button>
+
+          </div>
+
+        </div>
+
+        {/* =========================
+            MEMBER FORM
+        ========================= */}
+
+        {showAddMember && (
+
+          <div className="admin-add-member-card">
+
+            <div className="admin-form-heading">
+
+              <span className="section-tag">
+                {editingMember
+                  ? 'EDIT MEMBER'
+                  : 'NEW MEMBER'}
+              </span>
+
+              <h3>
+
+                {editingMember
+                  ? 'EDIT '
+                  : 'ADD '}
+
+                <span>
+                  MEMBER.
+                </span>
+
+              </h3>
+
+            </div>
+
+            <form
+              className="admin-member-form"
+              onSubmit={
+                editingMember
+                  ? handleUpdateMember
+                  : handleAddMember
+              }
+            >
+
+              <div className="admin-login-field">
+
+                <label htmlFor="member-name">
+                  FULL NAME
+                </label>
+
+                <input
+                  id="member-name"
+                  name="name"
+                  type="text"
+                  placeholder="Enter member name"
+                  value={memberForm.name}
+                  onChange={handleMemberChange}
+                  required
+                />
+
+              </div>
+
+              <div className="admin-login-field">
+
+                <label htmlFor="member-phone">
+                  PHONE
+                </label>
+
+                <input
+                  id="member-phone"
+                  name="phone"
+                  type="tel"
+                  placeholder="9876543210"
+                  value={memberForm.phone}
+                  onChange={handleMemberChange}
+                  required
+                />
+
+              </div>
+
+              <div className="admin-login-field">
+
+                <label htmlFor="member-email">
+                  EMAIL
+                </label>
+
+                <input
+                  id="member-email"
+                  name="email"
+                  type="email"
+                  placeholder="member@example.com"
+                  value={memberForm.email}
+                  onChange={handleMemberChange}
+                />
+
+              </div>
+
+              <div className="admin-login-field">
+
+                <label htmlFor="member-age">
+                  AGE
+                </label>
+
+                <input
+                  id="member-age"
+                  name="age"
+                  type="number"
+                  min="1"
+                  max="100"
+                  placeholder="25"
+                  value={memberForm.age}
+                  onChange={handleMemberChange}
+                />
+
+              </div>
+
+              <div className="admin-login-field">
+
+                <label htmlFor="member-gender">
+                  GENDER
+                </label>
+
+                <select
+                  id="member-gender"
+                  name="gender"
+                  value={memberForm.gender}
+                  onChange={handleMemberChange}
+                >
+
+                  <option value="Male">
+                    Male
+                  </option>
+
+                  <option value="Female">
+                    Female
+                  </option>
+
+                  <option value="Other">
+                    Other
+                  </option>
+
+                </select>
+
+              </div>
+
+              <div className="admin-login-field">
+
+                <label htmlFor="membership-plan">
+                  MEMBERSHIP PLAN
+                </label>
+
+                <select
+                  id="membership-plan"
+                  name="membershipPlan"
+                  value={
+                    memberForm.membershipPlan
+                  }
+                  onChange={handleMemberChange}
+                >
+
+                  <option value="Monthly">
+                    Monthly
+                  </option>
+
+                  <option value="Quarterly">
+                    Quarterly
+                  </option>
+
+                  <option value="Half-Yearly">
+                    Half-Yearly
+                  </option>
+
+                  <option value="Yearly">
+                    Yearly
+                  </option>
+
+                </select>
+
+              </div>
+             <div className="admin-login-field">
+
+  <label htmlFor="membership-offer">
+    MEMBERSHIP OFFER
+  </label>
+
+  <select
+    id="membership-offer"
+    name="membershipOffer"
+    value={memberForm.membershipOffer}
+    onChange={handleOfferChange}
+  >
+
+    <option value="">
+      No Offer
+    </option>
+
+    {offers
+      .filter(
+        (offer) => offer.isActive
+      )
+      .map((offer) => (
+        <option
+          key={offer._id}
+          value={offer._id}
+        >
+          {offer.name} - ₹
+          {Number(
+            offer.offerPrice
+          ).toLocaleString('en-IN')}
+        </option>
+      ))}
+
+  </select>
+
+</div>
+              <div className="admin-login-field">
+
+                <label htmlFor="start-date">
+                  MEMBERSHIP START DATE
+                </label>
+
+                <input
+                  id="start-date"
+                  name="membershipStartDate"
+                  type="date"
+                  value={
+                    memberForm.membershipStartDate
+                  }
+                  onChange={handleMemberChange}
+                  required
+                />
+
+              </div>
+
+              <div className="admin-login-field">
+
+                <label htmlFor="end-date">
+                  MEMBERSHIP END DATE
+                </label>
+
+                <input
+                  id="end-date"
+                  name="membershipEndDate"
+                  type="date"
+                  value={
+                    memberForm.membershipEndDate
+                  }
+                  onChange={handleMemberChange}
+                  required
+                />
+
+              </div>
+
+              <div className="admin-login-field">
+
+                <label htmlFor="member-amount">
+                  MEMBERSHIP AMOUNT
+                </label>
+
+                <input
+                  id="member-amount"
+                  name="amount"
+                  type="number"
+                  min="0"
+                  placeholder="1500"
+                  value={memberForm.amount}
+                  onChange={handleMemberChange}
+                  required
+                />
+
+              </div>
+
+              {memberFormError && (
+
+                <div className="admin-login-error">
+                  {memberFormError}
+                </div>
+
+              )}
+
+              {editMemberError && (
+
+                <div className="admin-login-error">
+                  {editMemberError}
+                </div>
+
+              )}
+
+              {memberSuccess && (
+
+                <div className="admin-member-success">
+                  {memberSuccess}
+                </div>
+
+              )}
+
+              <div className="admin-form-actions">
+
+                <button
+                  type="button"
+                  className="admin-cancel-btn"
+                  onClick={() => {
+
+                    setShowAddMember(false);
+                    setEditingMember(null);
+
+                    setMemberFormError('');
+                    setEditMemberError('');
+                    setMemberSuccess('');
+
+                  }}
+                >
+                  CANCEL
+                </button>
+
+                <button
+                  type="submit"
+                  className="admin-add-submit-btn"
+                  disabled={
+                    addingMember ||
+                    updatingMember
+                  }
+                >
+
+                  {addingMember ||
+                  updatingMember
+                    ? editingMember
+                      ? 'UPDATING MEMBER...'
+                      : 'ADDING MEMBER...'
+                    : editingMember
+                      ? 'UPDATE MEMBER →'
+                      : 'ADD MEMBER →'}
+
+                </button>
+
+              </div>
+
+            </form>
+
+          </div>
+
+        )}
+
+        {/* =========================
+            MEMBER SEARCH & FILTER
+        ========================= */}
+
+        {!membersLoading &&
+          !membersError &&
+          members.length > 0 && (
+            <div className="admin-member-filters">
+              <input
+                type="text"
+                placeholder="Search by name or phone..."
+                value={memberSearch}
+                onChange={(e) =>
+                  setMemberSearch(e.target.value)
+                }
+              />
+
+              <select
+                value={memberStatusFilter}
+                onChange={(e) =>
+                  setMemberStatusFilter(e.target.value)
+                }
+              >
+                <option value="All">All Members</option>
+                <option value="Active">Active</option>
+                <option value="Expired">Expired</option>
+              </select>
+            </div>
+          )}
+
+        {membersLoading && (
+
+          <div className="admin-message">
+            Loading members...
+          </div>
+
+        )}
+
+        {!membersLoading &&
+          membersError && (
+
+            <div className="admin-message admin-error">
+              {membersError}
+            </div>
+
+          )}
+
+        {!membersLoading &&
+          !membersError &&
+          members.length === 0 && (
+
+            <div className="admin-message">
+              No members found.
+            </div>
+
+          )}
+
+        {!membersLoading &&
+          !membersError &&
+          filteredMembers.length > 0 && (
+
+            <div className="admin-table-wrapper">
+
+              <table className="admin-table">
+
+                <thead>
+
+                  <tr>
+                    <th>#</th>
+                    <th>NAME</th>
+                    <th>PHONE</th>
+                    <th>PLAN</th>
+                    <th>AMOUNT</th>
+                    <th>START</th>
+                    <th>END</th>
+                    <th>STATUS</th>
+                    <th>ACTION</th>
+                  </tr>
+
+                </thead>
+
+                <tbody>
+
+                  {filteredMembers.map(
+                    (member, index) => (
+
+                      <tr
+                        key={
+                          member._id ||
+                          index
+                        }
+                      >
+
+                        <td>
+                          {String(
+                            index + 1
+                          ).padStart(2, '0')}
+                        </td>
+
+                        <td>
+                          <strong>
+                            {member.name}
+                          </strong>
+                        </td>
+
+                        <td>
+                          {member.phone}
+                        </td>
+
+                        <td>
+
+                          <span className="goal-badge">
+                            {
+                              member.membershipPlan
+                            }
+                          </span>
+
+                        </td>
+
+                        <td>
+                          ₹
+                          {Number(
+                            member.amount
+                          ).toLocaleString(
+                            'en-IN'
+                          )}
+                        </td>
+
+                        <td>
+                          {member.membershipStartDate
+                            ? new Date(
+                                member.membershipStartDate
+                              ).toLocaleDateString(
+                                'en-IN'
+                              )
+                            : '-'}
+                        </td>
+
+                        <td>
+                          {member.membershipEndDate
+                            ? new Date(
+                                member.membershipEndDate
+                              ).toLocaleDateString(
+                                'en-IN'
+                              )
+                            : '-'}
+                        </td>
+
+                        <td>
+
+                          <span className="goal-badge">
+                            {member.status}
+                          </span>
+
+                        </td>
+
+                        <td>
+
+                          <button
+                            type="button"
+                            className="admin-view-btn"
+                            onClick={() =>
+                              navigate(`/admin/members/${member._id}`)
+                            }
+                          >
+                            VIEW
+                          </button>
+
+                          <button
+                            type="button"
+                            className="admin-edit-btn"
+                            onClick={() =>
+                              handleEditMember(
+                                member
+                              )
+                            }
+                          >
+                            EDIT
+                          </button>
+
+                          <button
+                            type="button"
+                            className="admin-delete-btn"
+                            onClick={() =>
+                              handleDeleteMember(
+                                member._id
+                              )
+                            }
+                          >
+                            DELETE
+                          </button>
+
+                        </td>
+
+                      </tr>
+
+                    )
+                  )}
+
+                </tbody>
+
+              </table>
+
+            </div>
+
+          )}
+
+      </section>
+
+        {!membersLoading &&
+          !membersError &&
+          members.length > 0 &&
+          filteredMembers.length === 0 && (
+            <div className="admin-message">
+              No members match your search or filter.
+            </div>
+          )}
+
+
+      {/* =====================================================
+          PROMOTIONAL OFFERS
+      ===================================================== */}
+
+      <section className="admin-enquiries">
+
+        <div className="admin-section-heading">
+
+          <div>
+            <span className="section-tag">
+              PROMOTIONAL OFFERS
+            </span>
+
+            <h2>
+              OFFER <span>MANAGEMENT.</span>
+            </h2>
+
+            <p>
+              Manage the promotional offers used by Alpha Gym.
+            </p>
+          </div>
+
+          <div className="admin-section-actions">
+  <span className="admin-count">
+    {offers.length} OFFERS
+  </span>
+
+  <button
+    type="button"
+    className="admin-add-btn"
+    onClick={createDefaultOffers}
+    disabled={creatingOffers}
+  >
+    {creatingOffers
+      ? 'CREATING...'
+      : '+ CREATE DEFAULT OFFERS'}
+  </button>
+</div>
+
+</div>
+
+{offersLoading && (
+  <div className="admin-message">
+    Loading offers...
+  </div>
+)}
+
+{!offersLoading && offersError && (
+  <div className="admin-message admin-error">
+    {offersError}
+  </div>
+)}
+
+{!offersLoading &&
+  !offersError &&
+  offers.length === 0 && (
+    <div className="admin-message">
+      No promotional offers found. Click
+      <strong> + CREATE DEFAULT OFFERS</strong>
+      {' '}to add the four Alpha Gym offers.
+    </div>
+  )}
+
+{!offersLoading &&
+  !offersError &&
+  offers.length > 0 && (
+    <div
+      style={{
+        display: 'grid',
+        gridTemplateColumns:
+          'repeat(auto-fit, minmax(230px, 1fr))',
+        gap: '18px',
+      }}
+    >
+      {offers.map((offer, index) => (
+        <div
+          key={offer._id || index}
+          style={{
+            background:
+              'linear-gradient(145deg, #15151c, #0d0d12)',
+            border:
+              '1px solid rgba(255,255,255,0.10)',
+            borderRadius: '18px',
+            padding: '24px',
+            minHeight: '330px',
+            display: 'flex',
+            flexDirection: 'column',
+          }}
+        >
+
+          <div
+            style={{
+              display: 'flex',
+              justifyContent: 'space-between',
+              alignItems: 'center',
+              gap: '10px',
+              marginBottom: '18px',
+            }}
+          >
+            <span className="section-tag">
+              {offer.plan?.name || 'GYM OFFER'}
+            </span>
+
+            <div
+              style={{
+                display: 'flex',
+                alignItems: 'center',
+                gap: '8px',
+              }}
+            >
+              <span className="goal-badge">
+                {offer.isActive
+                  ? 'ACTIVE'
+                  : 'INACTIVE'}
+              </span>
+
+              <button
+                type="button"
+                className="admin-add-btn"
+                onClick={() =>
+                  handleToggleOfferStatus(offer)
+                }
+              >
+                {offer.isActive
+                  ? 'DEACTIVATE'
+                  : 'ACTIVATE'}
+              </button>
+            </div>
+          </div>
+
+          <h3
+            style={{
+              margin: '0 0 12px',
+              fontSize: '27px',
+              lineHeight: '1.05',
+            }}
+          >
+            {offer.name}
+          </h3>
+
+          <p
+            style={{
+              margin: '0 0 18px',
+              color: '#aaa',
+              lineHeight: '1.55',
+            }}
+          >
+            {offer.description ||
+              'Alpha Gym promotional offer.'}
+          </p>
+
+          <div style={{ marginBottom: '18px' }}>
+            <span
+              style={{
+                display: 'block',
+                fontSize: '11px',
+                letterSpacing: '1.5px',
+                opacity: 0.65,
+                marginBottom: '5px',
+              }}
+            >
+              SPECIAL PRICE
+            </span>
+
+            <strong style={{ fontSize: '34px' }}>
+              ₹{Number(
+                offer.offerPrice
+              ).toLocaleString('en-IN')}
+            </strong>
+          </div>
+
+          <div
+            style={{
+              display: 'grid',
+              gap: '8px',
+              marginTop: 'auto',
+            }}
+          >
+            {(offer.benefits || []).map(
+              (benefit, benefitIndex) => (
+                <span
+                  key={benefitIndex}
+                  style={{
+                    color: '#bbb',
+                    fontSize: '14px',
+                  }}
+                >
+                  ✓ {benefit}
+                </span>
+              )
+            )}
+          </div>
+
+        </div>
+      ))}
+    </div>
+  )}
+
+</section>
+{/* =====================================================
+    STAFF MANAGEMENT
+===================================================== */}
+
+<section className="admin-staff-management">
+
+  {/* STAFF HEADER */}
+  <div className="staff-header">
 
     <div>
-
-      <span className="section-tag">
-        GYM MEMBERS
+      <span className="staff-eyebrow">
+        TEAM & ACCESS
       </span>
 
       <h2>
-        MEMBER <span>MANAGEMENT.</span>
+        STAFF <span>MANAGEMENT.</span>
       </h2>
+
+      <p>
+        Manage receptionist accounts and control dashboard access.
+      </p>
+    </div>
+
+    <div className="staff-header-stats">
+
+      <div className="staff-stat-card">
+        <span className="staff-stat-number">
+          {staff.length}
+        </span>
+
+        <span className="staff-stat-label">
+          TOTAL STAFF
+        </span>
+      </div>
+
+      <div className="staff-stat-card">
+        <span className="staff-stat-number staff-green">
+          {
+            staff.filter(
+              (member) => member.status === 'active'
+            ).length
+          }
+        </span>
+
+        <span className="staff-stat-label">
+          ACTIVE
+        </span>
+      </div>
 
     </div>
 
-    <div className="admin-section-actions">
+  </div>
 
-      <span className="admin-count">
-        {filteredMembers.length} / {members.length} MEMBERS
-      </span>
+  {/* MESSAGES */}
 
-      {can('members', 'add') && (
-        <button
-          type="button"
-          className="admin-add-btn"
-          onClick={() => {
+  {staffError && !selectedStaff && (
+    <div className="staff-message staff-message-error">
+      <span>!</span>
+      {staffError}
+    </div>
+  )}
 
-            setShowAddMember(
-              (current) => !current
+  {staffSuccess && (
+    <div className="staff-message staff-message-success">
+      <span>✓</span>
+      {staffSuccess}
+    </div>
+  )}
+
+  {/* MAIN STAFF AREA */}
+
+  <div className="staff-layout">
+
+    {/* ==========================================
+        STAFF ACCOUNTS
+    ========================================== */}
+
+    <div className="staff-list-panel">
+
+      <div className="staff-panel-heading">
+
+        <div>
+          <span className="staff-panel-label">
+            TEAM
+          </span>
+
+          <h3>
+            STAFF ACCOUNTS
+          </h3>
+        </div>
+
+        <span className="staff-panel-count">
+          {staff.length}
+        </span>
+
+      </div>
+
+      {staff.length === 0 ? (
+
+        <div className="staff-empty">
+          <div className="staff-empty-icon">
+            👤
+          </div>
+
+          <strong>
+            No staff accounts
+          </strong>
+
+          <span>
+            Staff accounts will appear here.
+          </span>
+        </div>
+
+      ) : (
+
+        <div className="staff-account-list">
+
+          {staff.map((member) => {
+
+            const initials = member.name
+              ? member.name
+                  .split(/\s+/)
+                  .map((part) => part.charAt(0))
+                  .join('')
+                  .slice(0, 2)
+                  .toUpperCase()
+              : 'ST';
+
+            const isSelected =
+              selectedStaff?._id === member._id;
+
+            const isActive =
+              member.status === 'active';
+
+            return (
+              <button
+                type="button"
+                key={member._id}
+                className={`staff-account ${
+                  isSelected
+                    ? 'staff-account-selected'
+                    : ''
+                }`}
+                onClick={() => {
+                  setSelectedStaff(member);
+
+                  setPermissions(
+                    normalizeStaffPermissions(member)
+                  );
+
+                  setStaffSuccess('');
+                  setStaffError('');
+                }}
+              >
+
+                {/* AVATAR */}
+
+                <div className="staff-avatar">
+                  {initials}
+                </div>
+
+                {/* INFO */}
+
+                <div className="staff-account-info">
+
+                  <strong>
+                    {member.name || 'Staff Member'}
+                  </strong>
+
+                  <span className="staff-account-meta">
+                    {member.email}
+                  </span>
+
+                  <span
+                    className={`staff-status ${
+                      isActive
+                        ? 'staff-status-active'
+                        : 'staff-status-inactive'
+                    }`}
+                  >
+                    {isActive
+                      ? 'ACTIVE'
+                      : 'INACTIVE'}
+                  </span>
+
+                </div>
+
+                {/* ARROW */}
+
+                <span className="staff-account-arrow">
+                  →
+                </span>
+
+              </button>
             );
+          })}
 
-            setEditingMember(null);
+        </div>
 
-            setMemberFormError('');
-            setEditMemberError('');
-            setMemberSuccess('');
+      )}
 
-          }}
-        >
-          {showAddMember
-            ? '✕ CLOSE'
-            : '+ ADD MEMBER'}
-        </button>
+    </div>
+
+
+    {/* ==========================================
+        ACCESS CONTROL
+    ========================================== */}
+
+    <div className="staff-permission-panel">
+
+      {!selectedStaff ? (
+
+        <div className="staff-no-selection">
+
+          <div className="staff-no-selection-icon">
+            🔐
+          </div>
+
+          <h3>
+            SELECT A STAFF ACCOUNT
+          </h3>
+
+          <p>
+            Select a staff member from the left
+            to manage their permissions.
+          </p>
+
+        </div>
+
+      ) : (
+
+        <>
+
+          {/* PROFILE HEADER */}
+
+          <div className="staff-profile">
+
+            <div className="staff-profile-main">
+
+              <div className="staff-profile-identity">
+
+                <div className="staff-profile-avatar">
+
+                  {selectedStaff.name
+                    ? selectedStaff.name
+                        .split(/\s+/)
+                        .map((part) =>
+                          part.charAt(0)
+                        )
+                        .join('')
+                        .slice(0, 2)
+                        .toUpperCase()
+                    : 'ST'}
+
+                </div>
+
+                <div>
+
+                  <span className="staff-panel-label">
+                    STAFF PROFILE
+                  </span>
+
+                  <h3>
+                    {selectedStaff.name}
+                  </h3>
+
+                  <p>
+                    {selectedStaff.email}
+                  </p>
+
+                </div>
+
+              </div>
+
+
+              {/* ACCOUNT STATUS */}
+
+              <div className="staff-profile-status">
+
+                <span
+                  className={`staff-profile-status-badge ${
+                    selectedStaff.status === 'active'
+                      ? 'staff-badge-active'
+                      : 'staff-badge-inactive'
+                  }`}
+                >
+                  <span className="staff-status-dot" />
+                  {selectedStaff.status === 'active'
+                    ? 'ACTIVE'
+                    : 'INACTIVE'}
+                </span>
+
+                <button
+                  type="button"
+                  className={`staff-status-button ${
+                    selectedStaff.status === 'active'
+                      ? 'staff-deactivate'
+                      : 'staff-activate'
+                  }`}
+                  onClick={() =>
+                    handleToggleStaffStatus(
+                      selectedStaff
+                    )
+                  }
+                >
+                  {selectedStaff.status === 'active'
+                    ? 'DEACTIVATE'
+                    : 'ACTIVATE'}
+                </button>
+
+              </div>
+
+            </div>
+
+
+            {/* PERMISSION SUMMARY */}
+
+            <div className="staff-permission-summary">
+
+              <div>
+                <span>
+                  ACCESS LEVEL
+                </span>
+
+                <strong>
+                  RECEPTIONIST
+                </strong>
+              </div>
+
+              <div>
+                <span>
+                  PERMISSIONS
+                </span>
+
+                <strong>
+                  {permissionCount}
+                  <small>/18</small>
+                </strong>
+              </div>
+
+              <div>
+                <span>
+                  ACCOUNT
+                </span>
+
+                <strong>
+                  {selectedStaff.status === 'active'
+                    ? 'ENABLED'
+                    : 'DISABLED'}
+                </strong>
+              </div>
+
+            </div>
+
+          </div>
+
+
+          {/* PERMISSION HEADING */}
+
+          <div className="staff-permission-heading">
+
+            <div>
+
+              <span className="staff-panel-label">
+                ACCESS CONTROL
+              </span>
+
+              <h3>
+                PERMISSION <span>CONTROL.</span>
+              </h3>
+
+              <p>
+                Choose exactly what this staff member
+                can view, add, edit or delete.
+              </p>
+
+            </div>
+
+            <div className="staff-permission-total">
+
+              <strong>
+                {permissionCount}
+              </strong>
+
+              <span>
+                ENABLED
+              </span>
+
+            </div>
+
+          </div>
+
+
+          {/* PERMISSION CARDS */}
+
+          <div className="staff-permission-grid">
+
+            {[
+              {
+                key: 'members',
+                label: 'MEMBERS',
+                icon: '👥',
+                description:
+                  'Member records and profiles',
+                permissions: [
+                  'view',
+                  'add',
+                  'edit',
+                  'delete',
+                ],
+              },
+
+              {
+                key: 'payments',
+                label: 'PAYMENTS',
+                icon: '₹',
+                description:
+                  'Membership payments',
+                permissions: [
+                  'view',
+                  'add',
+                  'edit',
+                  'delete',
+                ],
+              },
+
+              {
+                key: 'attendance',
+                label: 'ATTENDANCE',
+                icon: '✓',
+                description:
+                  'Member attendance',
+                permissions: [
+                  'view',
+                  'add',
+                  'edit',
+                  'delete',
+                ],
+              },
+
+              {
+                key: 'workouts',
+                label: 'WORKOUTS',
+                icon: '⚡',
+                description:
+                  'Workout programmes',
+                permissions: [
+                  'view',
+                  'add',
+                  'edit',
+                  'delete',
+                ],
+              },
+
+              {
+                key: 'enquiries',
+                label: 'ENQUIRIES',
+                icon: '✉',
+                description:
+                  'Member enquiries',
+                permissions: [
+                  'view',
+                  'delete',
+                ],
+              },
+            ].map((section) => {
+
+              const enabledCount =
+                Object.values(
+                  permissions[section.key] || {}
+                ).filter(Boolean).length;
+
+              return (
+                <div
+                  className="staff-permission-card"
+                  key={section.key}
+                >
+
+                  {/* CARD HEADER */}
+
+                  <div className="staff-permission-card-header">
+
+                    <div className="staff-permission-title">
+
+                      <div className="staff-permission-icon">
+                        {section.icon}
+                      </div>
+
+                      <div>
+                        <strong>
+                          {section.label}
+                        </strong>
+
+                        <span>
+                          {section.description}
+                        </span>
+                      </div>
+
+                    </div>
+
+                    <div className="staff-permission-counter">
+                      {enabledCount}/
+                      {section.permissions.length}
+                    </div>
+
+                  </div>
+
+
+                  {/* PERMISSION OPTIONS */}
+
+                  <div className="staff-permission-options">
+
+                    {section.permissions.map(
+                      (permission) => {
+
+                        const checked =
+                          permissions[
+                            section.key
+                          ]?.[permission] || false;
+
+                        return (
+                          <label
+                            key={permission}
+                            className={`staff-permission-option ${
+                              checked
+                                ? 'staff-permission-enabled'
+                                : ''
+                            }`}
+                          >
+
+                            <input
+                              type="checkbox"
+                              checked={checked}
+                              onChange={() =>
+                                handlePermissionChange(
+                                  section.key,
+                                  permission
+                                )
+                              }
+                            />
+
+                            <span className="staff-custom-check">
+                              {checked ? '✓' : ''}
+                            </span>
+
+                            <span className="staff-permission-name">
+                              {permission
+                                .charAt(0)
+                                .toUpperCase() +
+                                permission.slice(1)}
+                            </span>
+
+                          </label>
+                        );
+                      }
+                    )}
+
+                  </div>
+
+                </div>
+              );
+            })}
+
+          </div>
+
+
+          {/* SAVE */}
+
+          <div className="staff-save-area">
+
+            <div className="staff-save-note">
+              <span>●</span>
+              Changes are saved to this account.
+            </div>
+
+            <button
+              type="button"
+              className="staff-save-button"
+              onClick={handleSavePermissions}
+              disabled={savingPermissions}
+            >
+              {savingPermissions
+                ? 'SAVING...'
+                : 'SAVE PERMISSIONS  →'}
+            </button>
+
+          </div>
+
+        </>
+
       )}
 
     </div>
 
   </div>
 
-
-  {/* =========================
-      MEMBER FORM
-  ========================= */}
-
-  {showAddMember && (
-
-    <div className="admin-add-member-card">
-
-      <div className="admin-form-heading">
-
-        <span className="section-tag">
-          {editingMember
-            ? 'EDIT MEMBER'
-            : 'NEW MEMBER'}
-        </span>
-
-        <h3>
-          {editingMember
-            ? 'EDIT '
-            : 'ADD '}
-
-          <span>
-            MEMBER.
-          </span>
-        </h3>
-
-      </div>
-
-
-      <form
-        className="admin-member-form"
-        onSubmit={
-          editingMember
-            ? handleUpdateMember
-            : handleAddMember
-        }
-      >
-
-        <div className="admin-login-field">
-
-          <label htmlFor="member-name">
-            FULL NAME
-          </label>
-
-          <input
-            id="member-name"
-            name="name"
-            type="text"
-            placeholder="Enter member name"
-            value={memberForm.name}
-            onChange={handleMemberChange}
-            required
-          />
-
-        </div>
-
-
-        <div className="admin-login-field">
-
-          <label htmlFor="member-phone">
-            PHONE
-          </label>
-
-          <input
-            id="member-phone"
-            name="phone"
-            type="tel"
-            placeholder="9876543210"
-            value={memberForm.phone}
-            onChange={handleMemberChange}
-            required
-          />
-
-        </div>
-
-
-        <div className="admin-login-field">
-
-          <label htmlFor="member-email">
-            EMAIL
-          </label>
-
-          <input
-            id="member-email"
-            name="email"
-            type="email"
-            placeholder="member@example.com"
-            value={memberForm.email}
-            onChange={handleMemberChange}
-          />
-
-        </div>
-
-
-        <div className="admin-login-field">
-
-          <label htmlFor="member-age">
-            AGE
-          </label>
-
-          <input
-            id="member-age"
-            name="age"
-            type="number"
-            min="1"
-            max="100"
-            placeholder="25"
-            value={memberForm.age}
-            onChange={handleMemberChange}
-          />
-
-        </div>
-
-
-        <div className="admin-login-field">
-
-          <label htmlFor="member-gender">
-            GENDER
-          </label>
-
-          <select
-            id="member-gender"
-            name="gender"
-            value={memberForm.gender}
-            onChange={handleMemberChange}
-          >
-
-            <option value="Male">
-              Male
-            </option>
-
-            <option value="Female">
-              Female
-            </option>
-
-            <option value="Other">
-              Other
-            </option>
-
-          </select>
-
-        </div>
-
-
-        <div className="admin-login-field">
-
-          <label htmlFor="membership-plan">
-            MEMBERSHIP PLAN
-          </label>
-
-          <select
-            id="membership-plan"
-            name="membershipPlan"
-            value={memberForm.membershipPlan}
-            onChange={handleMemberChange}
-          >
-
-            <option value="Monthly">
-              Monthly
-            </option>
-
-            <option value="Quarterly">
-              Quarterly
-            </option>
-
-            <option value="Half-Yearly">
-              Half-Yearly
-            </option>
-
-            <option value="Yearly">
-              Yearly
-            </option>
-
-          </select>
-
-        </div>
-
-
-        <div className="admin-login-field">
-
-          <label htmlFor="start-date">
-            MEMBERSHIP START DATE
-          </label>
-
-          <input
-            id="start-date"
-            name="membershipStartDate"
-            type="date"
-            value={memberForm.membershipStartDate}
-            onChange={handleMemberChange}
-            required
-          />
-
-        </div>
-
-
-        <div className="admin-login-field">
-
-          <label htmlFor="end-date">
-            MEMBERSHIP END DATE
-          </label>
-
-          <input
-            id="end-date"
-            name="membershipEndDate"
-            type="date"
-            value={memberForm.membershipEndDate}
-            onChange={handleMemberChange}
-            required
-          />
-
-        </div>
-
-
-        <div className="admin-login-field">
-
-          <label htmlFor="member-amount">
-            MEMBERSHIP AMOUNT
-          </label>
-
-          <input
-            id="member-amount"
-            name="amount"
-            type="number"
-            min="0"
-            placeholder="1500"
-            value={memberForm.amount}
-            onChange={handleMemberChange}
-            required
-          />
-
-        </div>
-
-
-        {memberFormError && (
-          <div className="admin-login-error">
-            {memberFormError}
-          </div>
-        )}
-
-
-        {editMemberError && (
-          <div className="admin-login-error">
-            {editMemberError}
-          </div>
-        )}
-
-
-        {memberSuccess && (
-          <div className="admin-member-success">
-            {memberSuccess}
-          </div>
-        )}
-
-
-        <div className="admin-form-actions">
-
-          <button
-            type="button"
-            className="admin-cancel-btn"
-            onClick={() => {
-
-              setShowAddMember(false);
-              setEditingMember(null);
-
-              setMemberFormError('');
-              setEditMemberError('');
-              setMemberSuccess('');
-
-            }}
-          >
-            CANCEL
-          </button>
-
-
-          <button
-            type="submit"
-            className="admin-add-submit-btn"
-            disabled={
-              addingMember ||
-              updatingMember
-            }
-          >
-
-            {addingMember || updatingMember
-              ? editingMember
-                ? 'UPDATING MEMBER...'
-                : 'ADDING MEMBER...'
-              : editingMember
-                ? 'UPDATE MEMBER →'
-                : 'ADD MEMBER →'}
-
-          </button>
-
-        </div>
-
-      </form>
-
-    </div>
-
-  )}
-
-
-  {/* =========================
-      MEMBER SEARCH & FILTER
-  ========================= */}
-
-  {!membersLoading &&
-    !membersError &&
-    members.length > 0 && (
-
-      <div className="admin-member-filters">
-
-        <input
-          type="text"
-          placeholder="Search by name or phone..."
-          value={memberSearch}
-          onChange={(e) =>
-            setMemberSearch(e.target.value)
-          }
-        />
-
-        <select
-          value={memberStatusFilter}
-          onChange={(e) =>
-            setMemberStatusFilter(e.target.value)
-          }
-        >
-
-          <option value="All">
-            All Members
-          </option>
-
-          <option value="Active">
-            Active
-          </option>
-
-          <option value="Expired">
-            Expired
-          </option>
-
-        </select>
-
-      </div>
-
-    )}
-
-
-  {membersLoading && (
-    <div className="admin-message">
-      Loading members...
-    </div>
-  )}
-
-
-  {!membersLoading && membersError && (
-    <div className="admin-message admin-error">
-      {membersError}
-    </div>
-  )}
-
-
-  {!membersLoading &&
-    !membersError &&
-    members.length === 0 && (
-
-      <div className="admin-message">
-        No members found.
-      </div>
-
-    )}
-
-
-  {!membersLoading &&
-    !membersError &&
-    filteredMembers.length > 0 && (
-
-      <div className="admin-table-wrapper">
-
-        <table className="admin-table">
-
-          <thead>
-
-            <tr>
-              <th>#</th>
-              <th>NAME</th>
-              <th>PHONE</th>
-              <th>PLAN</th>
-              <th>AMOUNT</th>
-              <th>START</th>
-              <th>END</th>
-              <th>STATUS</th>
-              <th>ACTION</th>
-            </tr>
-
-          </thead>
-
-
-          <tbody>
-
-            {filteredMembers.map(
-              (member, index) => (
-
-                <tr
-                  key={
-                    member._id ||
-                    index
-                  }
-                >
-
-                  <td>
-                    {String(
-                      index + 1
-                    ).padStart(2, '0')}
-                  </td>
-
-                  <td>
-                    <strong>
-                      {member.name}
-                    </strong>
-                  </td>
-
-                  <td>
-                    {member.phone}
-                  </td>
-
-                  <td>
-                    <span className="goal-badge">
-                      {member.membershipPlan}
-                    </span>
-                  </td>
-
-                  <td>
-                    ₹
-                    {Number(
-                      member.amount
-                    ).toLocaleString('en-IN')}
-                  </td>
-
-                  <td>
-                    {member.membershipStartDate
-                      ? new Date(
-                          member.membershipStartDate
-                        ).toLocaleDateString('en-IN')
-                      : '-'}
-                  </td>
-
-                  <td>
-                    {member.membershipEndDate
-                      ? new Date(
-                          member.membershipEndDate
-                        ).toLocaleDateString('en-IN')
-                      : '-'}
-                  </td>
-
-                  <td>
-                    <span className="goal-badge">
-                      {member.status}
-                    </span>
-                  </td>
-
-                  <td>
-
-                    <button
-                      type="button"
-                      className="admin-view-btn"
-                      onClick={() =>
-                        navigate(
-                          `/admin/members/${member._id}`
-                        )
-                      }
-                    >
-                      VIEW
-                    </button>
-
-
-                    {can('members', 'edit') && (
-                      <button
-                        type="button"
-                        className="admin-edit-btn"
-                        onClick={() =>
-                          handleEditMember(member)
-                        }
-                      >
-                        EDIT
-                      </button>
-                    )}
-
-
-                    {can('members', 'delete') && (
-                      <button
-                        type="button"
-                        className="admin-delete-btn"
-                        onClick={() =>
-                          handleDeleteMember(
-                            member._id
-                          )
-                        }
-                      >
-                        DELETE
-                      </button>
-                    )}
-
-                  </td>
-
-                </tr>
-
-              )
-            )}
-
-          </tbody>
-
-        </table>
-
-      </div>
-
-    )}
-
-
 </section>
-
-
-{!membersLoading &&
-  !membersError &&
-  members.length > 0 &&
-  filteredMembers.length === 0 && (
-
-    <div className="admin-message">
-      No members match your search or filter.
-    </div>
-
-  )}
-
-
 {/* =====================================================
     PAYMENT MANAGEMENT
 ===================================================== */}
@@ -2708,6 +3995,10 @@ const handleAttendanceChange = (e) => {
         PAYMENT <span>MANAGEMENT.</span>
       </h2>
 
+      <p>
+        Track membership payments, invoices and transaction status.
+      </p>
+
     </div>
 
 
@@ -2717,39 +4008,34 @@ const handleAttendanceChange = (e) => {
         {payments.length} PAYMENTS
       </span>
 
+      <button
+        type="button"
+        className="admin-add-btn"
+        onClick={() => {
 
-      {can('payments', 'add') && (
-        <button
-          type="button"
-          className="admin-add-btn"
-          onClick={() => {
+          setShowAddPayment(
+            (current) => !current
+          );
 
-            setShowAddPayment(
-              (current) => !current
-            );
+          setEditingPayment(null);
 
-            setEditingPayment(null);
+          setPaymentFormError('');
+          setEditPaymentError('');
+          setPaymentSuccess('');
 
-            setPaymentFormError('');
-            setEditPaymentError('');
-            setPaymentSuccess('');
-
-          }}
-        >
-          {showAddPayment
-            ? '✕ CLOSE'
-            : '+ ADD PAYMENT'}
-        </button>
-      )}
+        }}
+      >
+        {showAddPayment
+          ? '✕ CLOSE'
+          : '+ ADD PAYMENT'}
+      </button>
 
     </div>
 
   </div>
 
 
-  {/* =========================
-      PAYMENT FORM
-  ========================= */}
+  {/* PAYMENT FORM */}
 
   {showAddPayment && (
 
@@ -2803,18 +4089,16 @@ const handleAttendanceChange = (e) => {
               Select member
             </option>
 
-            {members.map(
-              (member) => (
+            {members.map((member) => (
 
-                <option
-                  key={member._id}
-                  value={member._id}
-                >
-                  {member.name} — {member.phone}
-                </option>
+              <option
+                key={member._id}
+                value={member._id}
+              >
+                {member.name} — {member.phone}
+              </option>
 
-              )
-            )}
+            ))}
 
           </select>
 
@@ -2832,7 +4116,9 @@ const handleAttendanceChange = (e) => {
             name="invoiceNumber"
             type="text"
             placeholder="INV-001"
-            value={paymentForm.invoiceNumber}
+            value={
+              paymentForm.invoiceNumber
+            }
             onChange={handlePaymentChange}
             required
           />
@@ -2852,7 +4138,9 @@ const handleAttendanceChange = (e) => {
             type="number"
             min="0"
             placeholder="1500"
-            value={paymentForm.amount}
+            value={
+              paymentForm.amount
+            }
             onChange={handlePaymentChange}
             required
           />
@@ -2869,7 +4157,9 @@ const handleAttendanceChange = (e) => {
           <select
             id="payment-method"
             name="paymentMethod"
-            value={paymentForm.paymentMethod}
+            value={
+              paymentForm.paymentMethod
+            }
             onChange={handlePaymentChange}
           >
 
@@ -2904,7 +4194,9 @@ const handleAttendanceChange = (e) => {
             id="payment-date"
             name="paymentDate"
             type="date"
-            value={paymentForm.paymentDate}
+            value={
+              paymentForm.paymentDate
+            }
             onChange={handlePaymentChange}
           />
 
@@ -2920,7 +4212,9 @@ const handleAttendanceChange = (e) => {
           <select
             id="payment-status"
             name="status"
-            value={paymentForm.status}
+            value={
+              paymentForm.status
+            }
             onChange={handlePaymentChange}
           >
 
@@ -2952,7 +4246,9 @@ const handleAttendanceChange = (e) => {
             name="notes"
             type="text"
             placeholder="Optional payment notes"
-            value={paymentForm.notes}
+            value={
+              paymentForm.notes
+            }
             onChange={handlePaymentChange}
           />
 
@@ -2960,23 +4256,29 @@ const handleAttendanceChange = (e) => {
 
 
         {paymentFormError && (
+
           <div className="admin-login-error">
             {paymentFormError}
           </div>
+
         )}
 
 
         {editPaymentError && (
+
           <div className="admin-login-error">
             {editPaymentError}
           </div>
+
         )}
 
 
         {paymentSuccess && (
+
           <div className="admin-member-success">
             {paymentSuccess}
           </div>
+
         )}
 
 
@@ -3008,15 +4310,16 @@ const handleAttendanceChange = (e) => {
               updatingPayment
             }
           >
+            {addingPayment ||
+            updatingPayment
 
-            {addingPayment || updatingPayment
               ? editingPayment
                 ? 'UPDATING PAYMENT...'
                 : 'ADDING PAYMENT...'
+
               : editingPayment
                 ? 'UPDATE PAYMENT →'
                 : 'ADD PAYMENT →'}
-
           </button>
 
         </div>
@@ -3028,18 +4331,25 @@ const handleAttendanceChange = (e) => {
   )}
 
 
+  {/* PAYMENT STATES */}
+
   {paymentsLoading && (
+
     <div className="admin-message">
       Loading payments...
     </div>
+
   )}
 
 
-  {!paymentsLoading && paymentsError && (
-    <div className="admin-message admin-error">
-      {paymentsError}
-    </div>
-  )}
+  {!paymentsLoading &&
+    paymentsError && (
+
+      <div className="admin-message admin-error">
+        {paymentsError}
+      </div>
+
+    )}
 
 
   {!paymentsLoading &&
@@ -3053,6 +4363,8 @@ const handleAttendanceChange = (e) => {
     )}
 
 
+  {/* PAYMENT TABLE */}
+
   {!paymentsLoading &&
     !paymentsError &&
     payments.length > 0 && (
@@ -3064,6 +4376,7 @@ const handleAttendanceChange = (e) => {
           <thead>
 
             <tr>
+
               <th>#</th>
               <th>MEMBER</th>
               <th>INVOICE</th>
@@ -3072,6 +4385,7 @@ const handleAttendanceChange = (e) => {
               <th>DATE</th>
               <th>STATUS</th>
               <th>ACTION</th>
+
             </tr>
 
           </thead>
@@ -3095,73 +4409,97 @@ const handleAttendanceChange = (e) => {
                     ).padStart(2, '0')}
                   </td>
 
+
                   <td>
+
                     <strong>
                       {payment.member?.name ||
                         'Unknown Member'}
                     </strong>
+
                   </td>
+
 
                   <td>
                     {payment.invoiceNumber}
                   </td>
 
-                  <td>
-                    ₹
-                    {Number(
-                      payment.amount
-                    ).toLocaleString('en-IN')}
-                  </td>
 
                   <td>
+
+                    <strong>
+                      ₹
+                      {Number(
+                        payment.amount
+                      ).toLocaleString(
+                        'en-IN'
+                      )}
+                    </strong>
+
+                  </td>
+
+
+                  <td>
+
                     <span className="goal-badge">
                       {payment.paymentMethod}
                     </span>
+
                   </td>
 
+
                   <td>
+
                     {payment.paymentDate
                       ? new Date(
                           payment.paymentDate
-                        ).toLocaleDateString('en-IN')
+                        ).toLocaleDateString(
+                          'en-IN'
+                        )
                       : '-'}
+
                   </td>
 
+
                   <td>
+
                     <span className="goal-badge">
                       {payment.status}
                     </span>
+
                   </td>
+
 
                   <td>
 
-                    <button
-                      type="button"
-                      className="admin-view-btn"
-                      onClick={() =>
-                        navigate(
-                          `/admin/payments/${payment._id}/receipt`
-                        )
-                      }
-                    >
-                      RECEIPT
-                    </button>
+                    <div className="admin-table-actions">
+
+                      <button
+                        type="button"
+                        className="admin-view-btn"
+                        onClick={() =>
+                          navigate(
+                            `/admin/payments/${payment._id}/receipt`
+                          )
+                        }
+                      >
+                        RECEIPT
+                      </button>
 
 
-                    {can('payments', 'edit') && (
                       <button
                         type="button"
                         className="admin-edit-btn"
                         onClick={() =>
-                          handleEditPayment(payment)
+                          handleEditPayment(
+                            payment
+                          )
                         }
                       >
                         EDIT
                       </button>
-                    )}
 
 
-                    {can('payments', 'delete') && (
                       <button
                         type="button"
                         className="admin-delete-btn"
@@ -3173,7 +4511,8 @@ const handleAttendanceChange = (e) => {
                       >
                         DELETE
                       </button>
-                    )}
+
+                    </div>
 
                   </td>
 
@@ -3191,6 +4530,7 @@ const handleAttendanceChange = (e) => {
     )}
 
 </section>
+
 
 
 {/* =====================================================
@@ -3211,6 +4551,10 @@ const handleAttendanceChange = (e) => {
         ATTENDANCE <span>MANAGEMENT.</span>
       </h2>
 
+      <p>
+        Monitor member attendance, check-in and check-out activity.
+      </p>
+
     </div>
 
 
@@ -3221,38 +4565,34 @@ const handleAttendanceChange = (e) => {
       </span>
 
 
-      {can('attendance', 'add') && (
-        <button
-          type="button"
-          className="admin-add-btn"
-          onClick={() => {
+      <button
+        type="button"
+        className="admin-add-btn"
+        onClick={() => {
 
-            setShowAddAttendance(
-              (current) => !current
-            );
+          setShowAddAttendance(
+            (current) => !current
+          );
 
-            setEditingAttendance(null);
+          setEditingAttendance(null);
 
-            setAttendanceFormError('');
-            setEditAttendanceError('');
-            setAttendanceSuccess('');
+          setAttendanceFormError('');
+          setEditAttendanceError('');
+          setAttendanceSuccess('');
 
-          }}
-        >
-          {showAddAttendance
-            ? '✕ CLOSE'
-            : '+ MARK ATTENDANCE'}
-        </button>
-      )}
+        }}
+      >
+        {showAddAttendance
+          ? '✕ CLOSE'
+          : '+ MARK ATTENDANCE'}
+      </button>
 
     </div>
 
   </div>
 
 
-  {/* =========================
-      ATTENDANCE FORM
-  ========================= */}
+  {/* ATTENDANCE FORM */}
 
   {showAddAttendance && (
 
@@ -3267,6 +4607,7 @@ const handleAttendanceChange = (e) => {
         </span>
 
         <h3>
+
           {editingAttendance
             ? 'EDIT '
             : 'MARK '}
@@ -3274,6 +4615,7 @@ const handleAttendanceChange = (e) => {
           <span>
             ATTENDANCE.
           </span>
+
         </h3>
 
       </div>
@@ -3297,8 +4639,12 @@ const handleAttendanceChange = (e) => {
           <select
             id="attendance-member"
             name="member"
-            value={attendanceForm.member}
-            onChange={handleAttendanceChange}
+            value={
+              attendanceForm.member
+            }
+            onChange={
+              handleAttendanceChange
+            }
             required
           >
 
@@ -3306,18 +4652,16 @@ const handleAttendanceChange = (e) => {
               Select member
             </option>
 
-            {members.map(
-              (member) => (
+            {members.map((member) => (
 
-                <option
-                  key={member._id}
-                  value={member._id}
-                >
-                  {member.name} — {member.phone}
-                </option>
+              <option
+                key={member._id}
+                value={member._id}
+              >
+                {member.name} — {member.phone}
+              </option>
 
-              )
-            )}
+            ))}
 
           </select>
 
@@ -3334,8 +4678,12 @@ const handleAttendanceChange = (e) => {
             id="attendance-date"
             name="date"
             type="date"
-            value={attendanceForm.date}
-            onChange={handleAttendanceChange}
+            value={
+              attendanceForm.date
+            }
+            onChange={
+              handleAttendanceChange
+            }
             required
           />
 
@@ -3352,8 +4700,12 @@ const handleAttendanceChange = (e) => {
             id="check-in-time"
             name="checkInTime"
             type="time"
-            value={attendanceForm.checkInTime}
-            onChange={handleAttendanceChange}
+            value={
+              attendanceForm.checkInTime
+            }
+            onChange={
+              handleAttendanceChange
+            }
           />
 
         </div>
@@ -3369,8 +4721,12 @@ const handleAttendanceChange = (e) => {
             id="check-out-time"
             name="checkOutTime"
             type="time"
-            value={attendanceForm.checkOutTime}
-            onChange={handleAttendanceChange}
+            value={
+              attendanceForm.checkOutTime
+            }
+            onChange={
+              handleAttendanceChange
+            }
           />
 
         </div>
@@ -3385,8 +4741,12 @@ const handleAttendanceChange = (e) => {
           <select
             id="attendance-status"
             name="status"
-            value={attendanceForm.status}
-            onChange={handleAttendanceChange}
+            value={
+              attendanceForm.status
+            }
+            onChange={
+              handleAttendanceChange
+            }
           >
 
             <option value="Present">
@@ -3403,23 +4763,29 @@ const handleAttendanceChange = (e) => {
 
 
         {attendanceFormError && (
+
           <div className="admin-login-error">
             {attendanceFormError}
           </div>
+
         )}
 
 
         {editAttendanceError && (
+
           <div className="admin-login-error">
             {editAttendanceError}
           </div>
+
         )}
 
 
         {attendanceSuccess && (
+
           <div className="admin-member-success">
             {attendanceSuccess}
           </div>
+
         )}
 
 
@@ -3452,10 +4818,13 @@ const handleAttendanceChange = (e) => {
             }
           >
 
-            {addingAttendance || updatingAttendance
+            {addingAttendance ||
+            updatingAttendance
+
               ? editingAttendance
                 ? 'UPDATING ATTENDANCE...'
                 : 'MARKING ATTENDANCE...'
+
               : editingAttendance
                 ? 'UPDATE ATTENDANCE →'
                 : 'MARK ATTENDANCE →'}
@@ -3471,18 +4840,25 @@ const handleAttendanceChange = (e) => {
   )}
 
 
+  {/* ATTENDANCE STATES */}
+
   {attendanceLoading && (
+
     <div className="admin-message">
       Loading attendance...
     </div>
+
   )}
 
 
-  {!attendanceLoading && attendanceError && (
-    <div className="admin-message admin-error">
-      {attendanceError}
-    </div>
-  )}
+  {!attendanceLoading &&
+    attendanceError && (
+
+      <div className="admin-message admin-error">
+        {attendanceError}
+      </div>
+
+    )}
 
 
   {!attendanceLoading &&
@@ -3496,6 +4872,8 @@ const handleAttendanceChange = (e) => {
     )}
 
 
+  {/* ATTENDANCE TABLE */}
+
   {!attendanceLoading &&
     !attendanceError &&
     attendance.length > 0 && (
@@ -3507,6 +4885,7 @@ const handleAttendanceChange = (e) => {
           <thead>
 
             <tr>
+
               <th>#</th>
               <th>MEMBER</th>
               <th>DATE</th>
@@ -3514,6 +4893,7 @@ const handleAttendanceChange = (e) => {
               <th>CHECK-OUT</th>
               <th>STATUS</th>
               <th>ACTION</th>
+
             </tr>
 
           </thead>
@@ -3537,22 +4917,32 @@ const handleAttendanceChange = (e) => {
                     ).padStart(2, '0')}
                   </td>
 
+
                   <td>
+
                     <strong>
                       {record.member?.name ||
                         'Unknown Member'}
                     </strong>
+
                   </td>
 
+
                   <td>
+
                     {record.date
                       ? new Date(
                           record.date
-                        ).toLocaleDateString('en-IN')
+                        ).toLocaleDateString(
+                          'en-IN'
+                        )
                       : '-'}
+
                   </td>
 
+
                   <td>
+
                     {record.checkInTime
                       ? new Date(
                           record.checkInTime
@@ -3564,9 +4954,12 @@ const handleAttendanceChange = (e) => {
                           }
                         )
                       : '-'}
+
                   </td>
 
+
                   <td>
+
                     {record.checkOutTime
                       ? new Date(
                           record.checkOutTime
@@ -3578,30 +4971,36 @@ const handleAttendanceChange = (e) => {
                           }
                         )
                       : '-'}
+
                   </td>
 
+
                   <td>
+
                     <span className="goal-badge">
                       {record.status}
                     </span>
+
                   </td>
+
 
                   <td>
 
-                    {can('attendance', 'edit') && (
+                    <div className="admin-table-actions">
+
                       <button
                         type="button"
                         className="admin-edit-btn"
                         onClick={() =>
-                          handleEditAttendance(record)
+                          handleEditAttendance(
+                            record
+                          )
                         }
                       >
                         EDIT
                       </button>
-                    )}
 
 
-                    {can('attendance', 'delete') && (
                       <button
                         type="button"
                         className="admin-delete-btn"
@@ -3613,7 +5012,8 @@ const handleAttendanceChange = (e) => {
                       >
                         DELETE
                       </button>
-                    )}
+
+                    </div>
 
                   </td>
 
@@ -3631,6 +5031,7 @@ const handleAttendanceChange = (e) => {
     )}
 
 </section>
+
 
 
 {/* =====================================================
@@ -3651,6 +5052,10 @@ const handleAttendanceChange = (e) => {
         WORKOUT <span>MANAGEMENT.</span>
       </h2>
 
+      <p>
+        Create and manage personalised training programmes for members.
+      </p>
+
     </div>
 
 
@@ -3661,39 +5066,36 @@ const handleAttendanceChange = (e) => {
       </span>
 
 
-      {can('workouts', 'add') && (
-        <button
-          type="button"
-          className="admin-add-btn"
-          onClick={() => {
+      <button
+        type="button"
+        className="admin-add-btn"
+        onClick={() => {
 
-            setShowAddWorkout(
-              (current) => !current
-            );
+          setShowAddWorkout(
+            (current) => !current
+          );
 
-            setEditingWorkout(null);
-            resetWorkoutForm();
+          setEditingWorkout(null);
 
-            setWorkoutFormError('');
-            setEditWorkoutError('');
-            setWorkoutSuccess('');
+          resetWorkoutForm();
 
-          }}
-        >
-          {showAddWorkout
-            ? '✕ CLOSE'
-            : '+ ADD WORKOUT'}
-        </button>
-      )}
+          setWorkoutFormError('');
+          setEditWorkoutError('');
+          setWorkoutSuccess('');
+
+        }}
+      >
+        {showAddWorkout
+          ? '✕ CLOSE'
+          : '+ ADD WORKOUT'}
+      </button>
 
     </div>
 
   </div>
 
 
-  {/* =========================
-      WORKOUT FORM
-  ========================= */}
+  {/* WORKOUT FORM */}
 
   {showAddWorkout && (
 
@@ -3707,7 +5109,9 @@ const handleAttendanceChange = (e) => {
             : 'NEW WORKOUT'}
         </span>
 
+
         <h3>
+
           {editingWorkout
             ? 'EDIT '
             : 'ADD '}
@@ -3715,6 +5119,7 @@ const handleAttendanceChange = (e) => {
           <span>
             WORKOUT.
           </span>
+
         </h3>
 
       </div>
@@ -3738,8 +5143,12 @@ const handleAttendanceChange = (e) => {
           <select
             id="workout-member"
             name="member"
-            value={workoutForm.member}
-            onChange={handleWorkoutChange}
+            value={
+              workoutForm.member
+            }
+            onChange={
+              handleWorkoutChange
+            }
             required
           >
 
@@ -3747,18 +5156,16 @@ const handleAttendanceChange = (e) => {
               Select member
             </option>
 
-            {members.map(
-              (member) => (
+            {members.map((member) => (
 
-                <option
-                  key={member._id}
-                  value={member._id}
-                >
-                  {member.name} — {member.phone}
-                </option>
+              <option
+                key={member._id}
+                value={member._id}
+              >
+                {member.name} — {member.phone}
+              </option>
 
-              )
-            )}
+            ))}
 
           </select>
 
@@ -3776,8 +5183,12 @@ const handleAttendanceChange = (e) => {
             name="workoutName"
             type="text"
             placeholder="Beginner Strength Program"
-            value={workoutForm.workoutName}
-            onChange={handleWorkoutChange}
+            value={
+              workoutForm.workoutName
+            }
+            onChange={
+              handleWorkoutChange
+            }
             required
           />
 
@@ -3793,8 +5204,12 @@ const handleAttendanceChange = (e) => {
           <select
             id="workout-type"
             name="workoutType"
-            value={workoutForm.workoutType}
-            onChange={handleWorkoutChange}
+            value={
+              workoutForm.workoutType
+            }
+            onChange={
+              handleWorkoutChange
+            }
           >
 
             <option value="Strength">
@@ -3822,6 +5237,8 @@ const handleAttendanceChange = (e) => {
         </div>
 
 
+        {/* EXERCISES */}
+
         <div className="admin-login-field">
 
           <label>
@@ -3829,38 +5246,50 @@ const handleAttendanceChange = (e) => {
           </label>
 
 
-          <div
-            style={{
-              display: 'grid',
-              gap: '12px',
-            }}
-          >
+          <div className="admin-exercise-builder">
 
             {workoutForm.exercises.map(
               (exercise, index) => (
 
                 <div
                   key={index}
-                  style={{
-                    display: 'grid',
-                    gap: '10px',
-                    padding: '16px',
-                    border:
-                      '1px solid rgba(255,255,255,0.12)',
-                  }}
+                  className="admin-exercise-card"
                 >
 
-                  <strong>
-                    EXERCISE {String(
-                      index + 1
-                    ).padStart(2, '0')}
-                  </strong>
+                  <div className="admin-exercise-header">
+
+                    <strong>
+                      EXERCISE{' '}
+                      {String(
+                        index + 1
+                      ).padStart(2, '0')}
+                    </strong>
+
+                    {workoutForm.exercises.length > 1 && (
+
+                      <button
+                        type="button"
+                        className="admin-delete-btn"
+                        onClick={() =>
+                          handleRemoveExercise(
+                            index
+                          )
+                        }
+                      >
+                        REMOVE
+                      </button>
+
+                    )}
+
+                  </div>
 
 
                   <input
                     type="text"
                     placeholder="Exercise name"
-                    value={exercise.name}
+                    value={
+                      exercise.name
+                    }
                     onChange={(e) =>
                       handleExerciseChange(
                         index,
@@ -3872,20 +5301,15 @@ const handleAttendanceChange = (e) => {
                   />
 
 
-                  <div
-                    style={{
-                      display: 'grid',
-                      gridTemplateColumns:
-                        'repeat(3, minmax(0, 1fr))',
-                      gap: '10px',
-                    }}
-                  >
+                  <div className="admin-exercise-stats">
 
                     <input
                       type="number"
                       min="0"
                       placeholder="Sets"
-                      value={exercise.sets}
+                      value={
+                        exercise.sets
+                      }
                       onChange={(e) =>
                         handleExerciseChange(
                           index,
@@ -3895,11 +5319,14 @@ const handleAttendanceChange = (e) => {
                       }
                     />
 
+
                     <input
                       type="number"
                       min="0"
                       placeholder="Reps"
-                      value={exercise.reps}
+                      value={
+                        exercise.reps
+                      }
                       onChange={(e) =>
                         handleExerciseChange(
                           index,
@@ -3909,11 +5336,14 @@ const handleAttendanceChange = (e) => {
                       }
                     />
 
+
                     <input
                       type="number"
                       min="0"
                       placeholder="Duration (min)"
-                      value={exercise.duration}
+                      value={
+                        exercise.duration
+                      }
                       onChange={(e) =>
                         handleExerciseChange(
                           index,
@@ -3929,7 +5359,9 @@ const handleAttendanceChange = (e) => {
                   <input
                     type="text"
                     placeholder="Exercise notes (optional)"
-                    value={exercise.notes}
+                    value={
+                      exercise.notes
+                    }
                     onChange={(e) =>
                       handleExerciseChange(
                         index,
@@ -3938,19 +5370,6 @@ const handleAttendanceChange = (e) => {
                       )
                     }
                   />
-
-
-                  {workoutForm.exercises.length > 1 && (
-                    <button
-                      type="button"
-                      className="admin-delete-btn"
-                      onClick={() =>
-                        handleRemoveExercise(index)
-                      }
-                    >
-                      REMOVE EXERCISE
-                    </button>
-                  )}
 
                 </div>
 
@@ -3961,7 +5380,9 @@ const handleAttendanceChange = (e) => {
             <button
               type="button"
               className="admin-edit-btn"
-              onClick={handleAddExercise}
+              onClick={
+                handleAddExercise
+              }
             >
               + ADD EXERCISE
             </button>
@@ -3981,8 +5402,12 @@ const handleAttendanceChange = (e) => {
             id="workout-start-date"
             name="startDate"
             type="date"
-            value={workoutForm.startDate}
-            onChange={handleWorkoutChange}
+            value={
+              workoutForm.startDate
+            }
+            onChange={
+              handleWorkoutChange
+            }
             required
           />
 
@@ -3999,8 +5424,12 @@ const handleAttendanceChange = (e) => {
             id="workout-end-date"
             name="endDate"
             type="date"
-            value={workoutForm.endDate}
-            onChange={handleWorkoutChange}
+            value={
+              workoutForm.endDate
+            }
+            onChange={
+              handleWorkoutChange
+            }
             required
           />
 
@@ -4016,8 +5445,12 @@ const handleAttendanceChange = (e) => {
           <select
             id="workout-status"
             name="status"
-            value={workoutForm.status}
-            onChange={handleWorkoutChange}
+            value={
+              workoutForm.status
+            }
+            onChange={
+              handleWorkoutChange
+            }
           >
 
             <option value="Active">
@@ -4044,31 +5477,41 @@ const handleAttendanceChange = (e) => {
             name="notes"
             type="text"
             placeholder="Workout notes"
-            value={workoutForm.notes}
-            onChange={handleWorkoutChange}
+            value={
+              workoutForm.notes
+            }
+            onChange={
+              handleWorkoutChange
+            }
           />
 
         </div>
 
 
         {workoutFormError && (
+
           <div className="admin-login-error">
             {workoutFormError}
           </div>
+
         )}
 
 
         {editWorkoutError && (
+
           <div className="admin-login-error">
             {editWorkoutError}
           </div>
+
         )}
 
 
         {workoutSuccess && (
+
           <div className="admin-member-success">
             {workoutSuccess}
           </div>
+
         )}
 
 
@@ -4081,6 +5524,7 @@ const handleAttendanceChange = (e) => {
 
               setShowAddWorkout(false);
               setEditingWorkout(null);
+
               resetWorkoutForm();
 
               setWorkoutFormError('');
@@ -4102,10 +5546,13 @@ const handleAttendanceChange = (e) => {
             }
           >
 
-            {addingWorkout || updatingWorkout
+            {addingWorkout ||
+            updatingWorkout
+
               ? editingWorkout
                 ? 'UPDATING WORKOUT...'
                 : 'ADDING WORKOUT...'
+
               : editingWorkout
                 ? 'UPDATE WORKOUT →'
                 : 'ADD WORKOUT →'}
@@ -4121,12 +5568,18 @@ const handleAttendanceChange = (e) => {
   )}
 
 
+  {/* WORKOUT STATES */}
+
   {workouts.length === 0 && (
+
     <div className="admin-message">
       No workouts found.
     </div>
+
   )}
 
+
+  {/* WORKOUT TABLE */}
 
   {workouts.length > 0 && (
 
@@ -4137,6 +5590,7 @@ const handleAttendanceChange = (e) => {
         <thead>
 
           <tr>
+
             <th>#</th>
             <th>MEMBER</th>
             <th>WORKOUT</th>
@@ -4146,6 +5600,7 @@ const handleAttendanceChange = (e) => {
             <th>END</th>
             <th>STATUS</th>
             <th>ACTION</th>
+
           </tr>
 
         </thead>
@@ -4169,65 +5624,92 @@ const handleAttendanceChange = (e) => {
                   ).padStart(2, '0')}
                 </td>
 
+
                 <td>
+
                   <strong>
                     {workout.member?.name ||
                       'Unknown Member'}
                   </strong>
+
                 </td>
+
 
                 <td>
                   {workout.workoutName}
                 </td>
 
+
                 <td>
+
                   <span className="goal-badge">
                     {workout.workoutType}
                   </span>
+
                 </td>
 
-                <td>
-                  {workout.exercises?.length || 0}
-                </td>
 
                 <td>
+
+                  <span className="admin-count">
+                    {workout.exercises?.length || 0}
+                  </span>
+
+                </td>
+
+
+                <td>
+
                   {workout.startDate
                     ? new Date(
                         workout.startDate
-                      ).toLocaleDateString('en-IN')
+                      ).toLocaleDateString(
+                        'en-IN'
+                      )
                     : '-'}
+
                 </td>
 
+
                 <td>
+
                   {workout.endDate
                     ? new Date(
                         workout.endDate
-                      ).toLocaleDateString('en-IN')
+                      ).toLocaleDateString(
+                        'en-IN'
+                      )
                     : '-'}
+
                 </td>
 
+
                 <td>
+
                   <span className="goal-badge">
                     {workout.status}
                   </span>
+
                 </td>
+
 
                 <td>
 
-                  {can('workouts', 'edit') && (
+                  <div className="admin-table-actions">
+
                     <button
                       type="button"
                       className="admin-edit-btn"
                       onClick={() =>
-                        handleEditWorkout(workout)
+                        handleEditWorkout(
+                          workout
+                        )
                       }
                     >
                       EDIT
                     </button>
-                  )}
 
 
-                  {can('workouts', 'delete') && (
                     <button
                       type="button"
                       className="admin-delete-btn"
@@ -4239,7 +5721,8 @@ const handleAttendanceChange = (e) => {
                     >
                       DELETE
                     </button>
-                  )}
+
+                  </div>
 
                 </td>
 
@@ -4257,6 +5740,7 @@ const handleAttendanceChange = (e) => {
   )}
 
 </section>
+
 
 
 {/* =====================================================
@@ -4277,27 +5761,41 @@ const handleAttendanceChange = (e) => {
         MEMBER <span>ENQUIRIES.</span>
       </h2>
 
+      <p>
+        Review and manage enquiries submitted through the gym website.
+      </p>
+
     </div>
 
 
-    <span className="admin-count">
-      {contacts.length} RECORDS
-    </span>
+    <div className="admin-section-actions">
+
+      <span className="admin-count">
+        {contacts.length} RECORDS
+      </span>
+
+    </div>
 
   </div>
 
 
+  {/* ENQUIRY STATES */}
+
   {loading && (
+
     <div className="admin-message">
       Loading enquiries...
     </div>
+
   )}
 
 
   {!loading && error && (
+
     <div className="admin-message admin-error">
       {error}
     </div>
+
   )}
 
 
@@ -4312,6 +5810,8 @@ const handleAttendanceChange = (e) => {
     )}
 
 
+  {/* ENQUIRY TABLE */}
+
   {!loading &&
     !error &&
     contacts.length > 0 && (
@@ -4323,6 +5823,7 @@ const handleAttendanceChange = (e) => {
           <thead>
 
             <tr>
+
               <th>#</th>
               <th>NAME</th>
               <th>PHONE</th>
@@ -4330,6 +5831,7 @@ const handleAttendanceChange = (e) => {
               <th>MESSAGE</th>
               <th>DATE</th>
               <th>ACTION</th>
+
             </tr>
 
           </thead>
@@ -4353,50 +5855,64 @@ const handleAttendanceChange = (e) => {
                     ).padStart(2, '0')}
                   </td>
 
+
                   <td>
+
                     <strong>
                       {contact.name}
                     </strong>
+
                   </td>
+
 
                   <td>
                     {contact.phone}
                   </td>
 
+
                   <td>
+
                     <span className="goal-badge">
                       {contact.goal}
                     </span>
+
                   </td>
+
 
                   <td className="message-cell">
+
                     {contact.message ||
                       'No message'}
+
                   </td>
 
+
                   <td>
+
                     {contact.createdAt
                       ? new Date(
                           contact.createdAt
-                        ).toLocaleDateString('en-IN')
+                        ).toLocaleDateString(
+                          'en-IN'
+                        )
                       : '-'}
+
                   </td>
+
 
                   <td>
 
-                    {can('enquiries', 'delete') && (
-                      <button
-                        type="button"
-                        className="admin-delete-btn"
-                        onClick={() =>
-                          handleDeleteContact(
-                            contact._id
-                          )
-                        }
-                      >
-                        DELETE
-                      </button>
-                    )}
+                    <button
+                      type="button"
+                      className="admin-delete-btn"
+                      onClick={() =>
+                        handleDeleteContact(
+                          contact._id
+                        )
+                      }
+                    >
+                      DELETE
+                    </button>
 
                   </td>
 
@@ -4414,14 +5930,9 @@ const handleAttendanceChange = (e) => {
     )}
 
 </section>
-{/* =====================================================
-    STAFF MANAGEMENT
-===================================================== */}
 
-{isOwner && (
-  <StaffManagement />   
-)}
+</div>   
 
-</div>
-);
-}
+    )}
+
+    

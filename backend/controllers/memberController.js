@@ -7,6 +7,7 @@ const Member = require('../models/Member');
 
 const addMember = async(req, res) => {
     try {
+
         const {
             name,
             phone,
@@ -14,10 +15,16 @@ const addMember = async(req, res) => {
             age,
             gender,
             membershipPlan,
+            membershipOffer,
             membershipStartDate,
             membershipEndDate,
             amount,
         } = req.body;
+
+
+        // ===============================
+        // VALIDATION
+        // ===============================
 
         if (!name ||
             !phone ||
@@ -31,28 +38,66 @@ const addMember = async(req, res) => {
             });
         }
 
+
+        // ===============================
+        // CREATE MEMBER
+        // ===============================
+
         const member = await Member.create({
+
             name,
+
             phone,
+
             email,
+
             age,
+
             gender,
+
             membershipPlan,
+
+            // Can be null when "No Offer" is selected
+            membershipOffer: membershipOffer || null,
+
             membershipStartDate,
+
             membershipEndDate,
+
             amount,
+
         });
 
+
+        // Get member with offer information
+        const populatedMember =
+            await Member.findById(
+                member._id
+            ).populate(
+                'membershipOffer',
+                'name offerPrice description benefits'
+            );
+
+
         res.status(201).json({
+
             message: 'Member added successfully.',
-            member,
+
+            member: populatedMember,
+
         });
 
     } catch (error) {
-        console.error('Add Member Error:', error.message);
+
+        console.error(
+            'Add Member Error:',
+            error.message
+        );
 
         res.status(500).json({
+
             message: 'Server error. Please try again.',
+
         });
     }
 };
@@ -64,38 +109,69 @@ const addMember = async(req, res) => {
 
 const getMembers = async(req, res) => {
     try {
-        const members = await Member.find()
-            .sort({ createdAt: -1 });
+
+        const members =
+            await Member.find()
+            .populate(
+                'membershipOffer',
+                'name offerPrice description benefits'
+            )
+            .sort({
+                createdAt: -1,
+            });
+
 
         const today = new Date();
 
-        const updatedMembers = await Promise.all(
-            members.map(async(member) => {
 
-                if (
-                    member.membershipEndDate &&
-                    new Date(member.membershipEndDate) < today &&
-                    member.status !== 'Expired'
-                ) {
-                    member.status = 'Expired';
+        const updatedMembers =
+            await Promise.all(
 
-                    await member.save();
-                }
+                members.map(
+                    async(member) => {
 
-                return member;
-            })
-        );
+                        if (
+                            member.membershipEndDate &&
+                            new Date(
+                                member.membershipEndDate
+                            ) < today &&
+                            member.status !== 'Expired'
+                        ) {
+
+                            member.status =
+                                'Expired';
+
+                            await member.save();
+                        }
+
+
+                        return member;
+
+                    }
+                )
+
+            );
+
 
         res.status(200).json({
+
             message: 'Members fetched successfully.',
+
             members: updatedMembers,
+
         });
 
     } catch (error) {
-        console.error('Get Members Error:', error.message);
+
+        console.error(
+            'Get Members Error:',
+            error.message
+        );
 
         res.status(500).json({
+
             message: 'Server error. Please try again.',
+
         });
     }
 };
@@ -107,36 +183,67 @@ const getMembers = async(req, res) => {
 
 const getMemberById = async(req, res) => {
     try {
-        const member = await Member.findById(req.params.id);
+
+        const member =
+            await Member.findById(
+                req.params.id
+            ).populate(
+                'membershipOffer',
+                'name offerPrice description benefits'
+            );
+
 
         if (!member) {
+
             return res.status(404).json({
+
                 message: 'Member not found.',
+
             });
         }
 
-        // Automatically mark expired membership
-        const today = new Date();
+
+        // ===============================
+        // AUTOMATIC EXPIRY CHECK
+        // ===============================
+
+        const today =
+            new Date();
+
 
         if (
             member.membershipEndDate &&
-            new Date(member.membershipEndDate) < today &&
+            new Date(
+                member.membershipEndDate
+            ) < today &&
             member.status !== 'Expired'
         ) {
-            member.status = 'Expired';
+
+            member.status =
+                'Expired';
 
             await member.save();
+
         }
 
+
         res.status(200).json({
+
             member,
+
         });
 
     } catch (error) {
-        console.error('Get Member Error:', error.message);
+
+        console.error(
+            'Get Member Error:',
+            error.message
+        );
 
         res.status(500).json({
+
             message: 'Server error. Please try again.',
+
         });
     }
 };
@@ -148,30 +255,54 @@ const getMemberById = async(req, res) => {
 
 const updateMember = async(req, res) => {
     try {
-        const member = await Member.findByIdAndUpdate(
-            req.params.id,
-            req.body, {
-                new: true,
-                runValidators: true,
-            }
-        );
+
+        const member =
+            await Member.findByIdAndUpdate(
+
+                req.params.id,
+
+                req.body,
+
+                {
+                    new: true,
+                    runValidators: true,
+                }
+
+            ).populate(
+                'membershipOffer',
+                'name offerPrice description benefits'
+            );
+
 
         if (!member) {
+
             return res.status(404).json({
+
                 message: 'Member not found.',
+
             });
         }
 
+
         res.status(200).json({
+
             message: 'Member updated successfully.',
+
             member,
+
         });
 
     } catch (error) {
-        console.error('Update Member Error:', error.message);
+
+        console.error(
+            'Update Member Error:',
+            error.message
+        );
 
         res.status(500).json({
+
             message: 'Server error. Please try again.',
+
         });
     }
 };
@@ -183,23 +314,40 @@ const updateMember = async(req, res) => {
 
 const deleteMember = async(req, res) => {
     try {
-        const member = await Member.findByIdAndDelete(req.params.id);
+
+        const member =
+            await Member.findByIdAndDelete(
+                req.params.id
+            );
+
 
         if (!member) {
+
             return res.status(404).json({
+
                 message: 'Member not found.',
+
             });
         }
 
+
         res.status(200).json({
+
             message: 'Member deleted successfully.',
+
         });
 
     } catch (error) {
-        console.error('Delete Member Error:', error.message);
+
+        console.error(
+            'Delete Member Error:',
+            error.message
+        );
 
         res.status(500).json({
+
             message: 'Server error. Please try again.',
+
         });
     }
 };
@@ -210,9 +358,15 @@ const deleteMember = async(req, res) => {
 // ===============================
 
 module.exports = {
+
     addMember,
+
     getMembers,
+
     getMemberById,
+
     updateMember,
+
     deleteMember,
+
 };

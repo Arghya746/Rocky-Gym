@@ -16,7 +16,17 @@ const {
 
 
 // =========================================
-// GET ACTIVE OFFERS
+// GET PUBLIC ACTIVE OFFERS
+// =========================================
+
+router.get(
+    '/public',
+    getOffers
+);
+
+
+// =========================================
+// GET ACTIVE OFFERS - ADMIN
 // =========================================
 
 router.get(

@@ -1,4 +1,3 @@
-
 import { useEffect, useState } from 'react';
 import { useNavigate, useParams } from 'react-router-dom';
 import API_URL from '../config/api';
@@ -76,7 +75,7 @@ export default function MemberDetails() {
                 ),
 
                 fetch(
-                     `${API_URL}/api/workouts`,
+                    `${API_URL}/api/workouts`,
                     {
                         headers,
                     }
@@ -437,15 +436,47 @@ export default function MemberDetails() {
 
                 <div className="member-info-grid">
 
+                    {/* PLAN */}
+
                     <div className="member-info-item">
                         <span>PLAN</span>
+
                         <strong>
-                            {member.membershipPlan}
+                            {member.membershipPlan || '—'}
                         </strong>
                     </div>
 
+
+                    {/* OFFER */}
+
+                    <div className="member-info-item">
+                        <span>OFFER</span>
+
+                        <strong>
+                            {member.membershipOffer?.name ||
+                                'No Offer'}
+                        </strong>
+                    </div>
+
+
+                    {/* OFFER PRICE */}
+
+                    <div className="member-info-item">
+                        <span>OFFER PRICE</span>
+
+                        <strong>
+                            {member.membershipOffer
+                                ? `₹${member.membershipOffer.offerPrice}`
+                                : '—'}
+                        </strong>
+                    </div>
+
+
+                    {/* START DATE */}
+
                     <div className="member-info-item">
                         <span>START DATE</span>
+
                         <strong>
                             {formatDate(
                                 member.membershipStartDate
@@ -453,8 +484,12 @@ export default function MemberDetails() {
                         </strong>
                     </div>
 
+
+                    {/* END DATE */}
+
                     <div className="member-info-item">
                         <span>END DATE</span>
+
                         <strong>
                             {formatDate(
                                 member.membershipEndDate
@@ -462,17 +497,25 @@ export default function MemberDetails() {
                         </strong>
                     </div>
 
+
+                    {/* MEMBERSHIP AMOUNT */}
+
                     <div className="member-info-item">
                         <span>
                             MEMBERSHIP AMOUNT
                         </span>
+
                         <strong>
                             ₹{member.amount || 0}
                         </strong>
                     </div>
 
+
+                    {/* STATUS */}
+
                     <div className="member-info-item">
                         <span>STATUS</span>
+
                         <strong>
                             {member.status}
                         </strong>
@@ -741,4 +784,3 @@ export default function MemberDetails() {
         </div>
     );
 }
-
