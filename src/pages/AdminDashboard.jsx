@@ -736,6 +736,59 @@ const handleAddMember = async (e) => {
   }
 };
 
+const handleToggleOfferStatus = async (offer) => {
+  try {
+    const token =
+      localStorage.getItem('adminToken');
+
+    if (!token) {
+      throw new Error(
+        'Admin session expired. Please login again.'
+      );
+    }
+
+    const response = await fetch(
+      `${API_URL}/api/offers/${offer._id}`,
+      {
+        method: 'PUT',
+        headers: {
+          'Content-Type': 'application/json',
+          Authorization: `Bearer ${token}`,
+        },
+        body: JSON.stringify({
+          isActive: !offer.isActive,
+        }),
+      }
+    );
+
+    const data = await response.json();
+
+    if (!response.ok) {
+      throw new Error(
+        data.message ||
+          'Failed to update offer status.'
+      );
+    }
+
+    await fetchOffers();
+
+    alert(
+      offer.isActive
+        ? 'Offer deactivated successfully.'
+        : 'Offer activated successfully.'
+    );
+  } catch (error) {
+    console.error(
+      'Toggle offer status error:',
+      error
+    );
+
+    alert(
+      error.message ||
+        'Failed to update offer status.'
+    );
+  }
+};
 
 // =========================================================
 // MEMBERSHIP OFFER CHANGE
