@@ -1527,6 +1527,118 @@ body.light .header {
   color: #777783;
 }
 
+.member-info-grid {
+  display: grid;
+  grid-template-columns: repeat(2, minmax(0, 1fr));
+  gap: 18px;
+}
+
+.member-info-item {
+  display: flex;
+  flex-direction: column;
+  gap: 6px;
+  padding: 16px;
+  background: #09090d;
+  border: 1px solid rgba(255, 255, 255, 0.08);
+  border-radius: 8px;
+}
+
+.member-info-item span {
+  color: #888;
+  font-size: 11px;
+  letter-spacing: 1.5px;
+}
+
+.member-info-item strong {
+  color: white;
+  font-size: 16px;
+  line-height: 1.4;
+}
+@media (max-width: 700px) {
+  .member-info-grid {
+    grid-template-columns: 1fr;
+  }
+}
+/* =========================================================
+   PAYMENT RECEIPT - 2 COLUMN LAYOUT
+========================================================= */
+
+.payment-receipt-info-grid {
+  display: grid;
+  grid-template-columns: repeat(2, minmax(0, 1fr));
+  gap: 18px;
+}
+
+.payment-receipt-payment-grid {
+  display: grid;
+  grid-template-columns: repeat(2, minmax(0, 1fr));
+  gap: 18px;
+}
+
+.payment-receipt-info-item {
+  display: flex;
+  flex-direction: column;
+  gap: 6px;
+  padding: 16px;
+  background: #09090d;
+  border: 1px solid rgba(255, 255, 255, 0.08);
+  border-radius: 8px;
+}
+
+.payment-receipt-info-item span {
+  color: #888;
+  font-size: 11px;
+  letter-spacing: 1.5px;
+}
+
+.payment-receipt-info-item strong {
+  color: white;
+  font-size: 16px;
+  line-height: 1.4;
+}
+
+.payment-receipt-amount {
+  display: flex;
+  flex-direction: column;
+  gap: 6px;
+  padding: 16px;
+  background: #09090d;
+  border: 1px solid rgba(255, 255, 255, 0.08);
+  border-radius: 8px;
+}
+
+.payment-receipt-amount span {
+  color: #888;
+  font-size: 11px;
+  letter-spacing: 1.5px;
+}
+
+.payment-receipt-amount strong {
+  color: white;
+  font-size: 24px;
+}
+
+
+/* =========================================================
+   MOBILE
+========================================================= */
+
+@media (max-width: 700px) {
+
+  .member-info-grid {
+    grid-template-columns: 1fr;
+  }
+
+  .payment-receipt-info-grid {
+    grid-template-columns: 1fr;
+  }
+
+  .payment-receipt-payment-grid {
+    grid-template-columns: 1fr;
+  }
+
+}
+
 .workout-list b,
 .payment-list b {
   color: var(--orange);
