@@ -28,6 +28,7 @@ router.get(
     getWorkouts
 );
 
+
 // Add workout
 router.post(
     '/',
@@ -35,6 +36,7 @@ router.post(
     requirePermission('workouts.add'),
     addWorkout
 );
+
 
 // View single workout
 router.get(
@@ -44,6 +46,7 @@ router.get(
     getWorkoutById
 );
 
+
 // Edit workout
 router.put(
     '/:id',
@@ -52,6 +55,7 @@ router.put(
     updateWorkout
 );
 
+
 // Delete workout
 router.delete(
     '/:id',
@@ -59,5 +63,6 @@ router.delete(
     requirePermission('workouts.delete'),
     deleteWorkout
 );
+
 
 module.exports = router;

@@ -1,11 +1,29 @@
 const mongoose = require('mongoose');
 
 const workoutSchema = new mongoose.Schema({
+    // =========================================
+    // GYM BRANCH
+    // =========================================
+
+    gymBranch: {
+        type: String,
+        enum: ['Kalyanpur', 'Gopalpur'],
+        required: true,
+    },
+
+    // =========================================
+    // MEMBER
+    // =========================================
+
     member: {
         type: mongoose.Schema.Types.ObjectId,
         ref: 'Member',
         required: true,
     },
+
+    // =========================================
+    // WORKOUT INFORMATION
+    // =========================================
 
     workoutName: {
         type: String,
@@ -49,7 +67,11 @@ const workoutSchema = new mongoose.Schema({
             type: String,
             trim: true,
         },
-    }, ],
+    }],
+
+    // =========================================
+    // DATES
+    // =========================================
 
     startDate: {
         type: Date,
@@ -59,6 +81,10 @@ const workoutSchema = new mongoose.Schema({
     endDate: {
         type: Date,
     },
+
+    // =========================================
+    // STATUS
+    // =========================================
 
     status: {
         type: String,
@@ -70,6 +96,7 @@ const workoutSchema = new mongoose.Schema({
         type: String,
         trim: true,
     },
+
 }, {
     timestamps: true,
 });

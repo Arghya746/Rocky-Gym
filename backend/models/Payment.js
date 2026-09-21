@@ -1,11 +1,32 @@
 const mongoose = require('mongoose');
 
 const paymentSchema = new mongoose.Schema({
+
+    // =========================================
+    // GYM BRANCH
+    // =========================================
+
+    gymBranch: {
+        type: String,
+        enum: ['Kalyanpur', 'Gopalpur'],
+        required: true,
+    },
+
+
+    // =========================================
+    // MEMBER
+    // =========================================
+
     member: {
         type: mongoose.Schema.Types.ObjectId,
         ref: 'Member',
         required: true,
     },
+
+
+    // =========================================
+    // PAYMENT INFORMATION
+    // =========================================
 
     invoiceNumber: {
         type: String,
@@ -41,6 +62,7 @@ const paymentSchema = new mongoose.Schema({
         type: String,
         trim: true,
     },
+
 }, {
     timestamps: true,
 });

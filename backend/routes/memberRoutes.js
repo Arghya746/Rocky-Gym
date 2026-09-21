@@ -17,10 +17,9 @@ const router = express.Router();
 
 
 // =====================================
-// MEMBERS
+// GET ALL MEMBERS
 // =====================================
 
-// View members
 router.get(
     '/',
     protect,
@@ -28,7 +27,11 @@ router.get(
     getMembers
 );
 
-// Add member
+
+// =====================================
+// ADD MEMBER
+// =====================================
+
 router.post(
     '/',
     protect,
@@ -36,7 +39,11 @@ router.post(
     addMember
 );
 
-// View single member
+
+// =====================================
+// GET SINGLE MEMBER
+// =====================================
+
 router.get(
     '/:id',
     protect,
@@ -44,7 +51,11 @@ router.get(
     getMemberById
 );
 
-// Edit member
+
+// =====================================
+// UPDATE MEMBER
+// =====================================
+
 router.put(
     '/:id',
     protect,
@@ -52,12 +63,21 @@ router.put(
     updateMember
 );
 
-// Delete member
+
+// =====================================
+// DELETE MEMBER
+// =====================================
+
 router.delete(
     '/:id',
     protect,
     requirePermission('members.delete'),
     deleteMember
 );
+
+
+// =====================================
+// EXPORT ROUTER
+// =====================================
 
 module.exports = router;

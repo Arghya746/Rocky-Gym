@@ -28,6 +28,7 @@ router.post(
     markAttendance
 );
 
+
 // View attendance
 router.get(
     '/',
@@ -35,6 +36,7 @@ router.get(
     requirePermission('attendance.view'),
     getAttendance
 );
+
 
 // View single attendance record
 router.get(
@@ -44,6 +46,7 @@ router.get(
     getAttendanceById
 );
 
+
 // Edit attendance
 router.put(
     '/:id',
@@ -52,6 +55,7 @@ router.put(
     updateAttendance
 );
 
+
 // Delete attendance
 router.delete(
     '/:id',
@@ -59,5 +63,6 @@ router.delete(
     requirePermission('attendance.delete'),
     deleteAttendance
 );
+
 
 module.exports = router;

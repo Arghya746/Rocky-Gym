@@ -14,6 +14,7 @@ const dashboardRoutes = require('./routes/dashboardRoutes');
 const staffRoutes = require('./routes/staffRoutes');
 const planRoutes = require('./routes/planRoutes');
 const offerRoutes = require('./routes/offerRoutes');
+const trainerRoutes = require('./routes/trainerRoutes');
 
 const app = express();
 
@@ -38,64 +39,78 @@ app.use(express.json());
 // ROUTES
 // ===============================
 
+// Contact / Enquiries
 app.use(
     '/api/contacts',
     contactRoutes
 );
 
+
+// Admin
 app.use(
     '/api/admin',
     adminRoutes
 );
 
+
+// Members
 app.use(
     '/api/members',
     memberRoutes
 );
 
+
+// Payments
 app.use(
     '/api/payments',
     paymentRoutes
 );
 
+
+// Attendance
 app.use(
     '/api/attendance',
     attendanceRoutes
 );
 
+
+// Workouts
 app.use(
     '/api/workouts',
     workoutRoutes
 );
 
+
+// Dashboard
 app.use(
     '/api/dashboard',
     dashboardRoutes
 );
 
+
+// Staff Management
 app.use(
     '/api/admin/staff',
     staffRoutes
 );
 
 
-// ===============================
-// MEMBERSHIP PLANS
-// ===============================
-
+// Membership Plans
 app.use(
     '/api/plans',
     planRoutes
 );
 
 
-// ===============================
-// MEMBERSHIP OFFERS
-// ===============================
-
+// Membership Offers
 app.use(
     '/api/offers',
     offerRoutes
+);
+
+app.use(
+    '/api/trainers',
+    trainerRoutes
 );
 
 

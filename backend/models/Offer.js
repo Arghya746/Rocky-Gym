@@ -1,6 +1,22 @@
 const mongoose = require('mongoose');
 
 const offerSchema = new mongoose.Schema({
+
+    // =========================================
+    // GYM BRANCH
+    // =========================================
+
+    gymBranch: {
+        type: String,
+        enum: ['Kalyanpur', 'Gopalpur'],
+        required: true,
+    },
+
+
+    // =========================================
+    // OFFER INFORMATION
+    // =========================================
+
     name: {
         type: String,
         required: true,
@@ -44,6 +60,7 @@ const offerSchema = new mongoose.Schema({
         type: Boolean,
         default: true,
     },
+
 }, {
     timestamps: true,
 });

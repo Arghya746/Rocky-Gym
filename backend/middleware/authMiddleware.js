@@ -5,9 +5,9 @@ const Admin = require('../models/Admin');
 // ===============================
 // PROTECT ROUTES
 // ===============================
+
 const protect = async(req, res, next) => {
     try {
-
         const authHeader =
             req.headers.authorization;
 
@@ -51,11 +51,20 @@ const protect = async(req, res, next) => {
         // Attach admin to request
         req.admin = admin;
 
+        // Keep JWT information available
+        // for branch-aware authorization
+        req.adminRole =
+            decoded.role || admin.role;
+
+        req.adminBranch =
+            decoded.gymBranch ||
+            admin.gymBranch ||
+            'Kalyanpur';
+
         // Continue
         next();
 
     } catch (error) {
-
         console.error(
             'Auth Error:',
             error.message
@@ -71,8 +80,8 @@ const protect = async(req, res, next) => {
 // ===============================
 // ROLE AUTHORIZATION
 // ===============================
-const authorize = (...allowedRoles) => {
 
+const authorize = (...allowedRoles) => {
     return (req, res, next) => {
 
         if (!req.admin) {
@@ -81,9 +90,11 @@ const authorize = (...allowedRoles) => {
             });
         }
 
-        if (!allowedRoles.includes(
-                req.admin.role
-            )) {
+        const role =
+            req.admin.role ||
+            req.adminRole;
+
+        if (!allowedRoles.includes(role)) {
             return res.status(403).json({
                 message: 'Access denied. You do not have permission.',
             });
@@ -97,6 +108,7 @@ const authorize = (...allowedRoles) => {
 // ===============================
 // PERMISSION CHECK
 // ===============================
+
 const requirePermission = (permission) => {
 
     return (req, res, next) => {
@@ -107,19 +119,38 @@ const requirePermission = (permission) => {
             });
         }
 
-        // Admin / Owner has full access
-        if (req.admin.role === 'admin') {
+        // =================================
+        // MAIN ADMIN / OWNER
+        // =================================
+
+        // Main admin has full access
+        if (
+            req.admin.role === 'admin' ||
+            req.adminRole === 'admin'
+        ) {
             return next();
         }
 
-        // Get receptionist permissions
+        // =================================
+        // RECEPTIONIST PERMISSIONS
+        // =================================
+
         const permissions =
             req.admin.permissions || {};
 
-        // Example:
-        // members.view
-        // payments.add
-        // attendance.edit
+        /*
+            Example:
+
+            members.view
+            members.add
+            payments.view
+            payments.add
+            attendance.view
+            attendance.add
+            workouts.view
+            offers.view
+        */
+
         const parts =
             permission.split('.');
 
@@ -127,7 +158,6 @@ const requirePermission = (permission) => {
             permissions;
 
         for (const part of parts) {
-
             current =
                 current &&
                 current[part];

@@ -26,6 +26,11 @@ const adminSchema = new mongoose.Schema({
         default: 'receptionist',
     },
 
+    gymBranch: {
+        type: String,
+        enum: ['Kalyanpur', 'Gopalpur'],
+        required: true,
+    },
     status: {
         type: String,
         enum: ['active', 'inactive'],

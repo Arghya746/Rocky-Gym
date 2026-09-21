@@ -13,6 +13,12 @@ const contactSchema = new mongoose.Schema({
         trim: true,
     },
 
+    gymBranch: {
+        type: String,
+        enum: ['Kalyanpur', 'Gopalpur'],
+        required: true,
+    },
+
     goal: {
         type: String,
         required: true,

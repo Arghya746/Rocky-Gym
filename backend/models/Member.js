@@ -3,6 +3,17 @@ const mongoose = require('mongoose');
 const memberSchema = new mongoose.Schema({
 
     // =========================================
+    // GYM BRANCH
+    // =========================================
+
+    gymBranch: {
+        type: String,
+        enum: ['Kalyanpur', 'Gopalpur'],
+        required: true,
+    },
+
+
+    // =========================================
     // PERSONAL INFORMATION
     // =========================================
 
@@ -84,8 +95,7 @@ const memberSchema = new mongoose.Schema({
     timestamps: true,
 });
 
-module.exports =
-    mongoose.model(
-        'Member',
-        memberSchema
-    );
+module.exports = mongoose.model(
+    'Member',
+    memberSchema
+);

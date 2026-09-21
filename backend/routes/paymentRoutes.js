@@ -20,13 +20,14 @@ const router = express.Router();
 // PAYMENTS
 // =====================================
 
-// View payments
+// View all payments
 router.get(
     '/',
     protect,
     requirePermission('payments.view'),
     getPayments
 );
+
 
 // Add payment
 router.post(
@@ -36,6 +37,7 @@ router.post(
     addPayment
 );
 
+
 // View single payment
 router.get(
     '/:id',
@@ -43,6 +45,7 @@ router.get(
     requirePermission('payments.view'),
     getPaymentById
 );
+
 
 // Edit payment
 router.put(
@@ -52,6 +55,7 @@ router.put(
     updatePayment
 );
 
+
 // Delete payment
 router.delete(
     '/:id',
@@ -59,5 +63,6 @@ router.delete(
     requirePermission('payments.delete'),
     deletePayment
 );
+
 
 module.exports = router;

@@ -7,12 +7,17 @@ const attendanceSchema = new mongoose.Schema({
         required: true,
     },
 
+    gymBranch: {
+        type: String,
+        enum: ['Kalyanpur', 'Gopalpur'],
+        required: true,
+    },
+
     date: {
         type: Date,
         required: true,
         default: Date.now,
     },
-
     checkInTime: {
         type: Date,
         default: null,

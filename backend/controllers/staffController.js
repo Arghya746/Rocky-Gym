@@ -1,66 +1,103 @@
 const Admin = require('../models/Admin');
-// =====================================
-// GET ALL STAFF
-// =====================================
 const mongoose = require('mongoose');
 
 
-// =====================================================
-// GET RECEPTIONIST STAFF
-// =====================================================
+// =====================================
+// GET ACCESSIBLE BRANCH
+// =====================================
+
+const getAccessibleBranch = (req) => {
+
+    // Main admin can access both branches
+    if (
+        req.admin &&
+        req.admin.role === 'admin'
+    ) {
+        return null;
+    }
+
+    // Receptionist is restricted
+    // to their assigned branch
+    if (
+        req.admin &&
+        req.admin.gymBranch
+    ) {
+        return req.admin.gymBranch;
+    }
+
+    // Fallback for old accounts
+    return 'Kalyanpur';
+};
+
+
+// =====================================
+// GET ALL RECEPTIONISTS
+// =====================================
 
 const getStaff = async(req, res) => {
     try {
-        const staff = await Admin.find({
-                role: 'receptionist',
-            })
+
+        const branch =
+            getAccessibleBranch(req);
+
+        const query = {
+            role: 'receptionist',
+        };
+
+        // Main admin -> both branches
+        // Branch user -> assigned branch
+        if (branch) {
+            query.gymBranch = branch;
+        }
+
+        const staff =
+            await Admin.find(query)
             .select('-password')
-            .sort({ createdAt: -1 })
+            .sort({
+                createdAt: -1,
+            })
             .lean();
 
         res.status(200).json({
+            message: 'Staff fetched successfully.',
             staff: staff || [],
         });
 
     } catch (error) {
+
         console.error(
             'Get Staff Error:',
-            error
+            error.message
         );
 
         res.status(500).json({
             message: 'Server error. Please try again.',
-            error: error.message,
         });
     }
 };
 
 
-// =====================================================
-// UPDATE STAFF PERMISSIONS
-// =====================================================
+// =====================================
+// UPDATE RECEPTIONIST PERMISSIONS
+// =====================================
 
-const updateStaffPermissions = async(req, res) => {
+const updateStaffPermissions = async(
+    req,
+    res
+) => {
     try {
+
         const { id } = req.params;
         const { permissions } = req.body;
 
-
-        // ---------------------------------------------
-        // VALIDATE ID
-        // ---------------------------------------------
-
+        // Validate ID
         if (!mongoose.Types.ObjectId.isValid(id)) {
             return res.status(400).json({
                 message: 'Invalid staff ID.',
             });
         }
 
-
-        // ---------------------------------------------
-        // VALIDATE PERMISSIONS
-        // ---------------------------------------------
-
+        // Validate permissions
         if (!permissions ||
             typeof permissions !== 'object'
         ) {
@@ -69,15 +106,21 @@ const updateStaffPermissions = async(req, res) => {
             });
         }
 
+        const branch =
+            getAccessibleBranch(req);
 
-        // ---------------------------------------------
-        // FIND RECEPTIONIST
-        // ---------------------------------------------
-
-        const staff = await Admin.findOne({
+        const query = {
             _id: id,
             role: 'receptionist',
-        });
+        };
+
+        // Branch restriction
+        if (branch) {
+            query.gymBranch = branch;
+        }
+
+        const staff =
+            await Admin.findOne(query);
 
         if (!staff) {
             return res.status(404).json({
@@ -85,20 +128,13 @@ const updateStaffPermissions = async(req, res) => {
             });
         }
 
-
-        // ---------------------------------------------
-        // EXISTING PERMISSIONS
-        // ---------------------------------------------
-
         const existingPermissions =
             staff.permissions ?
-            staff.permissions.toObject() : {};
+            staff.permissions.toObject() :
+            {};
 
-
-        // ---------------------------------------------
-        // MERGE PERMISSIONS
-        // ---------------------------------------------
-
+        // Keep branch assignment unchanged.
+        // Only permissions are updated.
         staff.permissions = {
 
             members: {
@@ -125,19 +161,19 @@ const updateStaffPermissions = async(req, res) => {
                 ...(existingPermissions.enquiries || {}),
                 ...(permissions.enquiries || {}),
             },
+
+            offers: {
+                ...(existingPermissions.offers || {}),
+                ...(permissions.offers || {}),
+            },
+
+            plans: {
+                ...(existingPermissions.plans || {}),
+                ...(permissions.plans || {}),
+            },
         };
 
-
-        // ---------------------------------------------
-        // SAVE
-        // ---------------------------------------------
-
         await staff.save();
-
-
-        // ---------------------------------------------
-        // RESPONSE
-        // ---------------------------------------------
 
         res.status(200).json({
             message: 'Staff permissions updated successfully.',
@@ -148,6 +184,7 @@ const updateStaffPermissions = async(req, res) => {
                 name: staff.name,
                 email: staff.email,
                 role: staff.role,
+                gymBranch: staff.gymBranch,
                 status: staff.status,
                 permissions: staff.permissions,
             },
@@ -157,57 +194,60 @@ const updateStaffPermissions = async(req, res) => {
 
         console.error(
             'Update Staff Permissions Error:',
-            error
+            error.message
         );
 
         res.status(500).json({
             message: 'Server error. Please try again.',
-            error: error.message,
         });
     }
 };
 
 
-// =====================================================
-// UPDATE STAFF STATUS
-// =====================================================
+// =====================================
+// UPDATE RECEPTIONIST STATUS
+// =====================================
 
-const updateStaffStatus = async(req, res) => {
+const updateStaffStatus = async(
+    req,
+    res
+) => {
     try {
+
         const { id } = req.params;
         const { status } = req.body;
 
-
-        // ---------------------------------------------
-        // VALIDATE ID
-        // ---------------------------------------------
-
+        // Validate ID
         if (!mongoose.Types.ObjectId.isValid(id)) {
             return res.status(400).json({
                 message: 'Invalid staff ID.',
             });
         }
 
-
-        // ---------------------------------------------
-        // VALIDATE STATUS
-        // ---------------------------------------------
-
-        if (!['active', 'inactive'].includes(status)) {
+        // Validate status
+        if (!['active', 'inactive']
+            .includes(status)
+        ) {
             return res.status(400).json({
                 message: 'Invalid status.',
             });
         }
 
+        const branch =
+            getAccessibleBranch(req);
 
-        // ---------------------------------------------
-        // FIND RECEPTIONIST
-        // ---------------------------------------------
-
-        const staff = await Admin.findOne({
+        const query = {
             _id: id,
             role: 'receptionist',
-        });
+        };
+
+        // Branch restriction
+        if (branch) {
+            query.gymBranch = branch;
+        }
+
+        const staff =
+            await Admin.findOne(query);
 
         if (!staff) {
             return res.status(404).json({
@@ -215,29 +255,17 @@ const updateStaffStatus = async(req, res) => {
             });
         }
 
-
-        // ---------------------------------------------
-        // UPDATE STATUS
-        // ---------------------------------------------
-
         staff.status = status;
 
         await staff.save();
 
-
-        // ---------------------------------------------
-        // RESPONSE
-        // ---------------------------------------------
+        const action =
+            status === 'active' ?
+            'activated' :
+            'deactivated';
 
         res.status(200).json({
-            message: `
-Receptionist $ {
-    status === 'active' ?
-        'activated' :
-        'deactivated'
-}
-successfully.
-`,
+            message: `Receptionist ${action} successfully.`,
 
             staff: {
                 _id: staff._id,
@@ -245,6 +273,7 @@ successfully.
                 name: staff.name,
                 email: staff.email,
                 role: staff.role,
+                gymBranch: staff.gymBranch,
                 status: staff.status,
                 permissions: staff.permissions,
             },
@@ -254,20 +283,19 @@ successfully.
 
         console.error(
             'Update Staff Status Error:',
-            error
+            error.message
         );
 
         res.status(500).json({
             message: 'Server error. Please try again.',
-            error: error.message,
         });
     }
 };
 
 
-// =====================================================
+// =====================================
 // EXPORT CONTROLLERS
-// =====================================================
+// =====================================
 
 module.exports = {
     getStaff,

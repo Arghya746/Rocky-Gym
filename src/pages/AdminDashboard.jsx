@@ -3,8 +3,200 @@ import { useEffect, useState } from 'react';
 import { useNavigate } from 'react-router-dom';
 import AdminLogout from '../components/AdminLogout';
 import API_URL from '../config/api';
-export default function AdminDashboard() { 
+
+const GYM_BRANCHES = [
+  { _id: 'Kalyanpur', name: 'Kalyanpur' },
+  { _id: 'Gopalpur', name: 'Gopalpur' },
+];
+
+const DEFAULT_PERMISSIONS = {
+  members: { view: true, add: true, edit: true, delete: false },
+  payments: { view: true, add: true, edit: true, delete: false },
+  attendance: { view: true, add: true, edit: true, delete: false },
+  workouts: { view: true, add: true, edit: true, delete: false },
+  enquiries: { view: true, delete: false },
+};
+
+const getDateKey = (value = new Date()) => {
+  const date = value instanceof Date ? value : new Date(value);
+  if (Number.isNaN(date.getTime())) return '';
+  const year = date.getFullYear();
+  const month = String(date.getMonth() + 1).padStart(2, '0');
+  const day = String(date.getDate()).padStart(2, '0');
+  return `${year}-${month}-${day}`;
+};
+
+export default function AdminDashboard() {
   const navigate = useNavigate();
+
+  // =========================================================
+  // AUTH / BRANCH CONTEXT
+  // =========================================================
+
+  const token = localStorage.getItem('adminToken');
+
+  const decodeJwtPayload = (jwtToken) => {
+    try {
+      if (!jwtToken) {
+        return {};
+      }
+
+      const parts = jwtToken.split('.');
+
+      if (parts.length !== 3) {
+        return {};
+      }
+
+      const base64 = parts[1]
+        .replace(/-/g, '+')
+        .replace(/_/g, '/');
+
+      const padded =
+        base64 + '='.repeat((4 - (base64.length % 4)) % 4);
+
+      return JSON.parse(atob(padded));
+    } catch (error) {
+      console.error(
+        'Unable to decode admin token:',
+        error
+      );
+      return {};
+    }
+  };
+
+  const tokenPayload = decodeJwtPayload(token);
+
+  let loggedInUser = null;
+
+  try {
+    const storedUser = JSON.parse(
+      localStorage.getItem('adminUser') ||
+      localStorage.getItem('user') ||
+      '{}'
+    );
+
+    loggedInUser =
+      storedUser?.admin ||
+      storedUser?.user ||
+      storedUser;
+  } catch (error) {
+    console.error(
+      'Unable to read logged-in user:',
+      error
+    );
+  }
+
+  // IMPORTANT:
+  // The backend JWT now contains both role and gymBranch.
+  // Use the stored user first, then fall back to the JWT.
+  // This prevents a receptionist from being incorrectly treated
+  // as the main admin when adminUser was not stored in localStorage.
+  const userRole =
+    loggedInUser?.role ||
+    loggedInUser?.userRole ||
+    tokenPayload?.role ||
+    null;
+
+  const userBranchId =
+    loggedInUser?.gymBranch ||
+    loggedInUser?.branchName ||
+    loggedInUser?.branch ||
+    tokenPayload?.gymBranch ||
+    null;
+
+  const userBranchName =
+    userBranchId ||
+    'BRANCH NOT ASSIGNED';
+
+  const isMainAdmin =
+    userRole === 'admin' ||
+    userRole === 'main_admin' ||
+    userRole === 'super_admin';
+
+  const isReceptionist =
+    userRole === 'receptionist' ||
+    userRole === 'staff';
+
+  const branches = GYM_BRANCHES;
+
+  const [selectedBranchId, setSelectedBranchId] =
+    useState(() =>
+      isMainAdmin
+        ? 'all'
+        : userBranchId
+    );
+
+  const [selectedBranchName, setSelectedBranchName] =
+    useState(() =>
+      isMainAdmin
+        ? 'ALL BRANCHES'
+        : userBranchName
+    );
+
+  const [branchError, setBranchError] =
+    useState('');
+
+  // Branch filtering is enforced by the backend for receptionists.
+  // Main admin receives both branches and can switch the visible branch.
+  const getBranchQuery = () => '';
+
+  const filterBySelectedBranch = (items) => {
+    if (!Array.isArray(items)) {
+      return [];
+    }
+
+    // Receptionists are permanently locked to their assigned branch.
+    if (!isMainAdmin) {
+      if (!userBranchId) {
+        return [];
+      }
+
+      return items.filter((item) => {
+        const branch =
+          item?.gymBranch ||
+          item?.branchName ||
+          item?.branch;
+        return branch === userBranchId;
+      });
+    }
+
+    // Main admin can see both branches.
+    if (selectedBranchId === 'all') {
+      return items;
+    }
+
+    // Main admin can switch between Kalyanpur and Gopalpur.
+    return items.filter((item) => {
+      const branch =
+        item?.gymBranch ||
+        item?.branchName ||
+        item?.branch;
+      return branch === selectedBranchId;
+    });
+  };
+
+  const getWriteBranchId = () => {
+    if (isMainAdmin) {
+      if (
+        !selectedBranchId ||
+        selectedBranchId === 'all'
+      ) {
+        throw new Error(
+          'Select Kalyanpur or Gopalpur before creating a record.'
+        );
+      }
+
+      return selectedBranchId;
+    }
+
+    if (!userBranchId) {
+      throw new Error(
+        'Your account is not assigned to a gym branch.'
+      );
+    }
+
+    return userBranchId;
+  };
 
   const [contacts, setContacts] = useState([]);
   const [members, setMembers] = useState([]);
@@ -28,6 +220,43 @@ export default function AdminDashboard() {
     totalRevenue: 0,
     todayAttendance: 0,
   });
+
+  // =========================================================
+  // BRANCH-AWARE FRONTEND STATS
+  // =========================================================
+
+  useEffect(() => {
+    const paidPayments = payments.filter(
+      (payment) => String(payment.status || '').toLowerCase() === 'paid'
+    );
+
+    const todayKey = getDateKey();
+
+    const todayAttendance = attendance.filter((record) => {
+      if (String(record.status || '').toLowerCase() !== 'present') {
+        return false;
+      }
+
+      return getDateKey(record.date) === todayKey;
+    }).length;
+
+    setStats({
+      totalMembers: members.length,
+      activeMembers: members.filter(
+        (member) => String(member.status || '').toLowerCase() === 'active'
+      ).length,
+      expiredMembers: members.filter(
+        (member) => String(member.status || '').toLowerCase() === 'expired'
+      ).length,
+      totalPayments: payments.length,
+      totalRevenue: paidPayments.reduce(
+        (total, payment) =>
+          total + Number(payment.amount || 0),
+        0
+      ),
+      todayAttendance,
+    });
+  }, [members, payments, attendance]);
 
   // =========================
   // LOADING STATES
@@ -143,36 +372,7 @@ export default function AdminDashboard() {
 
   const [staff, setStaff] = useState([]);
   const [selectedStaff, setSelectedStaff] = useState(null);
-  const [permissions, setPermissions] = useState({
-    members: {
-      view: true,
-      add: true,
-      edit: true,
-      delete: false,
-    },
-    payments: {
-      view: true,
-      add: true,
-      edit: true,
-      delete: false,
-    },
-    attendance: {
-      view: true,
-      add: true,
-      edit: true,
-      delete: false,
-    },
-    workouts: {
-      view: true,
-      add: true,
-      edit: true,
-      delete: false,
-    },
-    enquiries: {
-      view: true,
-      delete: false,
-    },
-  });
+  const [permissions, setPermissions] = useState(DEFAULT_PERMISSIONS);
 
   const [staffSuccess, setStaffSuccess] = useState('');
   const [staffError, setStaffError] = useState('');
@@ -262,6 +462,12 @@ export default function AdminDashboard() {
   });
 
   const fetchStaff = async () => {
+    if (!isMainAdmin) {
+      setStaff([]);
+      setSelectedStaff(null);
+      return;
+    }
+
     try {
       setStaffError('');
 
@@ -288,9 +494,11 @@ export default function AdminDashboard() {
         );
       }
 
-      const staffList = Array.isArray(data)
+      const rawStaffList = Array.isArray(data)
         ? data
         : data.staff || data.admins || [];
+
+      const staffList = filterBySelectedBranch(rawStaffList);
 
       setStaff(staffList);
 
@@ -469,7 +677,8 @@ export default function AdminDashboard() {
   };
   const permissionCount = Object.values(permissions).reduce(
     (total, section) =>
-      total + Object.values(section || {}).filter(Boolean).length,
+      Number(total) +
+      Object.values(section || {}).filter(Boolean).length,
     0
   );
 
@@ -510,7 +719,7 @@ export default function AdminDashboard() {
         );
       }
 
-      setContacts(data.contacts || []);
+      setContacts(filterBySelectedBranch(data.contacts || []));
 
     } catch (error) {
       console.error(
@@ -561,7 +770,15 @@ export default function AdminDashboard() {
         );
       }
 
-      setStats(data.stats);
+      // The backend stats endpoint returns both branches for the main admin.
+      // When a specific branch is selected, the branch-filtered member/payment/
+      // attendance arrays below calculate the visible stats instead.
+      if (
+        !isMainAdmin ||
+        selectedBranchId === 'all'
+      ) {
+        setStats(data.stats);
+      }
 
     } catch (error) {
       console.error(
@@ -609,7 +826,7 @@ export default function AdminDashboard() {
         );
       }
 
-      setMembers(data.members || []);
+      setMembers(filterBySelectedBranch(data.members || []));
 
     } catch (error) {
       console.error(
@@ -635,7 +852,7 @@ export default function AdminDashboard() {
     }));
   };
 
-  // =========================================================
+ // =========================================================
 // ADD MEMBER
 // =========================================================
 
@@ -665,6 +882,7 @@ const handleAddMember = async (e) => {
           Authorization: `Bearer ${token}`,
         },
         body: JSON.stringify({
+          gymBranch: getWriteBranchId(),
           name: memberForm.name,
           phone: memberForm.phone,
           email: memberForm.email,
@@ -789,7 +1007,6 @@ const handleToggleOfferStatus = async (offer) => {
     );
   }
 };
-
 // =========================================================
 // MEMBERSHIP OFFER CHANGE
 // =========================================================
@@ -886,6 +1103,7 @@ const handleOfferChange = (e) => {
             Authorization: `Bearer ${token}`,
           },
           body: JSON.stringify({
+            gymBranch: getWriteBranchId(),
             name: memberForm.name,
             phone: memberForm.phone,
             email: memberForm.email,
@@ -1054,7 +1272,7 @@ const handleOfferChange = (e) => {
         );
       }
 
-      setPlans(data.plans || []);
+      setPlans(filterBySelectedBranch(data.plans || []));
     } catch (error) {
       console.error('Fetch plans error:', error);
     }
@@ -1085,9 +1303,11 @@ const handleOfferChange = (e) => {
         );
       }
 
-      const rawOffers = Array.isArray(data.offers)
-        ? data.offers
-        : [];
+      const rawOffers = filterBySelectedBranch(
+        Array.isArray(data.offers)
+          ? data.offers
+          : []
+      );
 
       // Keep one visible copy of each promotional offer.
       // The database currently contains duplicate offer records,
@@ -1260,6 +1480,7 @@ const handleOfferChange = (e) => {
             },
             body: JSON.stringify({
               ...offer,
+              gymBranch: getWriteBranchId(),
               startDate,
               endDate,
             }),
@@ -1334,7 +1555,7 @@ const handleOfferChange = (e) => {
         );
       }
 
-      setPayments(data.payments || []);
+      setPayments(filterBySelectedBranch(data.payments || []));
 
     } catch (error) {
       console.error(
@@ -1390,6 +1611,7 @@ const handleOfferChange = (e) => {
             Authorization: `Bearer ${token}`,
           },
           body: JSON.stringify({
+            gymBranch: getWriteBranchId(),
             member: paymentForm.member,
             invoiceNumber:
               paymentForm.invoiceNumber,
@@ -1516,6 +1738,7 @@ const handleOfferChange = (e) => {
             Authorization: `Bearer ${token}`,
           },
           body: JSON.stringify({
+            gymBranch: getWriteBranchId(),
             member: paymentForm.member,
             invoiceNumber:
               paymentForm.invoiceNumber,
@@ -1656,8 +1879,8 @@ const fetchAttendance = async () => {
       );
     }
 
-    const response = await 
-    fetch(`${API_URL}/api/attendance`, 
+    const response = await fetch(
+      `${API_URL}/api/attendance`,
       {
         headers: {
           Authorization: `Bearer ${token}`,
@@ -1675,7 +1898,7 @@ const fetchAttendance = async () => {
     }
 
     setAttendance(
-      data.attendance || []
+      filterBySelectedBranch(data.attendance || [])
     );
 
   } catch (error) {
@@ -1724,7 +1947,7 @@ const handleMarkAttendance = async (e) => {
     }
 
     const response = await fetch(
-      'http://localhost:5000/api/attendance',
+      `${API_URL}/api/attendance`,
       {
         method: 'POST',
 
@@ -1734,6 +1957,7 @@ const handleMarkAttendance = async (e) => {
         },
 
        body: JSON.stringify({
+          gymBranch: getWriteBranchId(),
           member: attendanceForm.member,
           date: attendanceForm.date,
           status:
@@ -1799,6 +2023,43 @@ const handleAttendanceChange = (e) => {
   }));
 };
 
+  const handleEditAttendance = (record) => {
+    setEditingAttendance(record);
+
+    const memberId =
+      record?.member?._id ||
+      record?.member ||
+      '';
+
+    const dateValue = record?.date
+      ? new Date(record.date)
+      : null;
+
+    const formatTime = (value) => {
+      if (!value) return '';
+      const date = new Date(value);
+      if (Number.isNaN(date.getTime())) return '';
+      return `${String(date.getHours()).padStart(2, '0')}:${String(
+        date.getMinutes()
+      ).padStart(2, '0')}`;
+    };
+
+    setAttendanceForm({
+      member: memberId,
+      date: dateValue && !Number.isNaN(dateValue.getTime())
+        ? getDateKey(dateValue)
+        : '',
+      checkInTime: formatTime(record?.checkInTime),
+      checkOutTime: formatTime(record?.checkOutTime),
+      status: record?.status || 'Present',
+    });
+
+    setShowAddAttendance(true);
+    setAttendanceFormError('');
+    setEditAttendanceError('');
+    setAttendanceSuccess('');
+  };
+
   const handleUpdateAttendance = async (
     e
   ) => {
@@ -1819,7 +2080,7 @@ const handleAttendanceChange = (e) => {
       }
 
       const response = await fetch(
-        `http://localhost:5000/api/attendance/${editingAttendance._id}`,
+        `${API_URL}/api/attendance/${editingAttendance._id}`,
         {
           method: 'PUT',
           headers: {
@@ -1827,6 +2088,7 @@ const handleAttendanceChange = (e) => {
             Authorization: `Bearer ${token}`,
           },
           body: JSON.stringify({
+            gymBranch: getWriteBranchId(),
             member: attendanceForm.member,
             date: attendanceForm.date,
             checkInTime:
@@ -1908,7 +2170,7 @@ const handleAttendanceChange = (e) => {
       }
 
       const response = await fetch(
-        `http://localhost:5000/api/attendance/${attendanceId}`,
+        `${API_URL}/api/attendance/${attendanceId}`,
         {
           method: 'DELETE',
           headers: {
@@ -1965,8 +2227,8 @@ const handleAttendanceChange = (e) => {
         );
       }
 
-      const response = await 
-       fetch(`${API_URL}/api/workouts`, 
+      const response = await
+       fetch(`${API_URL}/api/workouts`,
         {
           headers: {
             Authorization: `Bearer ${token}`,
@@ -1983,7 +2245,7 @@ const handleAttendanceChange = (e) => {
         );
       }
 
-      setWorkouts(data.workouts || []);
+      setWorkouts(filterBySelectedBranch(data.workouts || []));
 
     } catch (error) {
       console.error(
@@ -2078,7 +2340,7 @@ const handleAttendanceChange = (e) => {
       }
 
       const response = await fetch(
-        'http://localhost:5000/api/workouts',
+        `${API_URL}/api/workouts`,
         {
           method: 'POST',
           headers: {
@@ -2086,6 +2348,7 @@ const handleAttendanceChange = (e) => {
             Authorization: `Bearer ${token}`,
           },
           body: JSON.stringify({
+            gymBranch: getWriteBranchId(),
             member: workoutForm.member,
             workoutName:
               workoutForm.workoutName,
@@ -2226,7 +2489,7 @@ const handleAttendanceChange = (e) => {
       }
 
       const response = await fetch(
-        `http://localhost:5000/api/workouts/${editingWorkout._id}`,
+        `${API_URL}/api/workouts/${editingWorkout._id}`,
         {
           method: 'PUT',
           headers: {
@@ -2234,6 +2497,7 @@ const handleAttendanceChange = (e) => {
             Authorization: `Bearer ${token}`,
           },
           body: JSON.stringify({
+            gymBranch: getWriteBranchId(),
             member: workoutForm.member,
             workoutName:
               workoutForm.workoutName,
@@ -2330,7 +2594,7 @@ const handleAttendanceChange = (e) => {
       }
 
       const response = await fetch(
-        `http://localhost:5000/api/workouts/${workoutId}`,
+        `${API_URL}/api/workouts/${workoutId}`,
         {
           method: 'DELETE',
           headers: {
@@ -2394,7 +2658,7 @@ const handleAttendanceChange = (e) => {
       }
 
       const response = await fetch(
-        `http://localhost:5000/api/contacts/${contactId}`,
+        `${API_URL}/api/contacts/${contactId}`,
         {
           method: 'DELETE',
           headers: {
@@ -2446,7 +2710,7 @@ const handleAttendanceChange = (e) => {
     fetchStaff();
     fetchPlans();
     fetchOffers();
-  }, []);
+  }, [selectedBranchId, isMainAdmin]);
 
   // =========================================================
   // REFRESH
@@ -2492,14 +2756,114 @@ const handleAttendanceChange = (e) => {
             attendance, workouts and enquiries.
           </p>
 
+          <div className="admin-current-branch">
+            {isMainAdmin
+              ? `BRANCH: ${selectedBranchName}`
+              : `BRANCH: ${userBranchName}`}
+          </div>
+
         </div>
 
         <div className="admin-header-actions">
+
+          <div
+            className="admin-branch-control"
+            style={{
+              display: 'flex',
+              alignItems: 'center',
+              gap: '12px',
+              padding: '8px 12px',
+              border: '1px solid rgba(255, 102, 0, 0.35)',
+              borderRadius: '8px',
+              background: 'rgba(255, 102, 0, 0.06)',
+            }}
+          >
+            <div
+              style={{
+                display: 'flex',
+                flexDirection: 'column',
+                gap: '2px',
+              }}
+            >
+              <span
+                style={{
+                  fontSize: '10px',
+                  fontWeight: 700,
+                  letterSpacing: '1.5px',
+                  opacity: 0.65,
+                }}
+              >
+                ACTIVE GYM BRANCH
+              </span>
+
+              <strong
+                className="admin-current-branch"
+                style={{
+                  fontSize: '13px',
+                }}
+              >
+                {isMainAdmin
+                  ? selectedBranchName
+                  : userBranchName}
+              </strong>
+            </div>
+
+            {isMainAdmin ? (
+              <select
+                className="admin-branch-select"
+                value={selectedBranchId || 'all'}
+                onChange={(e) => {
+                  const value = e.target.value;
+
+                  setBranchError('');
+                  setSelectedBranchId(value);
+
+                  if (value === 'all') {
+                    setSelectedBranchName('ALL BRANCHES');
+                  } else {
+                    const selected = branches.find(
+                      (branch) => branch._id === value
+                    );
+
+                    setSelectedBranchName(
+                      selected?.name || 'SELECTED BRANCH'
+                    );
+                  }
+                }}
+                aria-label="Select gym branch"
+              >
+                <option value="all">
+                  ALL BRANCHES
+                </option>
+
+                {branches.map((branch) => (
+                  <option
+                    key={branch._id}
+                    value={branch._id}
+                  >
+                    {branch.name}
+                  </option>
+                ))}
+              </select>
+            ) : (
+              <span
+                style={{
+                  fontSize: '11px',
+                  fontWeight: 700,
+                  opacity: 0.65,
+                  whiteSpace: 'nowrap',
+                }}
+              >
+                LOCKED TO ASSIGNED BRANCH
+              </span>
+            )}
+          </div>
 
           <button
             type="button"
             className="admin-refresh-btn"
             onClick={handleRefresh}
+            aria-label="Refresh dashboard data"
           >
             ↻ REFRESH
           </button>
@@ -2509,6 +2873,12 @@ const handleAttendanceChange = (e) => {
         </div>
 
       </header>
+
+      {branchError && (
+        <div className="admin-login-error" role="alert">
+          {branchError}
+        </div>
+      )}
 
       {/* =====================================================
           STATS ROW 1
@@ -3437,6 +3807,7 @@ const handleAttendanceChange = (e) => {
     STAFF MANAGEMENT
 ===================================================== */}
 
+{isMainAdmin && (
 <section className="admin-staff-management">
 
   {/* STAFF HEADER */}
@@ -3453,6 +3824,9 @@ const handleAttendanceChange = (e) => {
 
       <p>
         Manage receptionist accounts and control dashboard access.
+        {isMainAdmin && selectedBranchId !== 'all'
+          ? ` — ${selectedBranchName}`
+          : ''}
       </p>
     </div>
 
@@ -3606,6 +3980,10 @@ const handleAttendanceChange = (e) => {
                     {member.email}
                   </span>
 
+                  <span className="staff-account-meta">
+                    BRANCH: {member.gymBranch || 'NOT ASSIGNED'}
+                  </span>
+
                   <span
                     className={`staff-status ${
                       isActive
@@ -3701,6 +4079,10 @@ const handleAttendanceChange = (e) => {
 
                   <p>
                     {selectedStaff.email}
+                  </p>
+
+                  <p className="staff-branch-label">
+                    BRANCH: {selectedStaff.gymBranch || 'NOT ASSIGNED'}
                   </p>
 
                 </div>
@@ -4030,6 +4412,7 @@ const handleAttendanceChange = (e) => {
   </div>
 
 </section>
+)}
 {/* =====================================================
     PAYMENT MANAGEMENT
 ===================================================== */}
@@ -5984,8 +6367,8 @@ const handleAttendanceChange = (e) => {
 
 </section>
 
-</div>   
+</div>
 
     )}
 
-    
+

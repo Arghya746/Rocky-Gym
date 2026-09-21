@@ -16,7 +16,7 @@ const router = express.Router();
 
 // =====================================
 // STAFF MANAGEMENT
-// OWNER / ADMIN ONLY
+// MAIN ADMIN ONLY
 // =====================================
 
 // Get all receptionists

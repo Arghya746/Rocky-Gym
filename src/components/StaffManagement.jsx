@@ -1,1517 +1,2026 @@
-import React, { useEffect, useState } from 'react';
+import { useEffect, useState } from 'react';
 import API_URL from '../config/api';
 
-const defaultPermissions = {
+
+// =========================================================
+// DEFAULT PERMISSIONS
+// =========================================================
+
+const DEFAULT_PERMISSIONS = {
     members: {
         view: true,
         add: true,
         edit: true,
         delete: false,
     },
+
     payments: {
         view: true,
         add: true,
         edit: true,
         delete: false,
     },
+
     attendance: {
         view: true,
         add: true,
         edit: true,
         delete: false,
     },
+
     workouts: {
         view: true,
         add: true,
         edit: true,
         delete: false,
     },
+
     enquiries: {
         view: true,
         delete: false,
     },
 };
 
-const permissionLabels = {
-    members: 'Members',
-    payments: 'Payments',
-    attendance: 'Attendance',
-    workouts: 'Workouts',
-    enquiries: 'Enquiries',
-};
 
-function StaffManagement() {
-    const [staff, setStaff] = useState([]);
-    const [selectedStaff, setSelectedStaff] = useState(null);
-    const [permissions, setPermissions] =
-        useState(defaultPermissions);
+// =========================================================
+// BRANCH OPTIONS
+// =========================================================
 
-    const [loading, setLoading] = useState(true);
-    const [saving, setSaving] = useState(false);
-    const [message, setMessage] = useState('');
-    const [error, setError] = useState('');
+const BRANCH_OPTIONS = [
+    {
+        id: 'all',
+        name: 'ALL BRANCHES',
+    },
+    {
+        id: 'Kalyanpur',
+        name: 'KALYANPUR',
+    },
+    {
+        id: 'Gopalpur',
+        name: 'GOPALPUR',
+    },
+];
 
-    const normalizeStaff = (data) => {
-        if (Array.isArray(data)) return data;
 
-        if (Array.isArray(data?.staff)) {
-            return data.staff;
-        }
+// =========================================================
+// COMPONENT
+// =========================================================
 
-        if (Array.isArray(data?.data)) {
-            return data.data;
-        }
+export default function StaffManagement() {
 
-        return [];
-    };
+    // =====================================================
+    // AUTH / USER CONTEXT
+    // =====================================================
 
-    const fetchStaff = async () => {
-        try {
-            setLoading(true);
-            setError('');
+    const token =
+        localStorage.getItem('adminToken');
 
-            const token =
-                localStorage.getItem('adminToken');
+    let loggedInUser = null;
 
-            const response = await fetch(
-                `${API_URL}/api/admin/staff`,
-                {
-                    headers: {
-                        Authorization: `Bearer ${token}`,
-                    },
-                }
-            );
+    try {
+        const storedUser = JSON.parse(
+            localStorage.getItem('adminUser') ||
+            localStorage.getItem('user') ||
+            '{}'
+        );
 
-            const data = await response.json();
+        loggedInUser =
+            storedUser?.admin ||
+            storedUser?.user ||
+            storedUser;
 
-            if (!response.ok) {
-                throw new Error(
-                    data.message ||
-                    'Failed to fetch staff.'
-                );
-            }
-
-            const staffData =
-                normalizeStaff(data);
-
-            setStaff(staffData);
-
-            if (staffData.length > 0) {
-                setSelectedStaff((current) => {
-                    const existing =
-                        staffData.find(
-                            (item) =>
-                                item._id === current?._id
-                        );
-
-                    return existing || staffData[0];
-                });
-
-                setPermissions((current) => {
-                    const activeStaff =
-                        staffData.find(
-                            (item) =>
-                                item._id ===
-                                selectedStaff?._id
-                        ) || staffData[0];
-
-                    return {
-                        ...defaultPermissions,
-                        ...(activeStaff.permissions || {}),
-                    };
-                });
-            } else {
-                setSelectedStaff(null);
-            }
-        } catch (err) {
-            console.error(
-                'Fetch staff error:',
-                err
-            );
-
-            setError(
-                err.message ||
-                'Failed to load staff.'
-            );
-        } finally {
-            setLoading(false);
-        }
-    };
-
-    const selectStaff = (member) => {
-        setSelectedStaff(member);
-
-        setPermissions({
-            ...defaultPermissions,
-            ...(member.permissions || {}),
-        });
-
-        setMessage('');
-        setError('');
-    };
-
-    const handlePermissionChange = (
-        category,
-        permission
-    ) => {
-        setPermissions((previous) => ({
-            ...previous,
-            [category]: {
-                ...previous[category],
-                [permission]:
-                    !previous[category][permission],
-            },
-        }));
-    };
-
-    const savePermissions = async () => {
-        if (!selectedStaff) return;
-
-        try {
-            setSaving(true);
-            setMessage('');
-            setError('');
-
-            const token =
-                localStorage.getItem('adminToken');
-
-            const response = await fetch(
-                `${API_URL}/api/admin/staff/${selectedStaff._id}/permissions`,
-                {
-                    method: 'PUT',
-                    headers: {
-                        'Content-Type':
-                            'application/json',
-                        Authorization:
-                            `Bearer ${token}`,
-                    },
-                    body: JSON.stringify({
-                        permissions,
-                    }),
-                }
-            );
-
-            const data =
-                await response.json();
-
-            if (!response.ok) {
-                throw new Error(
-                    data.message ||
-                    'Failed to save permissions.'
-                );
-            }
-
-            setMessage(
-                'Changes are saved to this staff account.'
-            );
-
-            await fetchStaff();
-
-        } catch (err) {
-            console.error(
-                'Save permissions error:',
-                err
-            );
-
-            setError(
-                err.message ||
-                'Failed to save permissions.'
-            );
-        } finally {
-            setSaving(false);
-        }
-    };
-
-    const toggleStatus = async () => {
-        if (!selectedStaff) return;
-
-        try {
-            setMessage('');
-            setError('');
-
-            const token =
-                localStorage.getItem('adminToken');
-
-            const newStatus =
-                selectedStaff.status === 'active'
-                    ? 'inactive'
-                    : 'active';
-
-            const response = await fetch(
-                `${API_URL}/api/admin/staff/${selectedStaff._id}/status`,
-                {
-                    method: 'PUT',
-                    headers: {
-                        'Content-Type':
-                            'application/json',
-                        Authorization:
-                            `Bearer ${token}`,
-                    },
-                    body: JSON.stringify({
-                        status: newStatus,
-                    }),
-                }
-            );
-
-            const data =
-                await response.json();
-
-            if (!response.ok) {
-                throw new Error(
-                    data.message ||
-                    'Failed to update account status.'
-                );
-            }
-
-            setMessage(
-                `Account ${
-                    newStatus === 'active'
-                        ? 'activated'
-                        : 'deactivated'
-                } successfully.`
-            );
-
-            await fetchStaff();
-
-        } catch (err) {
-            console.error(
-                'Toggle status error:',
-                err
-            );
-
-            setError(
-                err.message ||
-                'Failed to update status.'
-            );
-        }
-    };
-
-    useEffect(() => {
-        fetchStaff();
-    }, []);
-
-    if (loading) {
-        return (
-            <>
-                <style>{staffStyles}</style>
-
-                <section className="staff-modern-section">
-                    <div className="staff-modern-loading">
-                        Loading staff accounts...
-                    </div>
-                </section>
-            </>
+    } catch (error) {
+        console.error(
+            'Unable to read logged-in user:',
+            error
         );
     }
 
+
+    const userRole =
+        loggedInUser?.role ||
+        loggedInUser?.userRole ||
+        'admin';
+
+
+    const userBranch =
+        loggedInUser?.gymBranch ||
+        loggedInUser?.branchName ||
+        loggedInUser?.branch ||
+        null;
+
+
+    const isMainAdmin =
+        userRole === 'admin' ||
+        userRole === 'main_admin' ||
+        userRole === 'super_admin';
+
+
+    // =====================================================
+    // STAFF STATES
+    // =====================================================
+
+    const [staff, setStaff] =
+        useState([]);
+
+    const [selectedStaff, setSelectedStaff] =
+        useState(null);
+
+    const [permissions, setPermissions] =
+        useState(DEFAULT_PERMISSIONS);
+
+
+    // =====================================================
+    // BRANCH STATES
+    // =====================================================
+
+    const [selectedBranch, setSelectedBranch] =
+        useState(
+            isMainAdmin
+                ? 'all'
+                : userBranch
+        );
+
+
+    // =====================================================
+    // CREATE STAFF STATES
+    // =====================================================
+
+    const [showCreateStaff, setShowCreateStaff] =
+        useState(false);
+
+    const [creatingStaff, setCreatingStaff] =
+        useState(false);
+
+    const [createStaffForm, setCreateStaffForm] =
+        useState({
+            name: '',
+            email: '',
+            password: '',
+            gymBranch:
+                isMainAdmin
+                    ? 'Kalyanpur'
+                    : userBranch || 'Kalyanpur',
+        });
+
+
+    // =====================================================
+    // UI STATES
+    // =====================================================
+
+    const [staffSuccess, setStaffSuccess] =
+        useState('');
+
+    const [staffError, setStaffError] =
+        useState('');
+
+    const [savingPermissions, setSavingPermissions] =
+        useState(false);
+
+    const [loadingStaff, setLoadingStaff] =
+        useState(true);
+
+
+    // =====================================================
+    // NORMALIZE PERMISSIONS
+    // =====================================================
+
+    const normalizeStaffPermissions =
+        (staffMember) => {
+
+            return {
+                members: {
+                    view:
+                        staffMember?.permissions?.members?.view
+                        ?? true,
+
+                    add:
+                        staffMember?.permissions?.members?.add
+                        ?? true,
+
+                    edit:
+                        staffMember?.permissions?.members?.edit
+                        ?? true,
+
+                    delete:
+                        staffMember?.permissions?.members?.delete
+                        ?? false,
+                },
+
+                payments: {
+                    view:
+                        staffMember?.permissions?.payments?.view
+                        ?? true,
+
+                    add:
+                        staffMember?.permissions?.payments?.add
+                        ?? true,
+
+                    edit:
+                        staffMember?.permissions?.payments?.edit
+                        ?? true,
+
+                    delete:
+                        staffMember?.permissions?.payments?.delete
+                        ?? false,
+                },
+
+                attendance: {
+                    view:
+                        staffMember?.permissions?.attendance?.view
+                        ?? true,
+
+                    add:
+                        staffMember?.permissions?.attendance?.add
+                        ?? true,
+
+                    edit:
+                        staffMember?.permissions?.attendance?.edit
+                        ?? true,
+
+                    delete:
+                        staffMember?.permissions?.attendance?.delete
+                        ?? false,
+                },
+
+                workouts: {
+                    view:
+                        staffMember?.permissions?.workouts?.view
+                        ?? true,
+
+                    add:
+                        staffMember?.permissions?.workouts?.add
+                        ?? true,
+
+                    edit:
+                        staffMember?.permissions?.workouts?.edit
+                        ?? true,
+
+                    delete:
+                        staffMember?.permissions?.workouts?.delete
+                        ?? false,
+                },
+
+                enquiries: {
+                    view:
+                        staffMember?.permissions?.enquiries?.view
+                        ?? true,
+
+                    delete:
+                        staffMember?.permissions?.enquiries?.delete
+                        ?? false,
+                },
+            };
+        };
+
+
+    // =====================================================
+    // FETCH STAFF
+    // =====================================================
+
+    const fetchStaff = async () => {
+
+        if (!isMainAdmin) {
+            setStaff([]);
+            setSelectedStaff(null);
+            setLoadingStaff(false);
+            return;
+        }
+
+        try {
+
+            setLoadingStaff(true);
+            setStaffError('');
+
+            if (!token) {
+                throw new Error(
+                    'Admin session expired. Please login again.'
+                );
+            }
+
+
+            const response =
+                await fetch(
+                    `${API_URL}/api/admin/staff`,
+                    {
+                        headers: {
+                            Authorization:
+                                `Bearer ${token}`,
+                        },
+                    }
+                );
+
+
+            const data =
+                await response.json();
+
+
+            if (!response.ok) {
+                throw new Error(
+                    data.message ||
+                    'Failed to fetch staff accounts.'
+                );
+            }
+
+
+            const rawStaffList =
+                Array.isArray(data)
+                    ? data
+                    : data.staff ||
+                      data.admins ||
+                      [];
+
+
+            let filteredStaff =
+                rawStaffList;
+
+
+            // =============================================
+            // BRANCH FILTER
+            // =============================================
+
+            if (
+                selectedBranch !== 'all'
+            ) {
+
+                filteredStaff =
+                    rawStaffList.filter(
+                        (member) =>
+                            member?.gymBranch ===
+                            selectedBranch
+                    );
+            }
+
+
+            setStaff(
+                filteredStaff
+            );
+
+
+            // =============================================
+            // KEEP SELECTED STAFF VALID
+            // =============================================
+
+            if (
+                filteredStaff.length > 0
+            ) {
+
+                setSelectedStaff(
+                    (current) => {
+
+                        const currentStaff =
+                            current
+                                ? filteredStaff.find(
+                                    (member) =>
+                                        member._id ===
+                                        current._id
+                                )
+                                : null;
+
+
+                        const nextStaff =
+                            currentStaff ||
+                            filteredStaff[0];
+
+
+                        setPermissions(
+                            normalizeStaffPermissions(
+                                nextStaff
+                            )
+                        );
+
+
+                        return nextStaff;
+                    }
+                );
+
+            } else {
+
+                setSelectedStaff(null);
+
+                setPermissions(
+                    DEFAULT_PERMISSIONS
+                );
+            }
+
+        } catch (error) {
+
+            console.error(
+                'Fetch staff error:',
+                error
+            );
+
+            setStaffError(
+                error.message ||
+                'Unable to load staff accounts.'
+            );
+
+            setStaff([]);
+
+            setSelectedStaff(null);
+
+        } finally {
+
+            setLoadingStaff(false);
+        }
+    };
+
+
+    // =====================================================
+    // FETCH WHEN BRANCH CHANGES
+    // =====================================================
+
+    useEffect(() => {
+
+        fetchStaff();
+
+    }, [selectedBranch]);
+
+
+    // =====================================================
+    // SELECT STAFF
+    // =====================================================
+
+    const handleSelectStaff =
+        (staffMember) => {
+
+            setSelectedStaff(
+                staffMember
+            );
+
+            setPermissions(
+                normalizeStaffPermissions(
+                    staffMember
+                )
+            );
+
+            setStaffSuccess('');
+            setStaffError('');
+        };
+
+
+    // =====================================================
+    // PERMISSION CHANGE
+    // =====================================================
+
+    const handlePermissionChange =
+        (section, permission) => {
+
+            setPermissions(
+                (current) => ({
+                    ...current,
+
+                    [section]: {
+                        ...current[section],
+
+                        [permission]:
+                            !current[
+                                section
+                            ]?.[permission],
+                    },
+                })
+            );
+
+            setStaffSuccess('');
+            setStaffError('');
+        };
+
+
+    // =====================================================
+    // CREATE RECEPTIONIST
+    // =====================================================
+
+    const handleCreateStaff =
+        async (event) => {
+
+            event.preventDefault();
+
+            try {
+
+                setCreatingStaff(true);
+                setStaffError('');
+                setStaffSuccess('');
+
+
+                if (!token) {
+                    throw new Error(
+                        'Admin session expired. Please login again.'
+                    );
+                }
+
+
+                if (!isMainAdmin) {
+                    throw new Error(
+                        'Only the main admin can create staff accounts.'
+                    );
+                }
+
+
+                const name =
+                    createStaffForm.name.trim();
+
+                const email =
+                    createStaffForm.email
+                        .trim()
+                        .toLowerCase();
+
+                const password =
+                    createStaffForm.password;
+
+                const gymBranch =
+                    createStaffForm.gymBranch;
+
+
+                if (!name) {
+                    throw new Error(
+                        'Staff name is required.'
+                    );
+                }
+
+
+                if (!email) {
+                    throw new Error(
+                        'Staff email is required.'
+                    );
+                }
+
+
+                if (!password) {
+                    throw new Error(
+                        'Staff password is required.'
+                    );
+                }
+
+
+                if (password.length < 6) {
+                    throw new Error(
+                        'Password must contain at least 6 characters.'
+                    );
+                }
+
+
+                if (
+                    gymBranch !== 'Kalyanpur' &&
+                    gymBranch !== 'Gopalpur'
+                ) {
+                    throw new Error(
+                        'Please select a valid gym branch.'
+                    );
+                }
+
+
+                const response =
+                    await fetch(
+                        `${API_URL}/api/admin/register`,
+                        {
+                            method: 'POST',
+
+                            headers: {
+                                'Content-Type':
+                                    'application/json',
+
+                                Authorization:
+                                    `Bearer ${token}`,
+                            },
+
+                            body: JSON.stringify({
+                                name,
+                                email,
+                                password,
+
+                                role:
+                                    'receptionist',
+
+                                gymBranch,
+                            }),
+                        }
+                    );
+
+
+                const data =
+                    await response.json();
+
+
+                if (!response.ok) {
+                    throw new Error(
+                        data.message ||
+                        'Failed to create receptionist account.'
+                    );
+                }
+
+
+                // Close form
+                setShowCreateStaff(false);
+
+
+                // Reset form
+                setCreateStaffForm({
+                    name: '',
+                    email: '',
+                    password: '',
+                    gymBranch: 'Kalyanpur',
+                });
+
+
+                // Switch to newly-created branch
+                setSelectedBranch(
+                    gymBranch
+                );
+
+
+                setStaffSuccess(
+                    `Receptionist account created successfully for ${gymBranch}.`
+                );
+
+
+                // Refresh staff list
+                await fetchStaff();
+
+            } catch (error) {
+
+                console.error(
+                    'Create staff error:',
+                    error
+                );
+
+                setStaffError(
+                    error.message ||
+                    'Unable to create receptionist account.'
+                );
+
+                setStaffSuccess('');
+
+            } finally {
+
+                setCreatingStaff(false);
+            }
+        };
+
+
+    // =====================================================
+    // TOGGLE STAFF STATUS
+    // =====================================================
+
+    const handleToggleStaffStatus =
+        async (staffMember) => {
+
+            try {
+
+                setStaffError('');
+                setStaffSuccess('');
+
+
+                if (!token) {
+                    throw new Error(
+                        'Admin session expired. Please login again.'
+                    );
+                }
+
+
+                const nextStatus =
+                    staffMember.status === 'active'
+                        ? 'inactive'
+                        : 'active';
+
+
+                const response =
+                    await fetch(
+                        `${API_URL}/api/admin/staff/${staffMember._id}/status`,
+                        {
+                            method: 'PUT',
+
+                            headers: {
+                                'Content-Type':
+                                    'application/json',
+
+                                Authorization:
+                                    `Bearer ${token}`,
+                            },
+
+                            body: JSON.stringify({
+                                status:
+                                    nextStatus,
+                            }),
+                        }
+                    );
+
+
+                const data =
+                    await response.json();
+
+
+                if (!response.ok) {
+                    throw new Error(
+                        data.message ||
+                        'Failed to update staff status.'
+                    );
+                }
+
+
+                const updatedStaff =
+                    data.staff ||
+                    {
+                        ...staffMember,
+                        status:
+                            nextStatus,
+                    };
+
+
+                setStaff(
+                    (currentStaff) =>
+                        currentStaff.map(
+                            (member) =>
+                                member._id ===
+                                staffMember._id
+                                    ? updatedStaff
+                                    : member
+                        )
+                );
+
+
+                setSelectedStaff(
+                    (current) =>
+                        current?._id ===
+                        staffMember._id
+                            ? updatedStaff
+                            : current
+                );
+
+
+                setStaffSuccess(
+                    nextStatus === 'active'
+                        ? 'Staff account activated successfully.'
+                        : 'Staff account deactivated successfully.'
+                );
+
+            } catch (error) {
+
+                console.error(
+                    'Toggle staff status error:',
+                    error
+                );
+
+                setStaffError(
+                    error.message ||
+                    'Unable to update staff status.'
+                );
+
+                setStaffSuccess('');
+            }
+        };
+
+
+    // =====================================================
+    // SAVE PERMISSIONS
+    // =====================================================
+
+    const handleSavePermissions =
+        async () => {
+
+            if (!selectedStaff) {
+                return;
+            }
+
+
+            try {
+
+                setSavingPermissions(true);
+
+                setStaffError('');
+                setStaffSuccess('');
+
+
+                if (!token) {
+                    throw new Error(
+                        'Admin session expired. Please login again.'
+                    );
+                }
+
+
+                const response =
+                    await fetch(
+                        `${API_URL}/api/admin/staff/${selectedStaff._id}/permissions`,
+                        {
+                            method: 'PUT',
+
+                            headers: {
+                                'Content-Type':
+                                    'application/json',
+
+                                Authorization:
+                                    `Bearer ${token}`,
+                            },
+
+                            body: JSON.stringify({
+                                permissions,
+                            }),
+                        }
+                    );
+
+
+                const data =
+                    await response.json();
+
+
+                if (!response.ok) {
+                    throw new Error(
+                        data.message ||
+                        'Failed to save staff permissions.'
+                    );
+                }
+
+
+                const updatedStaff =
+                    data.staff ||
+                    {
+                        ...selectedStaff,
+                        permissions,
+                    };
+
+
+                setStaff(
+                    (currentStaff) =>
+                        currentStaff.map(
+                            (member) =>
+                                member._id ===
+                                selectedStaff._id
+                                    ? updatedStaff
+                                    : member
+                        )
+                );
+
+
+                setSelectedStaff(
+                    updatedStaff
+                );
+
+
+                setPermissions(
+                    normalizeStaffPermissions(
+                        updatedStaff
+                    )
+                );
+
+
+                setStaffSuccess(
+                    'Staff permissions saved successfully.'
+                );
+
+            } catch (error) {
+
+                console.error(
+                    'Save permissions error:',
+                    error
+                );
+
+                setStaffError(
+                    error.message ||
+                    'Unable to save staff permissions.'
+                );
+
+                setStaffSuccess('');
+
+            } finally {
+
+                setSavingPermissions(false);
+            }
+        };
+
+
+    // =====================================================
+    // CREATE FORM CHANGE
+    // =====================================================
+
+    const handleCreateFormChange =
+        (event) => {
+
+            const {
+                name,
+                value,
+            } = event.target;
+
+            setCreateStaffForm(
+                (current) => ({
+                    ...current,
+                    [name]: value,
+                })
+            );
+
+            setStaffError('');
+        };
+
+
+    // =====================================================
+    // PERMISSION COUNT
+    // =====================================================
+
+    const permissionCount =
+        Object.values(
+            permissions
+        ).reduce(
+            (total, section) =>
+                total +
+                Object.values(
+                    section || {}
+                ).filter(Boolean).length,
+            0
+        );
+
+
+    // =====================================================
+    // STAFF PERMISSION SECTIONS
+    // =====================================================
+
+    const permissionSections = [
+
+        {
+            key: 'members',
+            label: 'MEMBERS',
+            icon: '👥',
+            description:
+                'Member records and profiles',
+
+            permissions: [
+                'view',
+                'add',
+                'edit',
+                'delete',
+            ],
+        },
+
+        {
+            key: 'payments',
+            label: 'PAYMENTS',
+            icon: '₹',
+            description:
+                'Membership payments',
+
+            permissions: [
+                'view',
+                'add',
+                'edit',
+                'delete',
+            ],
+        },
+
+        {
+            key: 'attendance',
+            label: 'ATTENDANCE',
+            icon: '✓',
+            description:
+                'Member attendance',
+
+            permissions: [
+                'view',
+                'add',
+                'edit',
+                'delete',
+            ],
+        },
+
+        {
+            key: 'workouts',
+            label: 'WORKOUTS',
+            icon: '⚡',
+            description:
+                'Workout programmes',
+
+            permissions: [
+                'view',
+                'add',
+                'edit',
+                'delete',
+            ],
+        },
+
+        {
+            key: 'enquiries',
+            label: 'ENQUIRIES',
+            icon: '✉',
+            description:
+                'Member enquiries',
+
+            permissions: [
+                'view',
+                'delete',
+            ],
+        },
+    ];
+
+
+    // =====================================================
+    // RENDER
+    // =====================================================
+
     return (
-        <>
-            <style>{staffStyles}</style>
+        <section className="admin-staff-management">
 
-            <section className="staff-modern-section">
+            {/* ==========================================
+                HEADER
+            ========================================== */}
 
-                {/* =================================================
-                    HEADER
-                ================================================= */}
+            <div className="staff-header">
 
-                <div className="staff-modern-header">
+                <div>
 
-                    <div>
-                        <div className="staff-modern-kicker">
-                            STAFF MANAGEMENT.
-                        </div>
+                    <span className="staff-eyebrow">
+                        TEAM & ACCESS
+                    </span>
 
-                        <h2 className="staff-modern-title">
-                            Staff Management
-                        </h2>
-                    </div>
+                    <h2>
+                        STAFF <span>MANAGEMENT.</span>
+                    </h2>
 
-                    <div className="staff-modern-count">
-                        <span>
-                            {staff.length}
-                        </span>
-
-                        STAFF
-                    </div>
+                    <p>
+                        Manage receptionist accounts,
+                        branch assignment and dashboard
+                        access.
+                    </p>
 
                 </div>
 
 
-                {/* =================================================
-                    MESSAGES
-                ================================================= */}
+                <div className="staff-header-stats">
 
-                {error && (
-                    <div className="staff-modern-error">
-                        {error}
-                    </div>
-                )}
+                    <div className="staff-stat-card">
 
-                {staff.length === 0 ? (
+                        <span className="staff-stat-number">
+                            {staff.length}
+                        </span>
 
-                    <div className="staff-modern-empty">
-                        No staff accounts found.
+                        <span className="staff-stat-label">
+                            STAFF
+                        </span>
+
                     </div>
 
-                ) : (
 
-                    <div className="staff-modern-layout">
+                    <div className="staff-stat-card">
 
-                        {/* =================================================
-                            LEFT — STAFF ACCOUNTS
-                        ================================================= */}
+                        <span className="staff-stat-number staff-green">
+                            {
+                                staff.filter(
+                                    (member) =>
+                                        member.status ===
+                                        'active'
+                                ).length
+                            }
+                        </span>
 
-                        <div className="staff-modern-accounts">
+                        <span className="staff-stat-label">
+                            ACTIVE
+                        </span>
 
-                            <div className="staff-modern-section-label">
+                    </div>
+
+                </div>
+
+            </div>
+
+
+            {/* ==========================================
+                BRANCH FILTER + CREATE BUTTON
+            ========================================== */}
+
+            <div className="staff-branch-bar">
+
+                <div>
+
+                    <span className="staff-panel-label">
+                        GYM BRANCH
+                    </span>
+
+                    <strong>
+                        {isMainAdmin
+                            ? 'FILTER STAFF BY BRANCH'
+                            : 'ASSIGNED BRANCH'}
+                    </strong>
+
+                </div>
+
+
+                <div
+                    style={{
+                        display: 'flex',
+                        alignItems: 'center',
+                        gap: '12px',
+                        flexWrap: 'wrap',
+                    }}
+                >
+
+                    {isMainAdmin ? (
+
+                        <select
+                            value={
+                                selectedBranch
+                            }
+                            onChange={(event) =>
+                                setSelectedBranch(
+                                    event.target.value
+                                )
+                            }
+                            className="staff-branch-select"
+                        >
+
+                            {BRANCH_OPTIONS.map(
+                                (branch) => (
+                                    <option
+                                        key={
+                                            branch.id
+                                        }
+                                        value={
+                                            branch.id
+                                        }
+                                    >
+                                        {branch.name}
+                                    </option>
+                                )
+                            )}
+
+                        </select>
+
+                    ) : (
+
+                        <span className="staff-branch-badge">
+                            {userBranch ||
+                                'NOT ASSIGNED'}
+                        </span>
+
+                    )}
+
+
+                    {isMainAdmin && (
+
+                        <button
+                            type="button"
+                            className="admin-add-submit-btn"
+                            onClick={() => {
+                                setCreateStaffForm({
+                                    name: '',
+                                    email: '',
+                                    password: '',
+                                    gymBranch:
+                                        selectedBranch !==
+                                        'all'
+                                            ? selectedBranch
+                                            : 'Kalyanpur',
+                                });
+
+                                setStaffError('');
+                                setStaffSuccess('');
+
+                                setShowCreateStaff(
+                                    true
+                                );
+                            }}
+                        >
+                            + CREATE RECEPTIONIST
+                        </button>
+
+                    )}
+
+                </div>
+
+            </div>
+
+
+            {/* ==========================================
+                CREATE RECEPTIONIST FORM
+            ========================================== */}
+
+            {showCreateStaff && isMainAdmin && (
+
+                <div
+                    style={{
+                        margin: '20px 0',
+                        padding: '24px',
+                        border:
+                            '1px solid rgba(255, 255, 255, 0.08)',
+                        borderRadius: '14px',
+                        background:
+                            'rgba(255, 255, 255, 0.025)',
+                    }}
+                >
+
+                    <div
+                        style={{
+                            display: 'flex',
+                            justifyContent:
+                                'space-between',
+                            alignItems: 'center',
+                            gap: '15px',
+                            marginBottom: '20px',
+                        }}
+                    >
+
+                        <div>
+
+                            <span className="staff-panel-label">
+                                NEW ACCOUNT
+                            </span>
+
+                            <h3
+                                style={{
+                                    margin:
+                                        '5px 0 0',
+                                }}
+                            >
+                                CREATE RECEPTIONIST
+                            </h3>
+
+                        </div>
+
+
+                        <button
+                            type="button"
+                            className="admin-cancel-btn"
+                            onClick={() => {
+                                setShowCreateStaff(
+                                    false
+                                );
+                                setStaffError('');
+                            }}
+                        >
+                            CLOSE
+                        </button>
+
+                    </div>
+
+
+                    <form
+                        onSubmit={
+                            handleCreateStaff
+                        }
+                    >
+
+                        <div
+                            style={{
+                                display: 'grid',
+                                gridTemplateColumns:
+                                    'repeat(2, minmax(0, 1fr))',
+                                gap: '16px',
+                            }}
+                        >
+
+                            <div>
+
+                                <label>
+                                    FULL NAME
+                                </label>
+
+                                <input
+                                    type="text"
+                                    name="name"
+                                    value={
+                                        createStaffForm.name
+                                    }
+                                    onChange={
+                                        handleCreateFormChange
+                                    }
+                                    placeholder="Receptionist name"
+                                    required
+                                />
+
+                            </div>
+
+
+                            <div>
+
+                                <label>
+                                    EMAIL
+                                </label>
+
+                                <input
+                                    type="email"
+                                    name="email"
+                                    value={
+                                        createStaffForm.email
+                                    }
+                                    onChange={
+                                        handleCreateFormChange
+                                    }
+                                    placeholder="receptionist@alphagym.com"
+                                    required
+                                />
+
+                            </div>
+
+
+                            <div>
+
+                                <label>
+                                    PASSWORD
+                                </label>
+
+                                <input
+                                    type="password"
+                                    name="password"
+                                    value={
+                                        createStaffForm.password
+                                    }
+                                    onChange={
+                                        handleCreateFormChange
+                                    }
+                                    placeholder="Minimum 6 characters"
+                                    minLength={6}
+                                    required
+                                />
+
+                            </div>
+
+
+                            <div>
+
+                                <label>
+                                    GYM BRANCH
+                                </label>
+
+                                <select
+                                    name="gymBranch"
+                                    value={
+                                        createStaffForm.gymBranch
+                                    }
+                                    onChange={
+                                        handleCreateFormChange
+                                    }
+                                    required
+                                >
+
+                                    <option value="Kalyanpur">
+                                        KALYANPUR
+                                    </option>
+
+                                    <option value="Gopalpur">
+                                        GOPALPUR
+                                    </option>
+
+                                </select>
+
+                            </div>
+
+                        </div>
+
+
+                        <div
+                            style={{
+                                marginTop: '20px',
+                                display: 'flex',
+                                justifyContent:
+                                    'flex-end',
+                                gap: '12px',
+                            }}
+                        >
+
+                            <button
+                                type="button"
+                                className="admin-cancel-btn"
+                                onClick={() =>
+                                    setShowCreateStaff(
+                                        false
+                                    )
+                                }
+                            >
+                                CANCEL
+                            </button>
+
+
+                            <button
+                                type="submit"
+                                className="admin-add-submit-btn"
+                                disabled={
+                                    creatingStaff
+                                }
+                            >
+                                {creatingStaff
+                                    ? 'CREATING ACCOUNT...'
+                                    : 'CREATE ACCOUNT →'}
+                            </button>
+
+                        </div>
+
+                    </form>
+
+                </div>
+
+            )}
+
+
+            {/* ==========================================
+                MESSAGES
+            ========================================== */}
+
+            {staffError && (
+
+                <div className="staff-message staff-message-error">
+
+                    <span>!</span>
+
+                    {staffError}
+
+                </div>
+
+            )}
+
+
+            {staffSuccess && (
+
+                <div className="staff-message staff-message-success">
+
+                    <span>✓</span>
+
+                    {staffSuccess}
+
+                </div>
+
+            )}
+
+
+            {/* ==========================================
+                MAIN STAFF AREA
+            ========================================== */}
+
+            <div className="staff-layout">
+
+
+                {/* ======================================
+                    STAFF ACCOUNT LIST
+                ====================================== */}
+
+                <div className="staff-list-panel">
+
+                    <div className="staff-panel-heading">
+
+                        <div>
+
+                            <span className="staff-panel-label">
+                                TEAM
+                            </span>
+
+                            <h3>
                                 STAFF ACCOUNTS
+                            </h3>
+
+                        </div>
+
+
+                        <span className="staff-panel-count">
+                            {staff.length}
+                        </span>
+
+                    </div>
+
+
+                    {loadingStaff ? (
+
+                        <div className="staff-empty">
+
+                            <div className="staff-empty-icon">
+                                ...
                             </div>
 
-                            <div className="staff-modern-section-subtitle">
-                                RECEPTIONIST ACCESS.
+                            <strong>
+                                Loading staff
+                            </strong>
+
+                            <span>
+                                Fetching receptionist
+                                accounts.
+                            </span>
+
+                        </div>
+
+                    ) : staff.length === 0 ? (
+
+                        <div className="staff-empty">
+
+                            <div className="staff-empty-icon">
+                                👤
                             </div>
 
+                            <strong>
+                                No staff accounts
+                            </strong>
 
-                            <div className="staff-modern-account-count">
-                                {staff.length}
-                            </div>
+                            <span>
+                                No receptionists found
+                                for this branch.
+                            </span>
 
+                        </div>
 
-                            <div className="staff-modern-staff-list">
+                    ) : (
 
-                                {staff.map((member) => {
+                        <div className="staff-account-list">
+
+                            {staff.map(
+                                (member) => {
+
+                                    const initials =
+                                        member.name
+                                            ? member.name
+                                                .split(
+                                                    /\s+/
+                                                )
+                                                .map(
+                                                    (part) =>
+                                                        part.charAt(
+                                                            0
+                                                        )
+                                                )
+                                                .join('')
+                                                .slice(
+                                                    0,
+                                                    2
+                                                )
+                                                .toUpperCase()
+                                            : 'ST';
+
 
                                     const isSelected =
                                         selectedStaff?._id ===
                                         member._id;
 
+
+                                    const isActive =
+                                        member.status ===
+                                        'active';
+
+
+                                    const branch =
+                                        member.gymBranch ||
+                                        'NOT ASSIGNED';
+
+
                                     return (
+
                                         <button
-                                            key={member._id}
                                             type="button"
-                                            className={
-                                                `staff-modern-staff-card ${
-                                                    isSelected
-                                                        ? 'selected'
-                                                        : ''
-                                                }`
+                                            key={
+                                                member._id
                                             }
+                                            className={`staff-account ${
+                                                isSelected
+                                                    ? 'staff-account-selected'
+                                                    : ''
+                                            }`}
                                             onClick={() =>
-                                                selectStaff(member)
+                                                handleSelectStaff(
+                                                    member
+                                                )
                                             }
                                         >
 
-                                            <div className="staff-modern-avatar">
-                                                {member.name
-                                                    ?.charAt(0)
-                                                    ?.toUpperCase() || 'G'}
+                                            <div className="staff-avatar">
+                                                {initials}
                                             </div>
 
 
-                                            <div className="staff-modern-person">
+                                            <div className="staff-account-info">
 
-                                                <div className="staff-modern-name">
-                                                    {member.name}
-                                                </div>
+                                                <strong>
+                                                    {member.name ||
+                                                        'Staff Member'}
+                                                </strong>
 
-                                                <div className="staff-modern-email">
+                                                <span className="staff-account-meta">
                                                     {member.email}
+                                                </span>
+
+
+                                                <div
+                                                    style={{
+                                                        display:
+                                                            'flex',
+                                                        gap:
+                                                            '8px',
+                                                        alignItems:
+                                                            'center',
+                                                        flexWrap:
+                                                            'wrap',
+                                                        marginTop:
+                                                            '5px',
+                                                    }}
+                                                >
+
+                                                    <span
+                                                        className={
+                                                            `staff-status ${
+                                                                isActive
+                                                                    ? 'staff-status-active'
+                                                                    : 'staff-status-inactive'
+                                                            }`
+                                                        }
+                                                    >
+                                                        {isActive
+                                                            ? 'ACTIVE'
+                                                            : 'INACTIVE'}
+                                                    </span>
+
+
+                                                    <span className="staff-branch-badge">
+                                                        {branch}
+                                                    </span>
+
                                                 </div>
 
                                             </div>
 
 
-                                            <div
-                                                className={
-                                                    `staff-modern-status ${
-                                                        member.status ===
-                                                        'active'
-                                                            ? 'active'
-                                                            : 'inactive'
-                                                    }`
-                                                }
-                                            >
-                                                {member.status}
-                                            </div>
+                                            <span className="staff-account-arrow">
+                                                →
+                                            </span>
 
                                         </button>
-                                    );
-                                })}
 
-                            </div>
+                                    );
+                                }
+                            )}
 
                         </div>
 
+                    )}
 
-                        {/* =================================================
-                            RIGHT — ACCESS CONTROL
-                        ================================================= */}
+                </div>
 
-                        {selectedStaff && (
 
-                            <div className="staff-modern-access">
+                {/* ======================================
+                    ACCESS CONTROL
+                ====================================== */}
 
-                                <div className="staff-modern-section-label">
-                                    ACCESS CONTROL
+                <div className="staff-permission-panel">
+
+                    {!selectedStaff ? (
+
+                        <div className="staff-empty">
+
+                            <div className="staff-empty-icon">
+                                ⚙
+                            </div>
+
+                            <strong>
+                                Select a receptionist
+                            </strong>
+
+                            <span>
+                                Select a staff account
+                                to manage permissions.
+                            </span>
+
+                        </div>
+
+                    ) : (
+
+                        <>
+
+                            {/* ==========================
+                                STAFF PROFILE
+                            ========================== */}
+
+                            <div className="staff-profile">
+
+                                <div className="staff-avatar">
+
+                                    {selectedStaff.name
+                                        ? selectedStaff.name
+                                            .charAt(0)
+                                            .toUpperCase()
+                                        : 'ST'}
+
                                 </div>
 
-                                <div className="staff-modern-section-subtitle">
-                                    {selectedStaff.name} PERMISSIONS.
-                                </div>
 
-                                <div className="staff-modern-access-description">
-                                    Manage access levels and account permissions.
-                                </div>
+                                <div className="staff-profile-info">
 
+                                    <strong>
+                                        {selectedStaff.name ||
+                                            'Staff Member'}
+                                    </strong>
 
-                                {/* ACCOUNT BAR */}
-
-                                <div className="staff-modern-account-bar">
-
-                                    <div className="staff-modern-account-info">
-
-                                        <div className="staff-modern-avatar large">
-                                            {selectedStaff.name
-                                                ?.charAt(0)
-                                                ?.toUpperCase() || 'G'}
-                                        </div>
-
-                                        <div>
-
-                                            <div className="staff-modern-account-name">
-                                                {selectedStaff.name}
-                                            </div>
-
-                                            <div className="staff-modern-account-email">
-                                                {selectedStaff.email}
-                                            </div>
-
-                                        </div>
-
-                                    </div>
+                                    <span>
+                                        {selectedStaff.email}
+                                    </span>
 
 
-                                    <button
-                                        type="button"
-                                        className="staff-modern-status-button"
-                                        onClick={toggleStatus}
+                                    <div
+                                        style={{
+                                            display:
+                                                'flex',
+                                            gap:
+                                                '8px',
+                                            flexWrap:
+                                                'wrap',
+                                            marginTop:
+                                                '8px',
+                                        }}
                                     >
-                                        {selectedStaff.status ===
-                                        'active'
-                                            ? 'DEACTIVATE ACCOUNT'
-                                            : 'ACTIVATE ACCOUNT'}
-                                    </button>
 
-                                </div>
-
-
-                                {/* PERMISSION HEADER */}
-
-                                <div className="staff-modern-permission-header">
-
-                                    <div>
-
-                                        <div className="staff-modern-permission-kicker">
-                                            ACCESS LEVELS
-                                        </div>
-
-                                        <h3>
-                                            PERMISSION CONTROL.
-                                        </h3>
-
-                                    </div>
-
-
-                                    <div className="staff-modern-enabled">
-
-                                        <span>
-                                            {Object.values(
-                                                permissions
-                                            ).reduce(
-                                                (
-                                                    total,
-                                                    category
-                                                ) =>
-                                                    total +
-                                                    Object.values(
-                                                        category
-                                                    ).filter(Boolean)
-                                                        .length,
-                                                0
-                                            )}
+                                        <span className="staff-branch-badge">
+                                            {selectedStaff.gymBranch ||
+                                                'NOT ASSIGNED'}
                                         </span>
 
-                                        ENABLED
+
+                                        <span
+                                            className={
+                                                selectedStaff.status ===
+                                                'active'
+                                                    ? 'staff-status staff-status-active'
+                                                    : 'staff-status staff-status-inactive'
+                                            }
+                                        >
+                                            {selectedStaff.status ===
+                                            'active'
+                                                ? 'ACTIVE'
+                                                : 'INACTIVE'}
+                                        </span>
 
                                     </div>
 
                                 </div>
 
 
-                                {/* PERMISSIONS */}
+                                <button
+                                    type="button"
+                                    className={
+                                        selectedStaff.status ===
+                                        'active'
+                                            ? 'admin-delete-btn'
+                                            : 'admin-add-submit-btn'
+                                    }
+                                    onClick={() =>
+                                        handleToggleStaffStatus(
+                                            selectedStaff
+                                        )
+                                    }
+                                >
 
-                                <div className="staff-modern-permissions">
+                                    {selectedStaff.status ===
+                                    'active'
+                                        ? 'DEACTIVATE ACCOUNT'
+                                        : 'ACTIVATE ACCOUNT'}
 
-                                    {Object.entries(
-                                        permissionLabels
-                                    ).map(
-                                        ([category, label]) => {
+                                </button>
 
-                                            const categoryPermissions =
+                            </div>
+
+
+                            {/* ==========================
+                                BRANCH INFORMATION
+                            ========================== */}
+
+                            <div
+                                style={{
+                                    margin:
+                                        '20px 0',
+                                    padding:
+                                        '16px 18px',
+                                    border:
+                                        '1px solid rgba(255, 255, 255, 0.08)',
+                                    borderRadius:
+                                        '12px',
+                                    background:
+                                        'rgba(255, 255, 255, 0.025)',
+                                    display:
+                                        'flex',
+                                    justifyContent:
+                                        'space-between',
+                                    alignItems:
+                                        'center',
+                                    gap:
+                                        '15px',
+                                    flexWrap:
+                                        'wrap',
+                                }}
+                            >
+
+                                <div>
+
+                                    <span className="staff-panel-label">
+                                        BRANCH ASSIGNMENT
+                                    </span>
+
+                                    <strong
+                                        style={{
+                                            display:
+                                                'block',
+                                            marginTop:
+                                                '5px',
+                                        }}
+                                    >
+                                        RECEPTIONIST BRANCH
+                                    </strong>
+
+                                </div>
+
+
+                                <span className="staff-branch-badge">
+
+                                    {selectedStaff.gymBranch ||
+                                        'NOT ASSIGNED'}
+
+                                </span>
+
+                            </div>
+
+
+                            {/* ==========================
+                                PERMISSION HEADING
+                            ========================== */}
+
+                            <div className="staff-permission-heading">
+
+                                <div>
+
+                                    <span className="staff-panel-label">
+                                        ACCESS CONTROL
+                                    </span>
+
+                                    <h3>
+                                        PERMISSION <span>CONTROL.</span>
+                                    </h3>
+
+                                    <p>
+                                        Choose exactly what
+                                        this staff member can
+                                        view, add, edit or
+                                        delete.
+                                    </p>
+
+                                </div>
+
+
+                                <div className="staff-permission-total">
+
+                                    <strong>
+                                        {permissionCount}
+                                    </strong>
+
+                                    <span>
+                                        ENABLED
+                                    </span>
+
+                                </div>
+
+                            </div>
+
+
+                            {/* ==========================
+                                PERMISSION CARDS
+                            ========================== */}
+
+                            <div className="staff-permission-grid">
+
+                                {permissionSections.map(
+                                    (section) => {
+
+                                        const enabledCount =
+                                            Object.values(
                                                 permissions[
-                                                    category
-                                                ] || {};
+                                                    section.key
+                                                ] || {}
+                                            ).filter(Boolean)
+                                                .length;
 
-                                            const enabledCount =
-                                                Object.values(
-                                                    categoryPermissions
-                                                ).filter(
-                                                    Boolean
-                                                ).length;
 
-                                            const totalCount =
-                                                Object.keys(
-                                                    categoryPermissions
-                                                ).length;
+                                        return (
 
-                                            return (
+                                            <div
+                                                className="staff-permission-card"
+                                                key={
+                                                    section.key
+                                                }
+                                            >
 
-                                                <div
-                                                    key={category}
-                                                    className="staff-modern-permission-row"
-                                                >
+                                                <div className="staff-permission-card-header">
 
-                                                    <div className="staff-modern-permission-name">
+                                                    <div className="staff-permission-title">
 
-                                                        <span>
-                                                            {label.toUpperCase()}
-                                                        </span>
+                                                        <div className="staff-permission-icon">
+                                                            {section.icon}
+                                                        </div>
 
-                                                        <small>
-                                                            {
-                                                                enabledCount
-                                                            }
-                                                            /
-                                                            {
-                                                                totalCount
-                                                            }
-                                                        </small>
+                                                        <div>
+
+                                                            <strong>
+                                                                {section.label}
+                                                            </strong>
+
+                                                            <span>
+                                                                {
+                                                                    section.description
+                                                                }
+                                                            </span>
+
+                                                        </div>
 
                                                     </div>
 
 
-                                                    <div className="staff-modern-options">
+                                                    <div className="staff-permission-counter">
 
-                                                        {Object.keys(
-                                                            categoryPermissions
-                                                        ).map(
-                                                            (
-                                                                permission
-                                                            ) => {
-
-                                                                const enabled =
-                                                                    categoryPermissions[
-                                                                        permission
-                                                                    ] === true;
-
-                                                                return (
-
-                                                                    <label
-                                                                        key={
-                                                                            permission
-                                                                        }
-                                                                        className={
-                                                                            `staff-modern-option ${
-                                                                                enabled
-                                                                                    ? 'enabled'
-                                                                                    : ''
-                                                                            }`
-                                                                        }
-                                                                    >
-
-                                                                        <input
-                                                                            type="checkbox"
-                                                                            checked={
-                                                                                enabled
-                                                                            }
-                                                                            onChange={() =>
-                                                                                handlePermissionChange(
-                                                                                    category,
-                                                                                    permission
-                                                                                )
-                                                                            }
-                                                                        />
-
-                                                                        <span className="staff-modern-check">
-                                                                            {enabled
-                                                                                ? '✓'
-                                                                                : ''}
-                                                                        </span>
-
-                                                                        <span>
-                                                                            {permission
-                                                                                .charAt(
-                                                                                    0
-                                                                                )
-                                                                                .toUpperCase() +
-                                                                                permission.slice(
-                                                                                    1
-                                                                                )}
-                                                                        </span>
-
-                                                                    </label>
-
-                                                                );
-                                                            }
-                                                        )}
+                                                        {enabledCount}/
+                                                        {
+                                                            section
+                                                                .permissions
+                                                                .length
+                                                        }
 
                                                     </div>
 
                                                 </div>
 
-                                            );
-                                        }
-                                    )}
 
-                                </div>
+                                                <div className="staff-permission-options">
 
+                                                    {section.permissions.map(
+                                                        (permission) => (
 
-                                {/* BOTTOM */}
+                                                            <label
+                                                                key={
+                                                                    permission
+                                                                }
+                                                                className="staff-permission-option"
+                                                            >
 
-                                <div className="staff-modern-bottom">
+                                                                <input
+                                                                    type="checkbox"
+                                                                    checked={
+                                                                        permissions[
+                                                                            section.key
+                                                                        ]?.[
+                                                                            permission
+                                                                        ] ||
+                                                                        false
+                                                                    }
+                                                                    onChange={() =>
+                                                                        handlePermissionChange(
+                                                                            section.key,
+                                                                            permission
+                                                                        )
+                                                                    }
+                                                                />
 
-                                    <div className="staff-modern-message">
+                                                                <span>
+                                                                    {permission
+                                                                        .charAt(
+                                                                            0
+                                                                        )
+                                                                        .toUpperCase() +
+                                                                        permission.slice(
+                                                                            1
+                                                                        )}
+                                                                </span>
 
-                                        {message && (
-                                            <>
-                                                <span>✓</span>
-                                                {message}
-                                            </>
-                                        )}
+                                                            </label>
 
-                                    </div>
+                                                        )
+                                                    )}
 
+                                                </div>
 
-                                    <button
-                                        type="button"
-                                        className="staff-modern-save"
-                                        onClick={
-                                            savePermissions
-                                        }
-                                        disabled={saving}
-                                    >
-                                        {saving
-                                            ? 'SAVING...'
-                                            : 'SAVE PERMISSIONS →'}
-                                    </button>
+                                            </div>
 
-                                </div>
+                                        );
+
+                                    }
+                                )}
 
                             </div>
-                        )}
 
-                    </div>
-                )}
 
-            </section>
-        </>
+                            {/* ==========================
+                                SAVE
+                            ========================== */}
+
+                            <div className="staff-save-area">
+
+                                <button
+                                    type="button"
+                                    className="admin-add-submit-btn"
+                                    onClick={
+                                        handleSavePermissions
+                                    }
+                                    disabled={
+                                        savingPermissions
+                                    }
+                                >
+
+                                    {savingPermissions
+                                        ? 'SAVING...'
+                                        : 'SAVE PERMISSIONS   →'}
+
+                                </button>
+
+                            </div>
+
+                        </>
+
+                    )}
+
+                </div>
+
+            </div>
+
+        </section>
     );
 }
-
-
-/* =============================================================
-   STAFF MANAGEMENT STYLES
-============================================================= */
-
-const staffStyles = `
-
-.staff-modern-section {
-    width: 100%;
-    margin: 0;
-    padding: 0;
-    color: var(--text);
-    box-sizing: border-box;
-}
-
-.staff-modern-section *,
-.staff-modern-section *::before,
-.staff-modern-section *::after {
-    box-sizing: border-box;
-}
-
-
-/* =============================================================
-   HEADER
-============================================================= */
-
-.staff-modern-header {
-    display: flex;
-    align-items: flex-end;
-    justify-content: space-between;
-    gap: 30px;
-
-    margin-bottom: 28px;
-    padding-bottom: 20px;
-
-    border-bottom: 1px solid var(--border);
-}
-
-.staff-modern-kicker {
-    margin-bottom: 7px;
-
-    color: var(--orange);
-
-    font-family: var(--mono);
-    font-size: 9px;
-    font-weight: 800;
-
-    letter-spacing: 2.5px;
-}
-
-.staff-modern-title {
-    margin: 0;
-
-    font-family: var(--heading);
-
-    font-size: clamp(2.4rem, 5vw, 4.2rem);
-
-    line-height: 0.95;
-    letter-spacing: 0;
-}
-
-.staff-modern-count {
-    display: flex;
-    align-items: center;
-    gap: 8px;
-
-    color: var(--orange);
-
-    font-family: var(--mono);
-    font-size: 9px;
-    font-weight: 800;
-
-    letter-spacing: 1.5px;
-}
-
-.staff-modern-count span {
-    font-size: 24px;
-}
-
-
-/* =============================================================
-   ERROR
-============================================================= */
-
-.staff-modern-error {
-    margin-bottom: 18px;
-
-    padding: 12px 15px;
-
-    border: 1px solid rgba(255, 77, 0, 0.25);
-
-    background: rgba(255, 77, 0, 0.06);
-
-    color: var(--text);
-
-    font-size: 12px;
-}
-
-
-/* =============================================================
-   MAIN TWO COLUMN LAYOUT
-============================================================= */
-
-.staff-modern-layout {
-    display: grid;
-
-    grid-template-columns:
-        minmax(260px, 0.72fr)
-        minmax(0, 1.65fr);
-
-    gap: 22px;
-
-    width: 100%;
-}
-
-
-/* =============================================================
-   LEFT STAFF ACCOUNTS
-============================================================= */
-
-.staff-modern-accounts {
-    min-width: 0;
-
-    padding: 25px;
-
-    border: 1px solid var(--border);
-
-    background:
-        linear-gradient(
-            135deg,
-            rgba(255,255,255,0.025),
-            rgba(255,255,255,0.008)
-        );
-}
-
-.staff-modern-section-label {
-    margin-bottom: 8px;
-
-    color: var(--text);
-
-    font-family: var(--mono);
-
-    font-size: 10px;
-    font-weight: 800;
-
-    letter-spacing: 2px;
-}
-
-.staff-modern-section-subtitle {
-    color: var(--orange);
-
-    font-family: var(--heading);
-
-    font-size: 22px;
-
-    line-height: 0.95;
-
-    letter-spacing: 0;
-}
-
-.staff-modern-account-count {
-    margin-top: 22px;
-    margin-bottom: 15px;
-
-    color: var(--text);
-
-    font-family: var(--mono);
-
-    font-size: 28px;
-    font-weight: 700;
-}
-
-
-/* =============================================================
-   STAFF LIST
-============================================================= */
-
-.staff-modern-staff-list {
-    display: flex;
-
-    flex-direction: column;
-
-    gap: 8px;
-}
-
-.staff-modern-staff-card {
-    position: relative;
-
-    display: grid;
-
-    grid-template-columns: 42px minmax(0, 1fr) auto;
-
-    align-items: center;
-
-    gap: 12px;
-
-    width: 100%;
-
-    padding: 14px;
-
-    border: 1px solid transparent;
-
-    background: transparent;
-
-    color: inherit;
-
-    text-align: left;
-
-    cursor: pointer;
-
-    transition:
-        background 0.2s ease,
-        border-color 0.2s ease;
-}
-
-.staff-modern-staff-card:hover {
-    background: rgba(255,255,255,0.035);
-
-    border-color: var(--border);
-}
-
-.staff-modern-staff-card.selected {
-    background: rgba(255,77,0,0.055);
-
-    border-color:
-        rgba(255,77,0,0.3);
-}
-
-
-/* =============================================================
-   AVATAR
-============================================================= */
-
-.staff-modern-avatar {
-    display: flex;
-
-    align-items: center;
-    justify-content: center;
-
-    width: 42px;
-    height: 42px;
-
-    border: 1px solid
-        rgba(255,77,0,0.35);
-
-    background:
-        rgba(255,77,0,0.08);
-
-    color: var(--orange);
-
-    font-family: var(--heading);
-
-    font-size: 21px;
-
-    flex-shrink: 0;
-}
-
-.staff-modern-avatar.large {
-    width: 48px;
-    height: 48px;
-
-    font-size: 24px;
-}
-
-
-/* =============================================================
-   STAFF TEXT
-============================================================= */
-
-.staff-modern-person {
-    min-width: 0;
-}
-
-.staff-modern-name {
-    overflow: hidden;
-
-    margin-bottom: 5px;
-
-    font-size: 13px;
-    font-weight: 700;
-
-    white-space: nowrap;
-
-    text-overflow: ellipsis;
-}
-
-.staff-modern-email {
-    overflow: hidden;
-
-    color: var(--muted);
-
-    font-family: var(--mono);
-
-    font-size: 8px;
-
-    white-space: nowrap;
-
-    text-overflow: ellipsis;
-}
-
-.staff-modern-status {
-    align-self: end;
-
-    font-family: var(--mono);
-
-    font-size: 7px;
-    font-weight: 800;
-
-    letter-spacing: 1.5px;
-
-    text-transform: uppercase;
-}
-
-.staff-modern-status.active {
-    color: #6fdc91;
-}
-
-.staff-modern-status.inactive {
-    color: var(--muted);
-}
-
-
-/* =============================================================
-   RIGHT ACCESS CONTROL
-============================================================= */
-
-.staff-modern-access {
-    min-width: 0;
-
-    padding: 25px;
-
-    border: 1px solid var(--border);
-
-    background:
-        linear-gradient(
-            135deg,
-            rgba(255,255,255,0.025),
-            rgba(255,255,255,0.008)
-        );
-}
-
-.staff-modern-access-description {
-    margin-top: 9px;
-    margin-bottom: 20px;
-
-    color: var(--muted);
-
-    font-size: 11px;
-
-    line-height: 1.5;
-}
-
-
-/* =============================================================
-   ACCOUNT BAR
-============================================================= */
-
-.staff-modern-account-bar {
-    display: flex;
-
-    align-items: center;
-
-    justify-content: space-between;
-
-    gap: 20px;
-
-    padding: 15px 0;
-
-    border-top: 1px solid var(--border);
-    border-bottom: 1px solid var(--border);
-}
-
-.staff-modern-account-info {
-    display: flex;
-
-    align-items: center;
-
-    gap: 12px;
-
-    min-width: 0;
-}
-
-.staff-modern-account-name {
-    margin-bottom: 5px;
-
-    font-size: 13px;
-    font-weight: 700;
-}
-
-.staff-modern-account-email {
-    color: var(--muted);
-
-    font-family: var(--mono);
-
-    font-size: 8px;
-}
-
-
-/* =============================================================
-   STATUS BUTTON
-============================================================= */
-
-.staff-modern-status-button {
-    flex-shrink: 0;
-
-    padding: 9px 12px;
-
-    border: 1px solid
-        rgba(255,77,0,0.3);
-
-    background:
-        rgba(255,77,0,0.05);
-
-    color: var(--orange);
-
-    font-family: var(--mono);
-
-    font-size: 7px;
-    font-weight: 800;
-
-    letter-spacing: 1px;
-
-    cursor: pointer;
-
-    transition: 0.2s ease;
-}
-
-.staff-modern-status-button:hover {
-    background:
-        rgba(255,77,0,0.12);
-}
-
-
-/* =============================================================
-   PERMISSION HEADER
-============================================================= */
-
-.staff-modern-permission-header {
-    display: flex;
-
-    align-items: flex-end;
-
-    justify-content: space-between;
-
-    gap: 20px;
-
-    margin-top: 25px;
-    margin-bottom: 17px;
-}
-
-.staff-modern-permission-kicker {
-    margin-bottom: 5px;
-
-    color: var(--muted);
-
-    font-family: var(--mono);
-
-    font-size: 7px;
-    font-weight: 800;
-
-    letter-spacing: 1.7px;
-}
-
-.staff-modern-permission-header h3 {
-    margin: 0;
-
-    font-family: var(--heading);
-
-    font-size: 25px;
-
-    line-height: 0.95;
-
-    letter-spacing: 0;
-}
-
-.staff-modern-enabled {
-    display: flex;
-
-    align-items: baseline;
-
-    gap: 6px;
-
-    color: var(--orange);
-
-    font-family: var(--mono);
-
-    font-size: 7px;
-    font-weight: 800;
-
-    letter-spacing: 1px;
-}
-
-.staff-modern-enabled span {
-    font-size: 21px;
-}
-
-
-/* =============================================================
-   PERMISSION ROWS
-============================================================= */
-
-.staff-modern-permissions {
-    display: flex;
-
-    flex-direction: column;
-
-    border-top: 1px solid var(--border);
-}
-
-.staff-modern-permission-row {
-    display: grid;
-
-    grid-template-columns:
-        125px minmax(0, 1fr);
-
-    align-items: center;
-
-    gap: 15px;
-
-    min-height: 58px;
-
-    padding: 12px 0;
-
-    border-bottom: 1px solid var(--border);
-}
-
-.staff-modern-permission-name {
-    display: flex;
-
-    align-items: center;
-
-    justify-content: space-between;
-
-    gap: 8px;
-}
-
-.staff-modern-permission-name span {
-    font-family: var(--mono);
-
-    font-size: 8px;
-    font-weight: 800;
-
-    letter-spacing: 1px;
-}
-
-.staff-modern-permission-name small {
-    color: var(--orange);
-
-    font-family: var(--mono);
-
-    font-size: 8px;
-    font-weight: 800;
-}
-
-
-/* =============================================================
-   PERMISSION OPTIONS
-============================================================= */
-
-.staff-modern-options {
-    display: flex;
-
-    flex-wrap: wrap;
-
-    gap: 7px;
-}
-
-.staff-modern-option {
-    display: inline-flex;
-
-    align-items: center;
-
-    gap: 6px;
-
-    min-height: 28px;
-
-    padding: 5px 8px;
-
-    border: 1px solid var(--border);
-
-    background:
-        rgba(255,255,255,0.018);
-
-    color: var(--muted);
-
-    font-size: 9px;
-
-    cursor: pointer;
-
-    user-select: none;
-
-    transition:
-        background 0.2s ease,
-        border-color 0.2s ease,
-        color 0.2s ease;
-}
-
-.staff-modern-option:hover {
-    border-color:
-        rgba(255,77,0,0.3);
-}
-
-.staff-modern-option.enabled {
-    border-color:
-        rgba(255,77,0,0.28);
-
-    background:
-        rgba(255,77,0,0.055);
-
-    color: var(--text);
-}
-
-.staff-modern-option input {
-    display: none;
-}
-
-.staff-modern-check {
-    display: inline-flex;
-
-    align-items: center;
-    justify-content: center;
-
-    width: 14px;
-    height: 14px;
-
-    border: 1px solid
-        rgba(255,255,255,0.18);
-
-    color: var(--orange);
-
-    font-size: 9px;
-    font-weight: 800;
-}
-
-.staff-modern-option.enabled
-.staff-modern-check {
-    border-color: var(--orange);
-}
-
-
-/* =============================================================
-   BOTTOM
-============================================================= */
-
-.staff-modern-bottom {
-    display: flex;
-
-    align-items: center;
-
-    justify-content: space-between;
-
-    gap: 20px;
-
-    margin-top: 18px;
-}
-
-.staff-modern-message {
-    min-height: 18px;
-
-    color: #6fdc91;
-
-    font-size: 10px;
-
-    line-height: 1.4;
-}
-
-.staff-modern-message span {
-    margin-right: 6px;
-}
-
-.staff-modern-save {
-    flex-shrink: 0;
-
-    padding: 11px 17px;
-
-    border: 0;
-
-    background: var(--orange);
-
-    color: #fff;
-
-    font-family: var(--mono);
-
-    font-size: 8px;
-    font-weight: 800;
-
-    letter-spacing: 1px;
-
-    cursor: pointer;
-
-    transition:
-        transform 0.2s ease,
-        opacity 0.2s ease;
-}
-
-.staff-modern-save:hover {
-    transform: translateY(-1px);
-}
-
-.staff-modern-save:disabled {
-    opacity: 0.5;
-
-    cursor: not-allowed;
-
-    transform: none;
-}
-
-
-/* =============================================================
-   LOADING / EMPTY
-============================================================= */
-
-.staff-modern-loading,
-.staff-modern-empty {
-    padding: 35px 20px;
-
-    border: 1px solid var(--border);
-
-    color: var(--muted);
-
-    font-family: var(--mono);
-
-    font-size: 9px;
-
-    letter-spacing: 1px;
-
-    text-align: center;
-}
-
-
-/* =============================================================
-   RESPONSIVE
-============================================================= */
-
-@media (max-width: 900px) {
-
-    .staff-modern-layout {
-        grid-template-columns: 1fr;
-    }
-
-    .staff-modern-permission-row {
-        grid-template-columns: 1fr;
-
-        gap: 9px;
-    }
-
-}
-
-
-@media (max-width: 600px) {
-
-    .staff-modern-header {
-        align-items: flex-start;
-
-        flex-direction: column;
-    }
-
-    .staff-modern-count {
-        align-self: flex-start;
-    }
-
-    .staff-modern-accounts,
-    .staff-modern-access {
-        padding: 18px;
-    }
-
-    .staff-modern-account-bar {
-        align-items: flex-start;
-
-        flex-direction: column;
-    }
-
-    .staff-modern-status-button {
-        width: 100%;
-    }
-
-    .staff-modern-permission-header {
-        align-items: flex-start;
-
-        flex-direction: column;
-    }
-
-    .staff-modern-bottom {
-        align-items: stretch;
-
-        flex-direction: column;
-    }
-
-    .staff-modern-save {
-        width: 100%;
-    }
-
-}
-
-`;
-
-export default StaffManagement;

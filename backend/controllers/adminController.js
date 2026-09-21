@@ -4,6 +4,16 @@ const jwt = require('jsonwebtoken');
 
 
 // ===============================
+// ALLOWED GYM BRANCHES
+// ===============================
+
+const allowedBranches = [
+    'Kalyanpur',
+    'Gopalpur',
+];
+
+
+// ===============================
 // DEFAULT RECEPTIONIST PERMISSIONS
 // ===============================
 
@@ -54,8 +64,13 @@ const registerAdmin = async(req, res) => {
             email,
             password,
             role,
+            gymBranch,
         } = req.body;
 
+
+        // -------------------------------
+        // REQUIRED FIELDS
+        // -------------------------------
 
         if (!name || !email || !password) {
             return res.status(400).json({
@@ -64,18 +79,10 @@ const registerAdmin = async(req, res) => {
         }
 
 
-        const existingAdmin = await Admin.findOne({
-            email,
-        });
+        // -------------------------------
+        // VALIDATE ROLE
+        // -------------------------------
 
-        if (existingAdmin) {
-            return res.status(400).json({
-                message: 'Admin already exists.',
-            });
-        }
-
-
-        // Only allow valid roles
         const allowedRoles = [
             'admin',
             'receptionist',
@@ -84,7 +91,6 @@ const registerAdmin = async(req, res) => {
         const selectedRole =
             role || 'receptionist';
 
-
         if (!allowedRoles.includes(selectedRole)) {
             return res.status(400).json({
                 message: 'Invalid role.',
@@ -92,27 +98,80 @@ const registerAdmin = async(req, res) => {
         }
 
 
+        // -------------------------------
+        // VALIDATE GYM BRANCH
+        // -------------------------------
+
+        const selectedBranch =
+            gymBranch || 'Kalyanpur';
+
+        if (!allowedBranches.includes(
+                selectedBranch
+            )) {
+            return res.status(400).json({
+                message: 'Invalid gym branch.',
+            });
+        }
+
+
+        // -------------------------------
+        // CHECK EXISTING ADMIN
+        // -------------------------------
+
+        const normalizedEmail =
+            email.toLowerCase().trim();
+
+        const existingAdmin =
+            await Admin.findOne({
+                email: normalizedEmail,
+            });
+
+        if (existingAdmin) {
+            return res.status(400).json({
+                message: 'Admin already exists.',
+            });
+        }
+
+
+        // -------------------------------
+        // HASH PASSWORD
+        // -------------------------------
+
         const hashedPassword =
-            await bcrypt.hash(password, 10);
+            await bcrypt.hash(
+                password,
+                10
+            );
 
 
-        const admin = await Admin.create({
-            name,
-            email,
-            password: hashedPassword,
-            role: selectedRole,
-            status: 'active',
+        // -------------------------------
+        // CREATE ADMIN / RECEPTIONIST
+        // -------------------------------
 
-            // Receptionists receive default permissions.
-            // Owner/admin gets full access through
-            // requirePermission().
-            permissions: selectedRole === 'receptionist' ?
-                defaultReceptionistPermissions :
-                undefined,
-        });
+        const admin =
+            await Admin.create({
+                name: name.trim(),
+                email: normalizedEmail,
+                password: hashedPassword,
+
+                role: selectedRole,
+
+                gymBranch: selectedBranch,
+
+                status: 'active',
+
+                permissions: selectedRole ===
+                    'receptionist' ?
+                    defaultReceptionistPermissions :
+                    undefined,
+            });
 
 
-        res.status(201).json({
+        // -------------------------------
+        // RESPONSE
+        // -------------------------------
+
+        return res.status(201).json({
             message: 'Admin registered successfully.',
 
             admin: {
@@ -120,6 +179,7 @@ const registerAdmin = async(req, res) => {
                 name: admin.name,
                 email: admin.email,
                 role: admin.role,
+                gymBranch: admin.gymBranch,
                 status: admin.status,
                 permissions: admin.permissions,
             },
@@ -131,7 +191,7 @@ const registerAdmin = async(req, res) => {
             error.message
         );
 
-        res.status(500).json({
+        return res.status(500).json({
             message: 'Server error. Please try again.',
         });
     }
@@ -150,6 +210,10 @@ const loginAdmin = async(req, res) => {
         } = req.body;
 
 
+        // -------------------------------
+        // REQUIRED FIELDS
+        // -------------------------------
+
         if (!email || !password) {
             return res.status(400).json({
                 message: 'Email and password are required.',
@@ -157,10 +221,17 @@ const loginAdmin = async(req, res) => {
         }
 
 
-        const admin = await Admin.findOne({
-            email,
-        });
+        // -------------------------------
+        // FIND ADMIN
+        // -------------------------------
 
+        const normalizedEmail =
+            email.toLowerCase().trim();
+
+        const admin =
+            await Admin.findOne({
+                email: normalizedEmail,
+            });
 
         if (!admin) {
             return res.status(401).json({
@@ -169,7 +240,10 @@ const loginAdmin = async(req, res) => {
         }
 
 
-        // Check account status
+        // -------------------------------
+        // CHECK ACCOUNT STATUS
+        // -------------------------------
+
         if (admin.status !== 'active') {
             return res.status(403).json({
                 message: 'Your account has been deactivated.',
@@ -177,12 +251,15 @@ const loginAdmin = async(req, res) => {
         }
 
 
+        // -------------------------------
+        // CHECK PASSWORD
+        // -------------------------------
+
         const isPasswordCorrect =
             await bcrypt.compare(
                 password,
                 admin.password
             );
-
 
         if (!isPasswordCorrect) {
             return res.status(401).json({
@@ -191,19 +268,65 @@ const loginAdmin = async(req, res) => {
         }
 
 
-        // Create JWT
-        const token = jwt.sign({
-                id: admin._id,
-                email: admin.email,
-                role: admin.role,
-            },
-            process.env.JWT_SECRET, {
-                expiresIn: '1d',
-            }
-        );
+        // -------------------------------
+        // RESOLVE GYM BRANCH
+        // -------------------------------
+
+        // Old accounts created before
+        // multi-branch support are treated
+        // as Kalyanpur until updated.
+
+        const gymBranch =
+            allowedBranches.includes(
+                admin.gymBranch
+            ) ?
+            admin.gymBranch :
+            'Kalyanpur';
 
 
-        res.status(200).json({
+        // -------------------------------
+        // ENSURE RECEPTIONIST PERMISSIONS
+        // -------------------------------
+
+        let permissions =
+            admin.permissions;
+
+        if (
+            admin.role === 'receptionist' &&
+            !permissions
+        ) {
+            permissions =
+                defaultReceptionistPermissions;
+
+            admin.permissions =
+                defaultReceptionistPermissions;
+
+            await admin.save();
+        }
+
+
+        // -------------------------------
+        // CREATE JWT
+        // -------------------------------
+
+        const token =
+            jwt.sign({
+                    id: admin._id,
+                    email: admin.email,
+                    role: admin.role,
+                    gymBranch: gymBranch,
+                },
+                process.env.JWT_SECRET, {
+                    expiresIn: '1d',
+                }
+            );
+
+
+        // -------------------------------
+        // RESPONSE
+        // -------------------------------
+
+        return res.status(200).json({
             message: 'Login successful.',
 
             token,
@@ -213,8 +336,9 @@ const loginAdmin = async(req, res) => {
                 name: admin.name,
                 email: admin.email,
                 role: admin.role,
+                gymBranch: gymBranch,
                 status: admin.status,
-                permissions: admin.permissions,
+                permissions: permissions,
             },
         });
 
@@ -224,7 +348,7 @@ const loginAdmin = async(req, res) => {
             error.message
         );
 
-        res.status(500).json({
+        return res.status(500).json({
             message: 'Server error. Please try again.',
         });
     }
