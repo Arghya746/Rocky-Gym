@@ -17,21 +17,26 @@ const {
 
 const router = express.Router();
 
+/* =========================================================
+   PUBLIC ACTIVE OFFERS
+   GET /api/offers/public
 
-// =====================================
-// GET PUBLIC ACTIVE OFFERS
-// =====================================
+   No authentication required.
+   ========================================================= */
 
 router.get(
     '/public',
     getOffers
 );
 
+/* =========================================================
+   ACTIVE OFFERS
+   GET /api/offers
 
-// =====================================
-// GET ACTIVE OFFERS
-// ADMIN / RECEPTIONIST
-// =====================================
+   Requires:
+   - Login
+   - offers.view permission
+   ========================================================= */
 
 router.get(
     '/',
@@ -40,11 +45,12 @@ router.get(
     getOffers
 );
 
+/* =========================================================
+   ALL OFFERS
+   GET /api/offers/all
 
-// =====================================
-// GET ALL OFFERS
-// ADMIN / RECEPTIONIST
-// =====================================
+   Includes active + inactive offers.
+   ========================================================= */
 
 router.get(
     '/all',
@@ -53,10 +59,10 @@ router.get(
     getAllOffers
 );
 
-
-// =====================================
-// GET OFFERS BY PLAN
-// =====================================
+/* =========================================================
+   OFFERS BY PLAN
+   GET /api/offers/plan/:planId
+   ========================================================= */
 
 router.get(
     '/plan/:planId',
@@ -65,10 +71,10 @@ router.get(
     getOffersByPlan
 );
 
-
-// =====================================
-// GET SINGLE OFFER
-// =====================================
+/* =========================================================
+   SINGLE OFFER
+   GET /api/offers/:id
+   ========================================================= */
 
 router.get(
     '/:id',
@@ -77,10 +83,14 @@ router.get(
     getOfferById
 );
 
+/* =========================================================
+   CREATE OFFER
+   POST /api/offers
 
-// =====================================
-// CREATE OFFER
-// =====================================
+   Requires:
+   - Login
+   - offers.add permission
+   ========================================================= */
 
 router.post(
     '/',
@@ -89,10 +99,14 @@ router.post(
     createOffer
 );
 
+/* =========================================================
+   UPDATE OFFER
+   PUT /api/offers/:id
 
-// =====================================
-// UPDATE OFFER
-// =====================================
+   Requires:
+   - Login
+   - offers.edit permission
+   ========================================================= */
 
 router.put(
     '/:id',
@@ -101,10 +115,12 @@ router.put(
     updateOffer
 );
 
+/* =========================================================
+   DEACTIVATE OFFER
+   DELETE /api/offers/:id
 
-// =====================================
-// DEACTIVATE OFFER
-// =====================================
+   Soft-delete is handled by the controller.
+   ========================================================= */
 
 router.delete(
     '/:id',
@@ -112,6 +128,5 @@ router.delete(
     requirePermission('offers.delete'),
     deleteOffer
 );
-
 
 module.exports = router;

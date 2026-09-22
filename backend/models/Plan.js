@@ -1,17 +1,18 @@
 const mongoose = require('mongoose');
 
-const planSchema = new mongoose.Schema({
+const VALID_BRANCHES = ['Kalyanpur', 'Gopalpur'];
 
+const planSchema = new mongoose.Schema({
     // =========================================
     // GYM BRANCH
     // =========================================
 
     gymBranch: {
         type: String,
-        enum: ['Kalyanpur', 'Gopalpur'],
+        enum: VALID_BRANCHES,
         required: true,
+        trim: true,
     },
-
 
     // =========================================
     // PLAN INFORMATION
@@ -45,9 +46,24 @@ const planSchema = new mongoose.Schema({
         type: Boolean,
         default: true,
     },
-
 }, {
     timestamps: true,
+});
+
+// =========================================
+// INDEXES
+// =========================================
+
+// Helps branch-based plan queries in AdminDashboard
+planSchema.index({
+    gymBranch: 1,
+    isActive: 1,
+});
+
+// Helps branch + plan-name lookups
+planSchema.index({
+    gymBranch: 1,
+    name: 1,
 });
 
 module.exports = mongoose.model('Plan', planSchema);

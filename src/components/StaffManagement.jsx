@@ -63,6 +63,49 @@ const BRANCH_OPTIONS = [
 
 
 // =========================================================
+// BRANCH / AUTH NORMALIZATION
+// =========================================================
+
+const normalizeBranch = (value) => {
+    if (!value) return '';
+
+    const normalized = String(value).trim().toLowerCase();
+
+    if (normalized === 'kalyanpur') return 'Kalyanpur';
+    if (normalized === 'gopalpur') return 'Gopalpur';
+
+    return String(value).trim();
+};
+
+const getTokenPayload = (jwtToken) => {
+    if (!jwtToken) return null;
+
+    try {
+        const parts = jwtToken.split('.');
+        if (parts.length !== 3) return null;
+
+        const base64 = parts[1]
+            .replace(/-/g, '+')
+            .replace(/_/g, '/');
+
+        const padded = base64.padEnd(
+            base64.length + ((4 - (base64.length % 4)) % 4),
+            '='
+        );
+
+        return JSON.parse(atob(padded));
+    } catch (error) {
+        console.warn('Unable to decode admin token:', error);
+        return null;
+    }
+};
+
+const getBranchLabel = (value) => {
+    const branch = normalizeBranch(value);
+    return branch || 'NOT ASSIGNED';
+};
+
+// =========================================================
 // COMPONENT
 // =========================================================
 
@@ -74,6 +117,9 @@ export default function StaffManagement() {
 
     const token =
         localStorage.getItem('adminToken');
+
+    const tokenPayload =
+        getTokenPayload(token);
 
     let loggedInUser = null;
 
@@ -97,17 +143,25 @@ export default function StaffManagement() {
     }
 
 
+    // JWT is the primary source of truth.
+    // localStorage is only a fallback for older sessions.
     const userRole =
+        tokenPayload?.role ||
         loggedInUser?.role ||
         loggedInUser?.userRole ||
-        'admin';
+        null;
 
-
-    const userBranch =
+    const userBranch = normalizeBranch(
+        tokenPayload?.gymBranch ||
         loggedInUser?.gymBranch ||
         loggedInUser?.branchName ||
         loggedInUser?.branch ||
-        null;
+        ''
+    );
+
+    const hasAssignedBranch =
+        userBranch === 'Kalyanpur' ||
+        userBranch === 'Gopalpur';
 
 
     const isMainAdmin =
@@ -138,7 +192,9 @@ export default function StaffManagement() {
         useState(
             isMainAdmin
                 ? 'all'
-                : userBranch
+                : hasAssignedBranch
+                    ? userBranch
+                    : ''
         );
 
 
@@ -160,7 +216,9 @@ export default function StaffManagement() {
             gymBranch:
                 isMainAdmin
                     ? 'Kalyanpur'
-                    : userBranch || 'Kalyanpur',
+                    : hasAssignedBranch
+                        ? userBranch
+                        : 'Kalyanpur',
         });
 
 
@@ -280,9 +338,13 @@ export default function StaffManagement() {
 
     const fetchStaff = async () => {
 
+        // Staff account management is intentionally restricted to
+        // the main admin. Branch receptionists can use their assigned
+        // branch but cannot create/edit other staff accounts.
         if (!isMainAdmin) {
             setStaff([]);
             setSelectedStaff(null);
+            setPermissions(DEFAULT_PERMISSIONS);
             setLoadingStaff(false);
             return;
         }
@@ -346,8 +408,8 @@ export default function StaffManagement() {
                 filteredStaff =
                     rawStaffList.filter(
                         (member) =>
-                            member?.gymBranch ===
-                            selectedBranch
+                            normalizeBranch(member?.gymBranch) ===
+                            normalizeBranch(selectedBranch)
                     );
             }
 
@@ -431,9 +493,11 @@ export default function StaffManagement() {
     // =====================================================
 
     useEffect(() => {
+        if (!isMainAdmin && hasAssignedBranch) {
+            setSelectedBranch(userBranch);
+        }
 
         fetchStaff();
-
     }, [selectedBranch]);
 
 
@@ -1142,12 +1206,22 @@ export default function StaffManagement() {
                     ) : (
 
                         <span className="staff-branch-badge">
-                            {userBranch ||
-                                'NOT ASSIGNED'}
+                            {getBranchLabel(userBranch)}
                         </span>
 
                     )}
 
+
+                    <span
+                        className="staff-branch-badge"
+                        title="Current staff management branch"
+                    >
+                        {isMainAdmin
+                            ? selectedBranch === 'all'
+                                ? 'ALL BRANCHES'
+                                : getBranchLabel(selectedBranch)
+                            : getBranchLabel(userBranch)}
+                    </span>
 
                     {isMainAdmin && (
 
@@ -1547,8 +1621,9 @@ export default function StaffManagement() {
 
 
                                     const branch =
-                                        member.gymBranch ||
-                                        'NOT ASSIGNED';
+                                        getBranchLabel(
+                                            member.gymBranch
+                                        );
 
 
                                     return (
@@ -1715,8 +1790,9 @@ export default function StaffManagement() {
                                     >
 
                                         <span className="staff-branch-badge">
-                                            {selectedStaff.gymBranch ||
-                                                'NOT ASSIGNED'}
+                                            {getBranchLabel(
+                                                selectedStaff.gymBranch
+                                            )}
                                         </span>
 
 
@@ -1815,8 +1891,9 @@ export default function StaffManagement() {
 
                                 <span className="staff-branch-badge">
 
-                                    {selectedStaff.gymBranch ||
-                                        'NOT ASSIGNED'}
+                                    {getBranchLabel(
+                                        selectedStaff.gymBranch
+                                    )}
 
                                 </span>
 

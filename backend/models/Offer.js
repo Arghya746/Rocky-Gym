@@ -10,6 +10,7 @@ const offerSchema = new mongoose.Schema({
         type: String,
         enum: ['Kalyanpur', 'Gopalpur'],
         required: true,
+        trim: true,
     },
 
 
@@ -64,5 +65,39 @@ const offerSchema = new mongoose.Schema({
 }, {
     timestamps: true,
 });
+
+
+/* =========================================================
+   INDEXES
+   ========================================================= */
+
+/*
+ * Helps queries such as:
+ *
+ * - Get active offers for Kalyanpur
+ * - Get active offers for Gopalpur
+ * - Find currently running offers
+ */
+offerSchema.index({
+    gymBranch: 1,
+    isActive: 1,
+    startDate: 1,
+    endDate: 1,
+});
+
+
+/*
+ * Helps find offers belonging to a particular plan.
+ */
+offerSchema.index({
+    gymBranch: 1,
+    plan: 1,
+    isActive: 1,
+});
+
+
+/* =========================================================
+   MODEL
+   ========================================================= */
 
 module.exports = mongoose.model('Offer', offerSchema);

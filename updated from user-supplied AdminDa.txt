@@ -17,25 +17,6 @@ const DEFAULT_PERMISSIONS = {
   enquiries: { view: true, delete: false },
 };
 
-const normalizeBranch = (value) => {
-  if (!value) return '';
-
-  const normalized = String(value).trim().toLowerCase();
-
-  if (normalized === 'kalyanpur') return 'Kalyanpur';
-  if (normalized === 'gopalpur') return 'Gopalpur';
-
-  return String(value).trim();
-};
-
-const getBranchLabel = (value) => {
-  const branch = normalizeBranch(value);
-  return branch || 'NOT ASSIGNED';
-};
-
-const normalizePlanName = (value) =>
-  String(value || '').trim().toLowerCase();
-
 const getDateKey = (value = new Date()) => {
   const date = value instanceof Date ? value : new Date(value);
   if (Number.isNaN(date.getTime())) return '';
@@ -116,13 +97,12 @@ export default function AdminDashboard() {
     tokenPayload?.role ||
     null;
 
-  const userBranchId = normalizeBranch(
+  const userBranchId =
     loggedInUser?.gymBranch ||
     loggedInUser?.branchName ||
     loggedInUser?.branch ||
     tokenPayload?.gymBranch ||
-    null
-  );
+    null;
 
   const userBranchName =
     userBranchId ||
@@ -176,7 +156,7 @@ export default function AdminDashboard() {
           item?.gymBranch ||
           item?.branchName ||
           item?.branch;
-        return normalizeBranch(branch) === userBranchId;
+        return branch === userBranchId;
       });
     }
 
@@ -191,7 +171,7 @@ export default function AdminDashboard() {
         item?.gymBranch ||
         item?.branchName ||
         item?.branch;
-      return normalizeBranch(branch) === normalizeBranch(selectedBranchId);
+      return branch === selectedBranchId;
     });
   };
 
@@ -223,25 +203,6 @@ export default function AdminDashboard() {
   const [payments, setPayments] = useState([]);
   const [attendance, setAttendance] = useState([]);
   const [plans, setPlans] = useState([]);
-  const [plansLoading, setPlansLoading] = useState(true);
-  const [plansError, setPlansError] = useState('');
-  const [showPlanForm, setShowPlanForm] = useState(false);
-  const [editingPlan, setEditingPlan] = useState(null);
-  const [savingPlan, setSavingPlan] = useState(false);
-  const [deletingPlanId, setDeletingPlanId] = useState('');
-  const [planFormError, setPlanFormError] = useState('');
-  const [planSuccess, setPlanSuccess] = useState('');
-  const [planForm, setPlanForm] = useState({
-    name: '',
-    durationMonths: '',
-    price: '',
-    description: '',
-    gymBranch: isMainAdmin && selectedBranchId !== 'all'
-      ? selectedBranchId
-      : userBranchId || 'Kalyanpur',
-    isActive: true,
-  });
-
   const [offers, setOffers] = useState([]);
   const [offersLoading, setOffersLoading] = useState(true);
   const [offersError, setOffersError] = useState('');
@@ -1291,17 +1252,13 @@ const handleOfferChange = (e) => {
 
   const fetchPlans = async () => {
     try {
-      setPlansLoading(true);
-      setPlansError('');
-
       const token = localStorage.getItem('adminToken');
 
       if (!token) {
-        throw new Error('Admin session expired. Please login again.');
+        throw new Error('Admin token not found.');
       }
 
-      // Admin uses /all so inactive plans stay visible and can be reactivated.
-      const response = await fetch(`${API_URL}/api/plans/all`, {
+      const response = await fetch(`${API_URL}/api/plans`, {
         headers: {
           Authorization: `Bearer ${token}`,
         },
@@ -1311,274 +1268,13 @@ const handleOfferChange = (e) => {
 
       if (!response.ok) {
         throw new Error(
-          data.message || 'Failed to fetch membership plans.'
+          data.message || 'Failed to fetch plans.'
         );
       }
 
       setPlans(filterBySelectedBranch(data.plans || []));
     } catch (error) {
       console.error('Fetch plans error:', error);
-      setPlansError(
-        error.message || 'Unable to load membership plans.'
-      );
-      setPlans([]);
-    } finally {
-      setPlansLoading(false);
-    }
-  };
-
-  const resetPlanForm = (branchOverride) => {
-    const defaultBranch =
-      branchOverride ||
-      (isMainAdmin && selectedBranchId !== 'all'
-        ? selectedBranchId
-        : userBranchId || 'Kalyanpur');
-
-    setPlanForm({
-      name: '',
-      durationMonths: '',
-      price: '',
-      description: '',
-      gymBranch: defaultBranch,
-      isActive: true,
-    });
-  };
-
-  const handlePlanFormChange = (event) => {
-    const { name, value, type, checked } = event.target;
-
-    setPlanForm((current) => ({
-      ...current,
-      [name]: type === 'checkbox' ? checked : value,
-    }));
-  };
-
-  const handleOpenCreatePlan = () => {
-    setEditingPlan(null);
-    setPlanFormError('');
-    setPlanSuccess('');
-    resetPlanForm();
-    setShowPlanForm(true);
-  };
-
-  const handleEditPlan = (plan) => {
-    setEditingPlan(plan);
-    setPlanFormError('');
-    setPlanSuccess('');
-
-    setPlanForm({
-      name: plan?.name || '',
-      durationMonths: plan?.durationMonths ?? '',
-      price: plan?.price ?? '',
-      description: plan?.description || '',
-      gymBranch: normalizeBranch(
-        plan?.gymBranch ||
-        (isMainAdmin && selectedBranchId !== 'all'
-          ? selectedBranchId
-          : userBranchId)
-      ),
-      isActive: plan?.isActive !== false,
-    });
-
-    setShowPlanForm(true);
-  };
-
-  const handleSavePlan = async (event) => {
-    event.preventDefault();
-
-    try {
-      setSavingPlan(true);
-      setPlanFormError('');
-      setPlanSuccess('');
-
-      const authToken = localStorage.getItem('adminToken');
-
-      if (!authToken) {
-        throw new Error('Admin session expired. Please login again.');
-      }
-
-      const name = String(planForm.name || '').trim();
-      const durationMonths = Number(planForm.durationMonths);
-      const price = Number(planForm.price);
-
-      if (!name) {
-        throw new Error('Plan name is required.');
-      }
-
-      if (!Number.isInteger(durationMonths) || durationMonths < 1) {
-        throw new Error('Duration must be a whole number of months greater than 0.');
-      }
-
-      if (Number.isNaN(price) || price < 0) {
-        throw new Error('Price must be a valid number greater than or equal to 0.');
-      }
-
-      const branch = normalizeBranch(planForm.gymBranch);
-
-      if (branch !== 'Kalyanpur' && branch !== 'Gopalpur') {
-        throw new Error('Please select a valid gym branch.');
-      }
-
-      const payload = {
-        name,
-        durationMonths,
-        price,
-        description: String(planForm.description || '').trim(),
-        gymBranch: branch,
-        isActive: Boolean(planForm.isActive),
-      };
-
-      const endpoint = editingPlan
-        ? `${API_URL}/api/plans/${editingPlan._id}`
-        : `${API_URL}/api/plans`;
-
-      const response = await fetch(endpoint, {
-        method: editingPlan ? 'PUT' : 'POST',
-        headers: {
-          'Content-Type': 'application/json',
-          Authorization: `Bearer ${authToken}`,
-        },
-        body: JSON.stringify(payload),
-      });
-
-      const data = await response.json();
-
-      if (!response.ok) {
-        throw new Error(
-          data.message ||
-          (editingPlan
-            ? 'Failed to update membership plan.'
-            : 'Failed to create membership plan.')
-        );
-      }
-
-      setPlanSuccess(
-        editingPlan
-          ? 'Membership plan updated successfully.'
-          : 'Membership plan created successfully.'
-      );
-
-      setShowPlanForm(false);
-      setEditingPlan(null);
-      resetPlanForm(branch);
-
-      await fetchPlans();
-    } catch (error) {
-      console.error('Save plan error:', error);
-      setPlanFormError(
-        error.message || 'Unable to save membership plan.'
-      );
-    } finally {
-      setSavingPlan(false);
-    }
-  };
-
-  const handleTogglePlanStatus = async (plan) => {
-    try {
-      setDeletingPlanId(plan?._id || '');
-      setPlansError('');
-      setPlanSuccess('');
-
-      const authToken = localStorage.getItem('adminToken');
-
-      if (!authToken) {
-        throw new Error('Admin session expired. Please login again.');
-      }
-
-      const response = await fetch(
-        `${API_URL}/api/plans/${plan._id}`,
-        {
-          method: 'PUT',
-          headers: {
-            'Content-Type': 'application/json',
-            Authorization: `Bearer ${authToken}`,
-          },
-          body: JSON.stringify({
-            name: plan.name,
-            durationMonths: Number(plan.durationMonths),
-            price: Number(plan.price),
-            description: plan.description || '',
-            gymBranch: normalizeBranch(plan.gymBranch),
-            isActive: !plan.isActive,
-          }),
-        }
-      );
-
-      const data = await response.json();
-
-      if (!response.ok) {
-        throw new Error(
-          data.message || 'Failed to update plan status.'
-        );
-      }
-
-      setPlanSuccess(
-        plan.isActive
-          ? `${plan.name} was deactivated.`
-          : `${plan.name} was activated.`
-      );
-
-      await fetchPlans();
-    } catch (error) {
-      console.error('Toggle plan status error:', error);
-      setPlansError(
-        error.message || 'Unable to update plan status.'
-      );
-    } finally {
-      setDeletingPlanId('');
-    }
-  };
-
-  const handleDeletePlan = async (plan) => {
-    const confirmed = window.confirm(
-      `Deactivate the ${plan.name} plan for ${normalizeBranch(plan.gymBranch)}?`
-    );
-
-    if (!confirmed) {
-      return;
-    }
-
-    try {
-      setDeletingPlanId(plan?._id || '');
-      setPlansError('');
-      setPlanSuccess('');
-
-      const authToken = localStorage.getItem('adminToken');
-
-      if (!authToken) {
-        throw new Error('Admin session expired. Please login again.');
-      }
-
-      const response = await fetch(
-        `${API_URL}/api/plans/${plan._id}`,
-        {
-          method: 'DELETE',
-          headers: {
-            Authorization: `Bearer ${authToken}`,
-          },
-        }
-      );
-
-      const data = await response.json();
-
-      if (!response.ok) {
-        throw new Error(
-          data.message || 'Failed to deactivate membership plan.'
-        );
-      }
-
-      setPlanSuccess(
-        `${plan.name} was deactivated successfully.`
-      );
-
-      await fetchPlans();
-    } catch (error) {
-      console.error('Delete plan error:', error);
-      setPlansError(
-        error.message || 'Unable to deactivate membership plan.'
-      );
-    } finally {
-      setDeletingPlanId('');
     }
   };
 
@@ -1666,12 +1362,6 @@ const handleOfferChange = (e) => {
     try {
       setCreatingOffers(true);
 
-      if (isMainAdmin && selectedBranchId === 'all') {
-        throw new Error(
-          'Select Kalyanpur or Gopalpur before creating default offers.'
-        );
-      }
-
       const token = localStorage.getItem('adminToken');
 
       if (!token) {
@@ -1680,39 +1370,17 @@ const handleOfferChange = (e) => {
         );
       }
 
-      // Plan names can differ only by case/whitespace in MongoDB.
-      // Normalize them before deciding that a required plan is missing.
-      const activePlans = plans.filter(
-        (plan) => plan?.isActive !== false
+      const monthlyPlan = plans.find(
+        (plan) => plan.name === 'Monthly'
       );
 
-      const monthlyPlan = activePlans.find(
-        (plan) => normalizePlanName(plan?.name) === 'monthly'
-      );
-
-      const quarterlyPlan = activePlans.find(
-        (plan) => normalizePlanName(plan?.name) === 'quarterly'
+      const quarterlyPlan = plans.find(
+        (plan) => plan.name === 'Quarterly'
       );
 
       if (!monthlyPlan || !quarterlyPlan) {
-        const availablePlans = activePlans
-          .map((plan) => {
-            const name = String(plan?.name || '').trim();
-            const branch = normalizeBranch(plan?.gymBranch);
-            return branch ? `${name} [${branch}]` : name;
-          })
-          .filter(Boolean);
-
-        const branchLabel =
-          isMainAdmin && selectedBranchId !== 'all'
-            ? selectedBranchId
-            : userBranchId || 'current branch';
-
         throw new Error(
-          `Monthly and Quarterly plans are required for ${branchLabel}. ` +
-          (availablePlans.length
-            ? `Available plans: ${availablePlans.join(', ')}.`
-            : 'No membership plans were loaded for this branch. Create Monthly and Quarterly plans first.')
+          'Please create Monthly and Quarterly plans first.'
         );
       }
 
@@ -3033,16 +2701,6 @@ const handleAttendanceChange = (e) => {
   // =========================================================
 
   useEffect(() => {
-    setPlanSuccess('');
-    setPlanFormError('');
-    setPlanForm((current) => ({
-      ...current,
-      gymBranch:
-        isMainAdmin && selectedBranchId !== 'all'
-          ? selectedBranchId
-          : userBranchId || current.gymBranch || 'Kalyanpur',
-    }));
-
     fetchContacts();
     fetchDashboardStats();
     fetchMembers();
@@ -3196,7 +2854,7 @@ const handleAttendanceChange = (e) => {
                   whiteSpace: 'nowrap',
                 }}
               >
-                ASSIGNED BRANCH
+                LOCKED TO ASSIGNED BRANCH
               </span>
             )}
           </div>
@@ -3947,452 +3605,6 @@ const handleAttendanceChange = (e) => {
 
 
       {/* =====================================================
-          MEMBERSHIP PLAN MANAGEMENT
-      ===================================================== */}
-
-      <section className="admin-enquiries" style={{ marginBottom: '28px' }}>
-        <div className="admin-section-heading">
-          <div>
-            <span className="section-tag">MEMBERSHIP PLANS</span>
-            <h2>
-              PLAN <span>MANAGEMENT.</span>
-            </h2>
-            <p>
-              Create, edit, activate and deactivate membership plans for each Alpha Gym branch.
-            </p>
-          </div>
-
-          <div className="admin-section-actions">
-            <span className="admin-count">{plans.length} PLANS</span>
-            <button
-              type="button"
-              className="admin-add-btn"
-              onClick={handleOpenCreatePlan}
-            >
-              + ADD PLAN
-            </button>
-          </div>
-        </div>
-
-        {planSuccess && (
-          <div
-            className="admin-message"
-            style={{ marginBottom: '16px', borderColor: 'rgba(80, 220, 130, 0.28)' }}
-          >
-            {planSuccess}
-          </div>
-        )}
-
-        {plansError && (
-          <div className="admin-message admin-error" style={{ marginBottom: '16px' }}>
-            {plansError}
-          </div>
-        )}
-
-        {showPlanForm && (
-          <form
-            onSubmit={handleSavePlan}
-            style={{
-              marginBottom: '20px',
-              padding: '22px',
-              border: '1px solid rgba(255, 102, 0, 0.24)',
-              borderRadius: '18px',
-              background: 'linear-gradient(145deg, rgba(255,102,0,0.07), rgba(255,255,255,0.025))',
-            }}
-          >
-            <div
-              style={{
-                display: 'flex',
-                justifyContent: 'space-between',
-                alignItems: 'center',
-                gap: '14px',
-                marginBottom: '18px',
-              }}
-            >
-              <div>
-                <span className="section-tag">
-                  {editingPlan ? 'EDIT PLAN' : 'NEW PLAN'}
-                </span>
-                <h3 style={{ margin: '6px 0 0', fontSize: '25px' }}>
-                  {editingPlan ? 'UPDATE MEMBERSHIP PLAN' : 'CREATE MEMBERSHIP PLAN'}
-                </h3>
-              </div>
-
-              <button
-                type="button"
-                className="admin-delete-btn"
-                onClick={() => {
-                  setShowPlanForm(false);
-                  setEditingPlan(null);
-                  setPlanFormError('');
-                }}
-              >
-                CANCEL
-              </button>
-            </div>
-
-            {planFormError && (
-              <div className="admin-message admin-error" style={{ marginBottom: '16px' }}>
-                {planFormError}
-              </div>
-            )}
-
-            <div
-              style={{
-                display: 'grid',
-                gridTemplateColumns: 'repeat(auto-fit, minmax(190px, 1fr))',
-                gap: '14px',
-              }}
-            >
-              <label style={{ display: 'flex', flexDirection: 'column', gap: '7px' }}>
-                <span className="form-label">PLAN NAME</span>
-                <input
-                  className="admin-input"
-                  name="name"
-                  value={planForm.name}
-                  onChange={handlePlanFormChange}
-                  placeholder="Monthly"
-                  required
-                />
-              </label>
-
-              <label style={{ display: 'flex', flexDirection: 'column', gap: '7px' }}>
-                <span className="form-label">DURATION (MONTHS)</span>
-                <input
-                  className="admin-input"
-                  name="durationMonths"
-                  type="number"
-                  min="1"
-                  step="1"
-                  value={planForm.durationMonths}
-                  onChange={handlePlanFormChange}
-                  placeholder="1"
-                  required
-                />
-              </label>
-
-              <label style={{ display: 'flex', flexDirection: 'column', gap: '7px' }}>
-                <span className="form-label">PRICE (₹)</span>
-                <input
-                  className="admin-input"
-                  name="price"
-                  type="number"
-                  min="0"
-                  step="0.01"
-                  value={planForm.price}
-                  onChange={handlePlanFormChange}
-                  placeholder="999"
-                  required
-                />
-              </label>
-
-              <label style={{ display: 'flex', flexDirection: 'column', gap: '7px' }}>
-                <span className="form-label">GYM BRANCH</span>
-                <select
-                  className="admin-input"
-                  name="gymBranch"
-                  value={planForm.gymBranch}
-                  onChange={handlePlanFormChange}
-                  disabled={!isMainAdmin}
-                  required
-                >
-                  <option value="Kalyanpur">KALYANPUR</option>
-                  <option value="Gopalpur">GOPALPUR</option>
-                </select>
-              </label>
-            </div>
-
-            <label
-              style={{
-                display: 'flex',
-                flexDirection: 'column',
-                gap: '7px',
-                marginTop: '14px',
-              }}
-            >
-              <span className="form-label">DESCRIPTION</span>
-              <textarea
-                className="admin-input"
-                name="description"
-                value={planForm.description}
-                onChange={handlePlanFormChange}
-                placeholder="Describe what this membership includes..."
-                rows={3}
-                style={{ resize: 'vertical', minHeight: '90px' }}
-              />
-            </label>
-
-            <label
-              style={{
-                display: 'flex',
-                alignItems: 'center',
-                gap: '9px',
-                marginTop: '14px',
-                cursor: 'pointer',
-              }}
-            >
-              <input
-                type="checkbox"
-                name="isActive"
-                checked={Boolean(planForm.isActive)}
-                onChange={handlePlanFormChange}
-              />
-              <span>ACTIVE PLAN</span>
-            </label>
-
-            <div style={{ display: 'flex', justifyContent: 'flex-end', marginTop: '18px' }}>
-              <button type="submit" className="admin-add-btn" disabled={savingPlan}>
-                {savingPlan
-                  ? 'SAVING...'
-                  : editingPlan
-                    ? 'UPDATE PLAN'
-                    : 'CREATE PLAN'}
-              </button>
-            </div>
-          </form>
-        )}
-
-        {plansLoading && (
-          <div className="admin-message">Loading membership plans...</div>
-        )}
-
-        {!plansLoading && !plansError && plans.length === 0 && (
-          <div className="admin-message">
-            No membership plans found for the current branch. Click
-            <strong> + ADD PLAN</strong> to create Monthly and Quarterly plans.
-          </div>
-        )}
-
-        {!plansLoading && plans.length > 0 && (
-          <div style={{ display: 'flex', flexDirection: 'column', gap: '24px' }}>
-            {['Kalyanpur', 'Gopalpur'].map((branch) => {
-              const branchPlans = plans.filter(
-                (plan) => normalizeBranch(plan.gymBranch) === branch
-              );
-
-              // Do not render an empty branch group when the admin has
-              // selected the other branch or when that branch has no plans.
-              if (branchPlans.length === 0) {
-                return null;
-              }
-
-              return (
-                <div
-                  key={branch}
-                  style={{
-                    padding: '20px',
-                    borderRadius: '20px',
-                    border: '1px solid rgba(255,255,255,0.08)',
-                    background: 'linear-gradient(145deg, rgba(255,255,255,0.035), rgba(255,255,255,0.015))',
-                  }}
-                >
-                  <div
-                    style={{
-                      display: 'flex',
-                      justifyContent: 'space-between',
-                      alignItems: 'center',
-                      gap: '14px',
-                      marginBottom: '16px',
-                      paddingBottom: '14px',
-                      borderBottom: '1px solid rgba(255,255,255,0.08)',
-                    }}
-                  >
-                    <div>
-                      <span className="section-tag">ALPHA GYM BRANCH</span>
-                      <h3 style={{ margin: '6px 0 0', fontSize: '28px', letterSpacing: '0.02em' }}>
-                        {branch.toUpperCase()}
-                      </h3>
-                    </div>
-                    <span className="admin-count">
-                      {branchPlans.length} {branchPlans.length === 1 ? 'PLAN' : 'PLANS'}
-                    </span>
-                  </div>
-
-                  <div
-                    style={{
-                      display: 'grid',
-                      gridTemplateColumns: 'repeat(auto-fit, minmax(250px, 1fr))',
-                      gap: '18px',
-                    }}
-                  >
-                    {branchPlans.map((plan) => (
-                      <article
-                        key={plan._id}
-                        style={{
-                          padding: '22px',
-                          borderRadius: '18px',
-                          border: plan.isActive
-                            ? '1px solid rgba(255,102,0,0.22)'
-                            : '1px solid rgba(255,255,255,0.10)',
-                          background: plan.isActive
-                            ? 'linear-gradient(145deg, #17171e, #0e0e13)'
-                            : 'linear-gradient(145deg, #111117, #0a0a0e)',
-                          opacity: plan.isActive ? 1 : 0.72,
-                        }}
-                      >
-                        <div
-                          style={{
-                            display: 'flex',
-                            justifyContent: 'space-between',
-                            alignItems: 'flex-start',
-                            gap: '12px',
-                          }}
-                        >
-                          <div>
-                            <span className="section-tag">{branch.toUpperCase()}</span>
-                            <h3 style={{ margin: '8px 0 5px', fontSize: '27px' }}>{plan.name}</h3>
-                          </div>
-                          <span className="goal-badge">{plan.isActive ? 'ACTIVE' : 'INACTIVE'}</span>
-                        </div>
-
-                        <div
-                          style={{
-                            display: 'grid',
-                            gridTemplateColumns: '1fr 1fr',
-                            gap: '10px',
-                            margin: '18px 0',
-                          }}
-                        >
-                          <div>
-                            <small style={{ opacity: 0.6 }}>DURATION</small>
-                            <strong style={{ display: 'block', fontSize: '20px', marginTop: '3px' }}>
-                              {plan.durationMonths} {Number(plan.durationMonths) === 1 ? 'MONTH' : 'MONTHS'}
-                            </strong>
-                          </div>
-                          <div>
-                            <small style={{ opacity: 0.6 }}>PRICE</small>
-                            <strong style={{ display: 'block', fontSize: '20px', marginTop: '3px' }}>
-                              ₹{Number(plan.price || 0).toLocaleString('en-IN')}
-                            </strong>
-                          </div>
-                        </div>
-
-                        <p style={{ minHeight: '46px', margin: '0 0 18px', color: '#aaa', lineHeight: '1.5' }}>
-                          {plan.description || 'No description added for this membership plan.'}
-                        </p>
-
-                        <div style={{ display: 'flex', flexWrap: 'wrap', gap: '8px', marginTop: 'auto' }}>
-                          <button type="button" className="admin-edit-btn" onClick={() => handleEditPlan(plan)}>
-                            EDIT
-                          </button>
-                          <button
-                            type="button"
-                            className="admin-add-btn"
-                            onClick={() => handleTogglePlanStatus(plan)}
-                            disabled={deletingPlanId === plan._id}
-                          >
-                            {deletingPlanId === plan._id
-                              ? 'UPDATING...'
-                              : plan.isActive
-                                ? 'DEACTIVATE'
-                                : 'ACTIVATE'}
-                          </button>
-                          {plan.isActive && (
-                            <button
-                              type="button"
-                              className="admin-delete-btn"
-                              onClick={() => handleDeletePlan(plan)}
-                              disabled={deletingPlanId === plan._id}
-                            >
-                              DELETE
-                            </button>
-                          )}
-                        </div>
-                      </article>
-                    ))}
-                  </div>
-                </div>
-              );
-            })}
-
-            {plans.filter(
-              (plan) => !['Kalyanpur', 'Gopalpur'].includes(normalizeBranch(plan.gymBranch))
-            ).length > 0 && (
-              <div
-                style={{
-                  padding: '20px',
-                  borderRadius: '20px',
-                  border: '1px solid rgba(255,180,0,0.22)',
-                  background: 'linear-gradient(145deg, rgba(255,180,0,0.06), rgba(255,255,255,0.015))',
-                }}
-              >
-                <span className="section-tag">REVIEW REQUIRED</span>
-                <h3 style={{ margin: '6px 0 14px', fontSize: '24px' }}>
-                  OTHER / UNASSIGNED PLANS
-                </h3>
-                <p style={{ margin: '0 0 14px', color: '#aaa', lineHeight: '1.5' }}>
-                  These plans do not have a recognised Kalyanpur or Gopalpur branch. Review them before using them for memberships or offers.
-                </p>
-                <div
-                  style={{
-                    display: 'grid',
-                    gridTemplateColumns: 'repeat(auto-fit, minmax(250px, 1fr))',
-                    gap: '18px',
-                  }}
-                >
-                  {plans
-                    .filter(
-                      (plan) => !['Kalyanpur', 'Gopalpur'].includes(normalizeBranch(plan.gymBranch))
-                    )
-                    .map((plan) => (
-                      <article
-                        key={plan._id}
-                        style={{
-                          padding: '22px',
-                          borderRadius: '18px',
-                          border: '1px solid rgba(255,180,0,0.20)',
-                          background: 'linear-gradient(145deg, #17171e, #0e0e13)',
-                          opacity: plan.isActive ? 1 : 0.72,
-                        }}
-                      >
-                        <div style={{ display: 'flex', justifyContent: 'space-between', gap: '12px' }}>
-                          <div>
-                            <span className="section-tag">{getBranchLabel(plan.gymBranch)}</span>
-                            <h3 style={{ margin: '8px 0 5px', fontSize: '27px' }}>{plan.name}</h3>
-                          </div>
-                          <span className="goal-badge">{plan.isActive ? 'ACTIVE' : 'INACTIVE'}</span>
-                        </div>
-                        <div style={{ display: 'grid', gridTemplateColumns: '1fr 1fr', gap: '10px', margin: '18px 0' }}>
-                          <div>
-                            <small style={{ opacity: 0.6 }}>DURATION</small>
-                            <strong style={{ display: 'block', fontSize: '20px', marginTop: '3px' }}>
-                              {plan.durationMonths} {Number(plan.durationMonths) === 1 ? 'MONTH' : 'MONTHS'}
-                            </strong>
-                          </div>
-                          <div>
-                            <small style={{ opacity: 0.6 }}>PRICE</small>
-                            <strong style={{ display: 'block', fontSize: '20px', marginTop: '3px' }}>
-                              ₹{Number(plan.price || 0).toLocaleString('en-IN')}
-                            </strong>
-                          </div>
-                        </div>
-                        <div style={{ display: 'flex', flexWrap: 'wrap', gap: '8px' }}>
-                          <button type="button" className="admin-edit-btn" onClick={() => handleEditPlan(plan)}>
-                            EDIT
-                          </button>
-                          <button
-                            type="button"
-                            className="admin-add-btn"
-                            onClick={() => handleTogglePlanStatus(plan)}
-                            disabled={deletingPlanId === plan._id}
-                          >
-                            {deletingPlanId === plan._id
-                              ? 'UPDATING...'
-                              : plan.isActive
-                                ? 'DEACTIVATE'
-                                : 'ACTIVATE'}
-                          </button>
-                        </div>
-                      </article>
-                    ))}
-                </div>
-              </div>
-            )}
-          </div>
-        )}
-      </section>
-
-      {/* =====================================================
           PROMOTIONAL OFFERS
       ===================================================== */}
 
@@ -4423,7 +3635,7 @@ const handleAttendanceChange = (e) => {
     type="button"
     className="admin-add-btn"
     onClick={createDefaultOffers}
-    disabled={creatingOffers || (isMainAdmin && selectedBranchId === 'all')}
+    disabled={creatingOffers}
   >
     {creatingOffers
       ? 'CREATING...'
@@ -4814,7 +4026,7 @@ const handleAttendanceChange = (e) => {
         <div className="staff-no-selection">
 
           <div className="staff-no-selection-icon">
-            👤
+            🔐
           </div>
 
           <h3>

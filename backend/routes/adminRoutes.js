@@ -12,17 +12,34 @@ const {
 
 const router = express.Router();
 
-// ===============================
-// ADMIN AUTH
-// ===============================
 
-router.post('/login', loginAdmin);
+// ======================================================
+// ADMIN AUTHENTICATION
+// ======================================================
 
-// ===============================
-// STAFF REGISTRATION
-// Only existing admin/owner can
-// create receptionist accounts
-// ===============================
+// Public login
+router.post(
+    '/login',
+    loginAdmin
+);
+
+
+// ======================================================
+// STAFF / ADMIN REGISTRATION
+// ======================================================
+//
+// Only an authenticated main admin can create accounts.
+//
+// IMPORTANT:
+// Do NOT make /register public.
+//
+// Main admin:
+//     role = admin
+//
+// Receptionist:
+//     role = receptionist
+//     gymBranch = Kalyanpur / Gopalpur
+//
 
 router.post(
     '/register',
@@ -31,19 +48,39 @@ router.post(
     registerAdmin
 );
 
-// ===============================
+
+// ======================================================
 // PROTECTED PROFILE
-// ===============================
+// ======================================================
+//
+// Returns the currently authenticated account.
+//
+// Branch and role information comes from the
+// authenticated database account.
+//
 
 router.get(
     '/profile',
     protect,
     (req, res) => {
-        res.status(200).json({
+
+        return res.status(200).json({
+
             message: 'Admin authentication successful.',
-            admin: req.admin,
+
+            admin: {
+                id: req.admin._id,
+                name: req.admin.name,
+                email: req.admin.email,
+                role: req.admin.role,
+                gymBranch: req.admin.gymBranch,
+                status: req.admin.status,
+                permissions: req.admin.permissions,
+            },
+
         });
     }
 );
+
 
 module.exports = router;

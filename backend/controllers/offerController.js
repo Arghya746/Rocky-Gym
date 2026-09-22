@@ -1,308 +1,433 @@
 const Offer = require('../models/Offer');
 const Plan = require('../models/Plan');
 
+/* =========================================================
+   CONSTANTS
+   ========================================================= */
 
-// =========================================
-// GET ACCESSIBLE BRANCH
-// =========================================
+const VALID_BRANCHES = ['Kalyanpur', 'Gopalpur'];
 
+
+/* =========================================================
+   ADMIN / BRANCH HELPERS
+   ========================================================= */
+
+/**
+ * Main admin can manage both branches.
+ *
+ * IMPORTANT:
+ * Keep this role list consistent with your authentication system.
+ * Currently your backend uses "admin" for the main admin.
+ */
+const isMainAdmin = (req) => {
+    return (
+        req.admin &&
+        req.admin.role === 'admin'
+    );
+};
+
+
+/**
+ * Get the branch accessible to the current user.
+ *
+ * Main admin:
+ *   -> null = can access both branches
+ *
+ * Branch-specific admin/receptionist:
+ *   -> assigned gymBranch
+ *
+ * Branchless account:
+ *   -> ''
+ *
+ * IMPORTANT:
+ * We do NOT silently default to Kalyanpur.
+ */
 const getAccessibleBranch = (req) => {
-
-    // Main admin can manage both branches
-    if (req.admin && req.admin.role === 'admin') {
+    if (isMainAdmin(req)) {
         return null;
     }
 
-    // Receptionist is restricted to assigned branch
     if (req.admin && req.admin.gymBranch) {
-        return req.admin.gymBranch;
+        return String(req.admin.gymBranch).trim();
     }
 
-    // Fallback for old accounts
-    return 'Kalyanpur';
+    return '';
 };
 
 
-// =========================================
-// GET CURRENT ACTIVE OFFERS
-// =========================================
+/**
+ * Check whether branch is valid.
+ */
+const isValidBranch = (branch) => {
+    return VALID_BRANCHES.includes(branch);
+};
+
+
+/* =========================================================
+   ESCAPE REGEX
+   ========================================================= */
+
+/**
+ * Escape user-provided text before using it in a regex.
+ */
+const escapeRegex = (value) => {
+    return String(value).replace(
+        /[.*+?^${}()|[\]\\]/g,
+        '\\$&'
+    );
+};
+
+
+/* =========================================================
+   GET CURRENT ACTIVE OFFERS
+   GET /api/offers
+   ========================================================= */
 
 const getOffers = async(req, res) => {
     try {
-
-        const branch =
-            getAccessibleBranch(req);
-
-        const today =
-            new Date();
-
-
-        // =========================================
-        // BUILD QUERY
-        // =========================================
-
-        const query = {
-
-            isActive: true,
-
-            startDate: {
-                $lte: today,
-            },
-
-            endDate: {
-                $gte: today,
-            },
-
-        };
-
-
-        // Branch restriction
-        if (branch) {
-            query.gymBranch = branch;
-        }
-
-
-        const offers =
-            await Offer.find(query)
-
-        .populate(
-            'plan',
-            'name durationMonths price'
-        )
-
-        .sort({
-            endDate: 1,
-        });
-
-
-        res.status(200).json({
-
-            offers,
-
-        });
-
-    } catch (error) {
-
-        console.error(
-            'Get Offers Error:',
-            error.message
-        );
-
-        res.status(500).json({
-
-            message: 'Failed to fetch offers.',
-
-        });
-    }
-};
-
-
-// =========================================
-// GET ALL OFFERS
-// =========================================
-
-const getAllOffers = async(req, res) => {
-    try {
-
-        const branch =
-            getAccessibleBranch(req);
-
-
-        // =========================================
-        // BUILD QUERY
-        // =========================================
-
-        const query =
-            branch ?
-            { gymBranch: branch } :
-            {};
-
-
-        const offers =
-            await Offer.find(query)
-
-        .populate(
-            'plan',
-            'name durationMonths price'
-        )
-
-        .sort({
-            createdAt: -1,
-        });
-
-
-        res.status(200).json({
-
-            offers,
-
-        });
-
-    } catch (error) {
-
-        console.error(
-            'Get All Offers Error:',
-            error.message
-        );
-
-        res.status(500).json({
-
-            message: 'Failed to fetch offers.',
-
-        });
-    }
-};
-
-
-// =========================================
-// GET OFFERS BY PLAN
-// =========================================
-
-const getOffersByPlan = async(req, res) => {
-    try {
-
-        const branch =
-            getAccessibleBranch(req);
-
-        const today =
-            new Date();
-
-
-        // =========================================
-        // BUILD QUERY
-        // =========================================
-
-        const query = {
-
-            plan: req.params.planId,
-
-            isActive: true,
-
-            startDate: {
-                $lte: today,
-            },
-
-            endDate: {
-                $gte: today,
-            },
-
-        };
-
-
-        if (branch) {
-            query.gymBranch = branch;
-        }
-
-
-        const offers =
-            await Offer.find(query)
-
-        .populate(
-            'plan',
-            'name durationMonths price'
-        )
-
-        .sort({
-            endDate: 1,
-        });
-
-
-        res.status(200).json({
-
-            offers,
-
-        });
-
-    } catch (error) {
-
-        console.error(
-            'Get Offers By Plan Error:',
-            error.message
-        );
-
-        res.status(500).json({
-
-            message: 'Failed to fetch offers for this plan.',
-
-        });
-    }
-};
-
-
-// =========================================
-// GET SINGLE OFFER
-// =========================================
-
-const getOfferById = async(req, res) => {
-    try {
-
-        const branch =
-            getAccessibleBranch(req);
-
-
-        // =========================================
-        // BUILD QUERY
-        // =========================================
-
-        const query = {
-
-            _id: req.params.id,
-
-        };
-
-
-        if (branch) {
-            query.gymBranch = branch;
-        }
-
-
-        const offer =
-            await Offer.findOne(query)
-
-        .populate(
-            'plan',
-            'name durationMonths price'
-        );
-
-
-        if (!offer) {
-
-            return res.status(404).json({
-
-                message: 'Offer not found.',
-
+        const branch = getAccessibleBranch(req);
+        const today = new Date();
+
+        /*
+         * Branchless non-main accounts cannot access offers.
+         */
+        if (!isMainAdmin(req) && !branch) {
+            return res.status(403).json({
+                success: false,
+                message: 'Your account is not assigned to a gym branch. Please contact the main administrator.',
             });
         }
 
+        /*
+         * Branch must be valid for branch-specific accounts.
+         */
+        if (!isMainAdmin(req) && !isValidBranch(branch)) {
+            return res.status(403).json({
+                success: false,
+                message: 'Invalid or unsupported gym branch.',
+            });
+        }
 
-        res.status(200).json({
+        /* -----------------------------------------------
+           BUILD QUERY
+        ------------------------------------------------ */
 
-            offer,
+        const query = {
+            isActive: true,
 
+            startDate: {
+                $lte: today,
+            },
+
+            endDate: {
+                $gte: today,
+            },
+        };
+
+        /*
+         * Main admin:
+         *   -> all branches
+         *
+         * Branch account:
+         *   -> own branch only
+         */
+        if (!isMainAdmin(req)) {
+            query.gymBranch = branch;
+        }
+
+        /* -----------------------------------------------
+           FETCH OFFERS
+        ------------------------------------------------ */
+
+        const offers = await Offer.find(query)
+            .populate(
+                'plan',
+                'name durationMonths price gymBranch'
+            )
+            .sort({
+                endDate: 1,
+            });
+
+        return res.status(200).json({
+            success: true,
+            count: offers.length,
+            offers,
         });
 
     } catch (error) {
-
         console.error(
-            'Get Offer Error:',
-            error.message
+            'Get Offers Error:',
+            error
         );
 
-        res.status(500).json({
-
-            message: 'Failed to fetch offer.',
-
+        return res.status(500).json({
+            success: false,
+            message: 'Failed to fetch offers.',
         });
     }
 };
 
 
-// =========================================
-// CREATE OFFER
-// =========================================
+/* =========================================================
+   GET ALL OFFERS
+   GET /api/offers/all
+   Includes inactive / expired offers
+   ========================================================= */
+
+const getAllOffers = async(req, res) => {
+    try {
+        const branch = getAccessibleBranch(req);
+
+        /*
+         * Branchless non-main accounts cannot access offers.
+         */
+        if (!isMainAdmin(req) && !branch) {
+            return res.status(403).json({
+                success: false,
+                message: 'Your account is not assigned to a gym branch. Please contact the main administrator.',
+            });
+        }
+
+        /*
+         * Validate assigned branch.
+         */
+        if (!isMainAdmin(req) && !isValidBranch(branch)) {
+            return res.status(403).json({
+                success: false,
+                message: 'Invalid or unsupported gym branch.',
+            });
+        }
+
+        /* -----------------------------------------------
+           BUILD QUERY
+        ------------------------------------------------ */
+
+        const query = {};
+
+        if (!isMainAdmin(req)) {
+            query.gymBranch = branch;
+        }
+
+        /* -----------------------------------------------
+           FETCH OFFERS
+        ------------------------------------------------ */
+
+        const offers = await Offer.find(query)
+            .populate(
+                'plan',
+                'name durationMonths price gymBranch'
+            )
+            .sort({
+                createdAt: -1,
+            });
+
+        return res.status(200).json({
+            success: true,
+            count: offers.length,
+            offers,
+        });
+
+    } catch (error) {
+        console.error(
+            'Get All Offers Error:',
+            error
+        );
+
+        return res.status(500).json({
+            success: false,
+            message: 'Failed to fetch offers.',
+        });
+    }
+};
+
+
+/* =========================================================
+   GET OFFERS BY PLAN
+   GET /api/offers/plan/:planId
+   ========================================================= */
+
+const getOffersByPlan = async(req, res) => {
+    try {
+        const branch = getAccessibleBranch(req);
+        const today = new Date();
+
+        /*
+         * Branchless non-main accounts cannot access offers.
+         */
+        if (!isMainAdmin(req) && !branch) {
+            return res.status(403).json({
+                success: false,
+                message: 'Your account is not assigned to a gym branch. Please contact the main administrator.',
+            });
+        }
+
+        if (!isMainAdmin(req) && !isValidBranch(branch)) {
+            return res.status(403).json({
+                success: false,
+                message: 'Invalid or unsupported gym branch.',
+            });
+        }
+
+        /* -----------------------------------------------
+           VERIFY PLAN
+        ------------------------------------------------ */
+
+        const planQuery = {
+            _id: req.params.planId,
+        };
+
+        /*
+         * Branch-specific user can only access their branch's plan.
+         */
+        if (!isMainAdmin(req)) {
+            planQuery.gymBranch = branch;
+        }
+
+        const existingPlan = await Plan.findOne(planQuery);
+
+        if (!existingPlan) {
+            return res.status(404).json({
+                success: false,
+                message: 'Membership plan not found.',
+            });
+        }
+
+        /* -----------------------------------------------
+           BUILD OFFER QUERY
+        ------------------------------------------------ */
+
+        const query = {
+            plan: existingPlan._id,
+
+            isActive: true,
+
+            startDate: {
+                $lte: today,
+            },
+
+            endDate: {
+                $gte: today,
+            },
+        };
+
+        if (!isMainAdmin(req)) {
+            query.gymBranch = branch;
+        }
+
+        /* -----------------------------------------------
+           FETCH OFFERS
+        ------------------------------------------------ */
+
+        const offers = await Offer.find(query)
+            .populate(
+                'plan',
+                'name durationMonths price gymBranch'
+            )
+            .sort({
+                endDate: 1,
+            });
+
+        return res.status(200).json({
+            success: true,
+            count: offers.length,
+            offers,
+        });
+
+    } catch (error) {
+        console.error(
+            'Get Offers By Plan Error:',
+            error
+        );
+
+        return res.status(500).json({
+            success: false,
+            message: 'Failed to fetch offers for this plan.',
+        });
+    }
+};
+
+
+/* =========================================================
+   GET SINGLE OFFER
+   GET /api/offers/:id
+   ========================================================= */
+
+const getOfferById = async(req, res) => {
+    try {
+        const branch = getAccessibleBranch(req);
+
+        /*
+         * Branchless non-main accounts cannot access offers.
+         */
+        if (!isMainAdmin(req) && !branch) {
+            return res.status(403).json({
+                success: false,
+                message: 'Your account is not assigned to a gym branch. Please contact the main administrator.',
+            });
+        }
+
+        if (!isMainAdmin(req) && !isValidBranch(branch)) {
+            return res.status(403).json({
+                success: false,
+                message: 'Invalid or unsupported gym branch.',
+            });
+        }
+
+        /* -----------------------------------------------
+           BUILD QUERY
+        ------------------------------------------------ */
+
+        const query = {
+            _id: req.params.id,
+        };
+
+        if (!isMainAdmin(req)) {
+            query.gymBranch = branch;
+        }
+
+        /* -----------------------------------------------
+           FIND OFFER
+        ------------------------------------------------ */
+
+        const offer = await Offer.findOne(query)
+            .populate(
+                'plan',
+                'name durationMonths price gymBranch'
+            );
+
+        if (!offer) {
+            return res.status(404).json({
+                success: false,
+                message: 'Offer not found.',
+            });
+        }
+
+        return res.status(200).json({
+            success: true,
+            offer,
+        });
+
+    } catch (error) {
+        console.error(
+            'Get Offer Error:',
+            error
+        );
+
+        return res.status(500).json({
+            success: false,
+            message: 'Failed to fetch offer.',
+        });
+    }
+};
+
+
+/* =========================================================
+   CREATE OFFER
+   POST /api/offers
+   ========================================================= */
 
 const createOffer = async(req, res) => {
     try {
-
         const {
             name,
             plan,
@@ -314,278 +439,307 @@ const createOffer = async(req, res) => {
             gymBranch,
         } = req.body;
 
-
-        // =========================================
-        // VALIDATION
-        // =========================================
+        /* -----------------------------------------------
+           REQUIRED FIELD VALIDATION
+        ------------------------------------------------ */
 
         if (!name ||
+            !String(name).trim() ||
             !plan ||
             offerPrice === undefined ||
+            offerPrice === null ||
+            offerPrice === '' ||
             !startDate ||
             !endDate
         ) {
-
             return res.status(400).json({
-
+                success: false,
                 message: 'Name, plan, offer price, start date and end date are required.',
-
             });
         }
 
+        const mainAdmin = isMainAdmin(req);
+        const accessibleBranch = getAccessibleBranch(req);
 
-        // =========================================
-        // DETERMINE BRANCH
-        // =========================================
+        /* -----------------------------------------------
+           DETERMINE BRANCH
+        ------------------------------------------------ */
 
         let selectedBranch;
 
-
-        if (
-            req.admin &&
-            req.admin.role === 'admin'
-        ) {
-
-            // Main admin can select branch
-            selectedBranch =
-                gymBranch || 'Kalyanpur';
-
+        if (mainAdmin) {
+            /*
+             * Main admin must explicitly select a branch.
+             *
+             * No silent Kalyanpur fallback.
+             */
+            selectedBranch = gymBranch ?
+                String(gymBranch).trim() :
+                '';
         } else {
-
-            // Receptionist uses assigned branch
-            selectedBranch =
-                (req.admin && req.admin.gymBranch) ?
-                req.admin.gymBranch :
-                'Kalyanpur';
+            /*
+             * Branch-specific user can ONLY create offers
+             * for their assigned branch.
+             */
+            selectedBranch = accessibleBranch;
         }
 
+        /* -----------------------------------------------
+           VALIDATE BRANCH
+        ------------------------------------------------ */
 
-        // =========================================
-        // VALIDATE BRANCH
-        // =========================================
-
-        const allowedBranches = [
-            'Kalyanpur',
-            'Gopalpur',
-        ];
-
-
-        if (!allowedBranches.includes(
-                selectedBranch
-            )) {
-
+        if (!selectedBranch) {
             return res.status(400).json({
-
-                message: 'Invalid gym branch.',
-
+                success: false,
+                message: 'Gym branch is required. Please select Kalyanpur or Gopalpur.',
             });
         }
 
+        if (!isValidBranch(selectedBranch)) {
+            return res.status(400).json({
+                success: false,
+                message: 'Invalid gym branch. Allowed branches are Kalyanpur and Gopalpur.',
+            });
+        }
 
-        // =========================================
-        // CHECK MEMBERSHIP PLAN
-        // =========================================
+        if (!mainAdmin &&
+            !isValidBranch(accessibleBranch)
+        ) {
+            return res.status(403).json({
+                success: false,
+                message: 'Your account is not assigned to a valid gym branch.',
+            });
+        }
 
-        const existingPlan =
-            await Plan.findById(plan);
+        /* -----------------------------------------------
+           CHECK MEMBERSHIP PLAN
+        ------------------------------------------------ */
 
+        /*
+         * Main admin can use a plan from either branch,
+         * but it MUST match the selected offer branch.
+         *
+         * Branch users are automatically restricted to
+         * their assigned branch.
+         */
+        const planQuery = {
+            _id: plan,
+            gymBranch: selectedBranch,
+        };
+
+        const existingPlan = await Plan.findOne(planQuery);
 
         if (!existingPlan) {
-
             return res.status(404).json({
-
-                message: 'Membership plan not found.',
-
+                success: false,
+                message: `Membership plan not found for ${selectedBranch}.`,
             });
         }
 
-
-        // =========================================
-        // CHECK PLAN BRANCH
-        // =========================================
-
-        if (
-            existingPlan.gymBranch &&
-            existingPlan.gymBranch !== selectedBranch
-        ) {
-
+        /*
+         * Inactive plans should not be used for new offers.
+         */
+        if (!existingPlan.isActive) {
             return res.status(400).json({
-
-                message: 'Membership plan does not belong to the selected gym branch.',
-
+                success: false,
+                message: 'Cannot create an offer using an inactive membership plan.',
             });
         }
 
+        /* -----------------------------------------------
+           VALIDATE OFFER PRICE
+        ------------------------------------------------ */
 
-        // =========================================
-        // VALIDATE PRICE
-        // =========================================
+        const price = Number(offerPrice);
 
-        const price =
-            Number(offerPrice);
-
-
-        if (
-            Number.isNaN(price) ||
+        if (!Number.isFinite(price) ||
             price < 0
         ) {
-
             return res.status(400).json({
-
-                message: 'Offer price must be a valid positive number.',
-
+                success: false,
+                message: 'Offer price must be a valid number greater than or equal to 0.',
             });
         }
 
+        /* -----------------------------------------------
+           VALIDATE DATES
+        ------------------------------------------------ */
 
-        // =========================================
-        // VALIDATE DATES
-        // =========================================
-
-        const start =
-            new Date(startDate);
-
-
-        const end =
-            new Date(endDate);
-
+        const start = new Date(startDate);
+        const end = new Date(endDate);
 
         if (
-            Number.isNaN(
-                start.getTime()
-            ) ||
-            Number.isNaN(
-                end.getTime()
-            )
+            Number.isNaN(start.getTime()) ||
+            Number.isNaN(end.getTime())
         ) {
-
             return res.status(400).json({
-
+                success: false,
                 message: 'Start date and end date must be valid dates.',
-
             });
         }
-
 
         if (end < start) {
-
             return res.status(400).json({
-
+                success: false,
                 message: 'Offer end date cannot be before start date.',
-
             });
         }
 
+        /* -----------------------------------------------
+           NORMALIZE VALUES
+        ------------------------------------------------ */
 
-        // =========================================
-        // CREATE OFFER
-        // =========================================
+        const normalizedName = String(name).trim();
 
-        const offer =
-            await Offer.create({
+        const normalizedDescription =
+            description !== undefined &&
+            description !== null ?
+            String(description).trim() :
+            '';
 
-                gymBranch: selectedBranch,
+        const normalizedBenefits =
+            Array.isArray(benefits) ?
+            benefits
+            .map((benefit) =>
+                String(benefit).trim()
+            )
+            .filter(Boolean) :
+            [];
 
-                name: name.trim(),
+        /* -----------------------------------------------
+           DUPLICATE ACTIVE OFFER CHECK
+        ------------------------------------------------ */
 
-                plan,
+        /*
+         * Prevent multiple active offers with the same name
+         * in the same branch.
+         */
+        const existingOffer = await Offer.findOne({
+            gymBranch: selectedBranch,
 
-                offerPrice: price,
+            name: {
+                $regex: `^${escapeRegex(normalizedName)}$`,
+                $options: 'i',
+            },
 
-                startDate: start,
+            isActive: true,
+        });
 
-                endDate: end,
-
-                description: description ?
-                    description.trim() :
-                    '',
-
-                benefits: Array.isArray(benefits) ?
-                    benefits :
-                    [],
-
+        if (existingOffer) {
+            return res.status(409).json({
+                success: false,
+                message: `${normalizedName} offer already exists for ${selectedBranch}.`,
             });
+        }
 
+        /* -----------------------------------------------
+           CREATE OFFER
+        ------------------------------------------------ */
 
-        // =========================================
-        // POPULATE OFFER
-        // =========================================
+        const offer = await Offer.create({
+            gymBranch: selectedBranch,
+
+            name: normalizedName,
+
+            plan: existingPlan._id,
+
+            offerPrice: price,
+
+            startDate: start,
+
+            endDate: end,
+
+            description: normalizedDescription,
+
+            benefits: normalizedBenefits,
+
+            isActive: true,
+        });
+
+        /* -----------------------------------------------
+           POPULATE OFFER
+        ------------------------------------------------ */
 
         const populatedOffer =
-            await Offer.findById(
-                offer._id
-            )
+            await Offer.findById(offer._id)
+            .populate(
+                'plan',
+                'name durationMonths price gymBranch'
+            );
 
-        .populate(
-            'plan',
-            'name durationMonths price'
-        );
-
-
-        res.status(201).json({
-
+        return res.status(201).json({
+            success: true,
             message: 'Offer created successfully.',
-
             offer: populatedOffer,
-
         });
 
     } catch (error) {
-
         console.error(
             'Create Offer Error:',
-            error.message
+            error
         );
 
-        res.status(500).json({
-
+        return res.status(500).json({
+            success: false,
             message: 'Failed to create offer.',
-
         });
     }
 };
 
 
-// =========================================
-// UPDATE OFFER
-// =========================================
+/* =========================================================
+   UPDATE OFFER
+   PUT /api/offers/:id
+   ========================================================= */
 
 const updateOffer = async(req, res) => {
     try {
+        const branch = getAccessibleBranch(req);
+        const mainAdmin = isMainAdmin(req);
 
-        const branch =
-            getAccessibleBranch(req);
+        /* -----------------------------------------------
+           BRANCH ACCESS VALIDATION
+        ------------------------------------------------ */
 
-
-        // =========================================
-        // FIND OFFER
-        // =========================================
-
-        const query = {
-
-            _id: req.params.id,
-
-        };
-
-
-        if (branch) {
-            query.gymBranch = branch;
-        }
-
-
-        const offer =
-            await Offer.findOne(query);
-
-
-        if (!offer) {
-
-            return res.status(404).json({
-
-                message: 'Offer not found.',
-
+        if (!mainAdmin && !branch) {
+            return res.status(403).json({
+                success: false,
+                message: 'Your account is not assigned to a gym branch. Please contact the main administrator.',
             });
         }
 
+        if (!mainAdmin &&
+            !isValidBranch(branch)
+        ) {
+            return res.status(403).json({
+                success: false,
+                message: 'Invalid or unsupported gym branch.',
+            });
+        }
+
+        /* -----------------------------------------------
+           FIND OFFER
+        ------------------------------------------------ */
+
+        const query = {
+            _id: req.params.id,
+        };
+
+        /*
+         * Branch user can only update own branch.
+         */
+        if (!mainAdmin) {
+            query.gymBranch = branch;
+        }
+
+        const offer = await Offer.findOne(query);
+
+        if (!offer) {
+            return res.status(404).json({
+                success: false,
+                message: 'Offer not found.',
+            });
+        }
 
         const {
             name,
@@ -599,394 +753,423 @@ const updateOffer = async(req, res) => {
             gymBranch,
         } = req.body;
 
-
-        // =========================================
-        // DETERMINE FINAL BRANCH
-        // =========================================
+        /* -----------------------------------------------
+           DETERMINE FINAL BRANCH
+        ------------------------------------------------ */
 
         let finalBranch;
 
-
-        if (branch) {
-
-            // Receptionist cannot change branch
+        if (mainAdmin) {
+            /*
+             * Main admin can move offer between branches.
+             *
+             * If no new branch supplied,
+             * retain existing branch.
+             */
             finalBranch =
-                branch;
-
+                gymBranch !== undefined &&
+                gymBranch !== null &&
+                String(gymBranch).trim() !== '' ?
+                String(gymBranch).trim() :
+                offer.gymBranch;
         } else {
-
-            // Main admin can change branch
-            finalBranch =
-                gymBranch ||
-                offer.gymBranch ||
-                'Kalyanpur';
+            /*
+             * Branch-specific user cannot change branch.
+             */
+            finalBranch = branch;
         }
 
+        /* -----------------------------------------------
+           VALIDATE FINAL BRANCH
+        ------------------------------------------------ */
 
-        // =========================================
-        // VALIDATE FINAL BRANCH
-        // =========================================
-
-        const allowedBranches = [
-            'Kalyanpur',
-            'Gopalpur',
-        ];
-
-
-        if (!allowedBranches.includes(
-                finalBranch
-            )) {
-
+        if (!isValidBranch(finalBranch)) {
             return res.status(400).json({
-
-                message: 'Invalid gym branch.',
-
+                success: false,
+                message: 'Invalid gym branch. Allowed branches are Kalyanpur and Gopalpur.',
             });
         }
 
+        /* -----------------------------------------------
+           DETERMINE FINAL PLAN
+        ------------------------------------------------ */
 
-        // =========================================
-        // UPDATE PLAN
-        // =========================================
+        let finalPlan = offer.plan;
 
         if (plan !== undefined) {
-
+            /*
+             * Plan must belong to final branch.
+             */
             const existingPlan =
-                await Plan.findById(plan);
-
+                await Plan.findOne({
+                    _id: plan,
+                    gymBranch: finalBranch,
+                });
 
             if (!existingPlan) {
-
                 return res.status(404).json({
-
-                    message: 'Membership plan not found.',
-
+                    success: false,
+                    message: `Membership plan not found for ${finalBranch}.`,
                 });
             }
 
-
-            // Plan must belong to same branch
-            if (
-                existingPlan.gymBranch &&
-                existingPlan.gymBranch !== finalBranch
-            ) {
-
-                return res.status(400).json({
-
-                    message: 'Membership plan does not belong to the selected gym branch.',
-
-                });
-            }
-
-
-            offer.plan =
-                plan;
-        }
-
-
-        // =========================================
-        // UPDATE NAME
-        // =========================================
-
-        if (name !== undefined) {
-
-            offer.name =
-                name.trim();
-        }
-
-
-        // =========================================
-        // UPDATE PRICE
-        // =========================================
-
-        if (
-            offerPrice !== undefined
-        ) {
-
-            const price =
-                Number(offerPrice);
-
+            /*
+             * Do not attach inactive plan to an active offer.
+             */
+            const requestedActiveStatus =
+                isActive !== undefined ?
+                Boolean(isActive) :
+                offer.isActive;
 
             if (
-                Number.isNaN(price) ||
-                price < 0
+                requestedActiveStatus &&
+                !existingPlan.isActive
             ) {
-
                 return res.status(400).json({
-
-                    message: 'Offer price must be a valid positive number.',
-
+                    success: false,
+                    message: 'Cannot use an inactive membership plan for an active offer.',
                 });
             }
 
+            finalPlan = existingPlan;
+        } else {
+            /*
+             * Existing plan reference must still belong
+             * to the final branch.
+             */
+            const currentPlan =
+                await Plan.findById(offer.plan);
 
-            offer.offerPrice =
-                price;
+            if (!currentPlan) {
+                return res.status(404).json({
+                    success: false,
+                    message: 'The membership plan linked to this offer no longer exists.',
+                });
+            }
+
+            if (
+                currentPlan.gymBranch !== finalBranch
+            ) {
+                return res.status(400).json({
+                    success: false,
+                    message: 'The membership plan does not belong to the selected gym branch.',
+                });
+            }
+
+            finalPlan = currentPlan;
         }
 
+        /* -----------------------------------------------
+           DETERMINE FINAL NAME
+        ------------------------------------------------ */
 
-        // =========================================
-        // UPDATE START DATE
-        // =========================================
+        const finalName =
+            name !== undefined ?
+            String(name).trim() :
+            String(offer.name).trim();
 
-        if (
-            startDate !== undefined
-        ) {
+        if (!finalName) {
+            return res.status(400).json({
+                success: false,
+                message: 'Offer name cannot be empty.',
+            });
+        }
 
-            const start =
+        /* -----------------------------------------------
+           DETERMINE FINAL PRICE
+        ------------------------------------------------ */
+
+        let finalPrice = offer.offerPrice;
+
+        if (offerPrice !== undefined) {
+            finalPrice = Number(offerPrice);
+
+            if (!Number.isFinite(finalPrice) ||
+                finalPrice < 0
+            ) {
+                return res.status(400).json({
+                    success: false,
+                    message: 'Offer price must be a valid number greater than or equal to 0.',
+                });
+            }
+        }
+
+        /* -----------------------------------------------
+           DETERMINE FINAL DATES
+        ------------------------------------------------ */
+
+        let finalStartDate = offer.startDate;
+        let finalEndDate = offer.endDate;
+
+        if (startDate !== undefined) {
+            finalStartDate =
                 new Date(startDate);
 
-
             if (
                 Number.isNaN(
-                    start.getTime()
+                    finalStartDate.getTime()
                 )
             ) {
-
                 return res.status(400).json({
-
+                    success: false,
                     message: 'Invalid start date.',
-
                 });
             }
-
-
-            offer.startDate =
-                start;
         }
 
-
-        // =========================================
-        // UPDATE END DATE
-        // =========================================
-
-        if (
-            endDate !== undefined
-        ) {
-
-            const end =
+        if (endDate !== undefined) {
+            finalEndDate =
                 new Date(endDate);
 
-
             if (
                 Number.isNaN(
-                    end.getTime()
+                    finalEndDate.getTime()
                 )
             ) {
-
                 return res.status(400).json({
-
+                    success: false,
                     message: 'Invalid end date.',
-
                 });
             }
-
-
-            offer.endDate =
-                end;
         }
 
-
-        // =========================================
-        // UPDATE DESCRIPTION
-        // =========================================
+        /* -----------------------------------------------
+           VALIDATE DATE RANGE
+        ------------------------------------------------ */
 
         if (
-            description !== undefined
+            finalEndDate <
+            finalStartDate
         ) {
-
-            offer.description =
-                description.trim();
+            return res.status(400).json({
+                success: false,
+                message: 'Offer end date cannot be before start date.',
+            });
         }
 
+        /* -----------------------------------------------
+           DETERMINE FINAL ACTIVE STATUS
+        ------------------------------------------------ */
 
-        // =========================================
-        // UPDATE BENEFITS
-        // =========================================
+        const finalIsActive =
+            isActive !== undefined ?
+            Boolean(isActive) :
+            offer.isActive;
 
+        /*
+         * Active offer cannot use inactive plan.
+         */
         if (
-            benefits !== undefined
+            finalIsActive &&
+            !finalPlan.isActive
         ) {
-
-            offer.benefits =
-                Array.isArray(benefits) ?
-                benefits :
-                [];
+            return res.status(400).json({
+                success: false,
+                message: 'An active offer must be linked to an active membership plan.',
+            });
         }
 
+        /* -----------------------------------------------
+           DUPLICATE ACTIVE OFFER CHECK
+        ------------------------------------------------ */
 
-        // =========================================
-        // UPDATE ACTIVE STATUS
-        // =========================================
+        if (finalIsActive) {
+            const duplicateOffer =
+                await Offer.findOne({
+                    _id: {
+                        $ne: offer._id,
+                    },
 
-        if (
-            isActive !== undefined
-        ) {
+                    gymBranch: finalBranch,
 
-            offer.isActive =
-                Boolean(isActive);
+                    name: {
+                        $regex: `^${escapeRegex(finalName)}$`,
+                        $options: 'i',
+                    },
+
+                    isActive: true,
+                });
+
+            if (duplicateOffer) {
+                return res.status(409).json({
+                    success: false,
+                    message: `${finalName} offer already exists for ${finalBranch}.`,
+                });
+            }
         }
 
-
-        // =========================================
-        // UPDATE BRANCH
-        // =========================================
+        /* -----------------------------------------------
+           UPDATE OFFER
+        ------------------------------------------------ */
 
         offer.gymBranch =
             finalBranch;
 
+        offer.name =
+            finalName;
 
-        // =========================================
-        // VALIDATE DATE RANGE
-        // =========================================
+        offer.plan =
+            finalPlan._id;
 
-        if (
-            offer.endDate <
-            offer.startDate
-        ) {
+        offer.offerPrice =
+            finalPrice;
 
-            return res.status(400).json({
+        offer.startDate =
+            finalStartDate;
 
-                message: 'Offer end date cannot be before start date.',
+        offer.endDate =
+            finalEndDate;
 
-            });
+        if (description !== undefined) {
+            offer.description =
+                description !== null ?
+                String(description).trim() :
+                '';
         }
 
+        if (benefits !== undefined) {
+            offer.benefits =
+                Array.isArray(benefits) ?
+                benefits
+                .map((benefit) =>
+                    String(benefit).trim()
+                )
+                .filter(Boolean) :
+                [];
+        }
 
-        // =========================================
-        // SAVE
-        // =========================================
+        offer.isActive =
+            finalIsActive;
+
+        /* -----------------------------------------------
+           SAVE
+        ------------------------------------------------ */
 
         await offer.save();
 
-
-        // =========================================
-        // POPULATE UPDATED OFFER
-        // =========================================
+        /* -----------------------------------------------
+           POPULATE UPDATED OFFER
+        ------------------------------------------------ */
 
         const updatedOffer =
             await Offer.findById(
                 offer._id
             )
+            .populate(
+                'plan',
+                'name durationMonths price gymBranch'
+            );
 
-        .populate(
-            'plan',
-            'name durationMonths price'
-        );
-
-
-        res.status(200).json({
-
+        return res.status(200).json({
+            success: true,
             message: 'Offer updated successfully.',
-
             offer: updatedOffer,
-
         });
 
     } catch (error) {
-
         console.error(
             'Update Offer Error:',
-            error.message
+            error
         );
 
-        res.status(500).json({
-
+        return res.status(500).json({
+            success: false,
             message: 'Failed to update offer.',
-
         });
     }
 };
 
 
-// =========================================
-// DEACTIVATE OFFER
-// =========================================
+/* =========================================================
+   DEACTIVATE OFFER
+   DELETE /api/offers/:id
+   ========================================================= */
 
 const deleteOffer = async(req, res) => {
     try {
+        const branch = getAccessibleBranch(req);
+        const mainAdmin = isMainAdmin(req);
 
-        const branch =
-            getAccessibleBranch(req);
+        /* -----------------------------------------------
+           ACCESS VALIDATION
+        ------------------------------------------------ */
 
-
-        // =========================================
-        // BUILD QUERY
-        // =========================================
-
-        const query = {
-
-            _id: req.params.id,
-
-        };
-
-
-        if (branch) {
-            query.gymBranch = branch;
+        if (!mainAdmin && !branch) {
+            return res.status(403).json({
+                success: false,
+                message: 'Your account is not assigned to a gym branch. Please contact the main administrator.',
+            });
         }
 
+        if (!mainAdmin &&
+            !isValidBranch(branch)
+        ) {
+            return res.status(403).json({
+                success: false,
+                message: 'Invalid or unsupported gym branch.',
+            });
+        }
+
+        /* -----------------------------------------------
+           FIND OFFER
+        ------------------------------------------------ */
+
+        const query = {
+            _id: req.params.id,
+        };
+
+        if (!mainAdmin) {
+            query.gymBranch = branch;
+        }
 
         const offer =
             await Offer.findOne(query);
 
-
         if (!offer) {
-
             return res.status(404).json({
-
+                success: false,
                 message: 'Offer not found.',
-
             });
         }
 
+        /* -----------------------------------------------
+           SOFT DELETE
+        ------------------------------------------------ */
 
-        offer.isActive =
-            false;
-
+        offer.isActive = false;
 
         await offer.save();
 
-
-        res.status(200).json({
-
+        return res.status(200).json({
+            success: true,
             message: 'Offer deactivated successfully.',
-
+            offer,
         });
 
     } catch (error) {
-
         console.error(
             'Delete Offer Error:',
-            error.message
+            error
         );
 
-        res.status(500).json({
-
+        return res.status(500).json({
+            success: false,
             message: 'Failed to deactivate offer.',
-
         });
     }
 };
 
 
-// =========================================
-// EXPORTS
-// =========================================
+/* =========================================================
+   EXPORTS
+   ========================================================= */
 
 module.exports = {
-
     getOffers,
-
     getAllOffers,
-
     getOffersByPlan,
-
     getOfferById,
-
     createOffer,
-
     updateOffer,
-
     deleteOffer,
-
 };
