@@ -2,31 +2,94 @@ const Contact = require('../models/Contact');
 
 
 // =========================================
+// ALLOWED BRANCHES
+// =========================================
+
+const ALLOWED_BRANCHES = [
+    'Kalyanpur',
+    'Gopalpur',
+];
+
+
+// =========================================
+// NORMALIZE BRANCH
+// =========================================
+
+const normalizeBranch = (value) => {
+
+    if (!value) {
+        return null;
+    }
+
+    const normalized = String(value)
+        .trim()
+        .toLowerCase();
+
+    if (normalized === 'kalyanpur') {
+        return 'Kalyanpur';
+    }
+
+    if (normalized === 'gopalpur') {
+        return 'Gopalpur';
+    }
+
+    return null;
+};
+
+
+// =========================================
 // GET ACCESSIBLE BRANCH
+// =========================================
+// Main admin:
+//   null = access to both branches
+//
+// Receptionist:
+//   assigned branch only
+//
+// Invalid receptionist branch:
+//   null, but caller checks this condition
 // =========================================
 
 const getAccessibleBranch = (req) => {
 
-    // Main admin can manage both branches
-    if (req.admin && req.admin.role === 'admin') {
+    // Main admin can access both branches
+    if (
+        req.admin &&
+        req.admin.role === 'admin'
+    ) {
         return null;
     }
 
-    // Receptionist is restricted to assigned branch
-    if (req.admin && req.admin.gymBranch) {
-        return req.admin.gymBranch;
+    // Receptionist is restricted to
+    // their assigned branch
+    if (
+        req.admin &&
+        req.admin.role === 'receptionist'
+    ) {
+        return normalizeBranch(
+            req.admin.gymBranch
+        );
     }
 
-    // Fallback for old accounts
-    return 'Kalyanpur';
+    return null;
 };
 
 
 // =========================================
 // CREATE CONTACT / ENQUIRY
 // =========================================
+// PUBLIC ENDPOINT
+//
+// The public website must provide:
+//   gymBranch: "Kalyanpur"
+//   OR
+//   gymBranch: "Gopalpur"
+//
+// No login is required here.
+// =========================================
 
 const createContact = async(req, res) => {
+
     try {
 
         const {
@@ -39,63 +102,52 @@ const createContact = async(req, res) => {
 
 
         // =========================================
-        // VALIDATION
+        // VALIDATE NAME
         // =========================================
 
-        if (!name || !phone) {
+        if (!name || !String(name).trim()) {
 
             return res.status(400).json({
 
-                message: 'Name and phone are required.',
+                message: 'Name is required.',
 
             });
         }
 
 
         // =========================================
-        // DETERMINE BRANCH
+        // VALIDATE PHONE
         // =========================================
 
-        let selectedBranch;
+        if (!phone || !String(phone).trim()) {
 
+            return res.status(400).json({
 
-        if (
-            req.admin &&
-            req.admin.role === 'admin'
-        ) {
+                message: 'Phone is required.',
 
-            // Main admin can select branch
-            selectedBranch =
-                gymBranch || 'Kalyanpur';
-
-        } else if (
-            req.admin &&
-            req.admin.gymBranch
-        ) {
-
-            // Receptionist uses assigned branch
-            selectedBranch =
-                req.admin.gymBranch;
-
-        } else {
-
-            // Public website / old requests
-            selectedBranch =
-                gymBranch || 'Kalyanpur';
+            });
         }
 
 
         // =========================================
-        // VALIDATE BRANCH
+        // VALIDATE PUBLIC BRANCH
         // =========================================
 
-        const allowedBranches = [
-            'Kalyanpur',
-            'Gopalpur',
-        ];
+        const selectedBranch =
+            normalizeBranch(gymBranch);
 
 
-        if (!allowedBranches.includes(
+        if (!selectedBranch) {
+
+            return res.status(400).json({
+
+                message: 'A valid gym branch is required.',
+
+            });
+        }
+
+
+        if (!ALLOWED_BRANCHES.includes(
                 selectedBranch
             )) {
 
@@ -116,22 +168,28 @@ const createContact = async(req, res) => {
 
                 gymBranch: selectedBranch,
 
-                name: name.trim(),
+                name: String(name).trim(),
 
-                phone: phone.trim(),
+                phone: String(phone).trim(),
 
                 email: email ?
-                    email.trim().toLowerCase() :
+                    String(email)
+                    .trim()
+                    .toLowerCase() :
                     '',
 
                 message: message ?
-                    message.trim() :
+                    String(message).trim() :
                     '',
 
             });
 
 
-        res.status(201).json({
+        // =========================================
+        // RESPONSE
+        // =========================================
+
+        return res.status(201).json({
 
             message: 'Enquiry submitted successfully.',
 
@@ -146,7 +204,7 @@ const createContact = async(req, res) => {
             error.message
         );
 
-        res.status(500).json({
+        return res.status(500).json({
 
             message: 'Server error. Please try again.',
 
@@ -158,12 +216,39 @@ const createContact = async(req, res) => {
 // =========================================
 // GET ALL CONTACTS / ENQUIRIES
 // =========================================
+// PROTECTED
+//
+// Main admin:
+//   Kalyanpur + Gopalpur
+//
+// Receptionist:
+//   assigned branch only
+// =========================================
 
 const getContacts = async(req, res) => {
+
     try {
 
         const branch =
             getAccessibleBranch(req);
+
+
+        // =========================================
+        // VALIDATE RECEPTIONIST BRANCH
+        // =========================================
+
+        if (
+            req.admin &&
+            req.admin.role === 'receptionist' &&
+            !branch
+        ) {
+
+            return res.status(403).json({
+
+                message: 'Your account is not assigned to a valid gym branch.',
+
+            });
+        }
 
 
         // =========================================
@@ -173,10 +258,21 @@ const getContacts = async(req, res) => {
         const query = {};
 
 
+        // Main admin:
+        // no branch filter
+        //
+        // Receptionist:
+        // assigned branch filter
         if (branch) {
-            query.gymBranch = branch;
+
+            query.gymBranch =
+                branch;
         }
 
+
+        // =========================================
+        // FETCH CONTACTS
+        // =========================================
 
         const contacts =
             await Contact.find(query)
@@ -185,7 +281,7 @@ const getContacts = async(req, res) => {
             });
 
 
-        res.status(200).json({
+        return res.status(200).json({
 
             message: 'Enquiries fetched successfully.',
 
@@ -200,7 +296,7 @@ const getContacts = async(req, res) => {
             error.message
         );
 
-        res.status(500).json({
+        return res.status(500).json({
 
             message: 'Server error. Please try again.',
 
@@ -212,12 +308,39 @@ const getContacts = async(req, res) => {
 // =========================================
 // GET SINGLE CONTACT
 // =========================================
+// PROTECTED
+//
+// Main admin:
+//   Can access either branch.
+//
+// Receptionist:
+//   Can access only their branch.
+// =========================================
 
 const getContactById = async(req, res) => {
+
     try {
 
         const branch =
             getAccessibleBranch(req);
+
+
+        // =========================================
+        // VALIDATE RECEPTIONIST BRANCH
+        // =========================================
+
+        if (
+            req.admin &&
+            req.admin.role === 'receptionist' &&
+            !branch
+        ) {
+
+            return res.status(403).json({
+
+                message: 'Your account is not assigned to a valid gym branch.',
+
+            });
+        }
 
 
         // =========================================
@@ -231,10 +354,21 @@ const getContactById = async(req, res) => {
         };
 
 
+        // Receptionist:
+        // force branch restriction.
+        //
+        // Main admin:
+        // no branch restriction.
         if (branch) {
-            query.gymBranch = branch;
+
+            query.gymBranch =
+                branch;
         }
 
+
+        // =========================================
+        // FIND CONTACT
+        // =========================================
 
         const contact =
             await Contact.findOne(query);
@@ -250,7 +384,7 @@ const getContactById = async(req, res) => {
         }
 
 
-        res.status(200).json({
+        return res.status(200).json({
 
             contact,
 
@@ -263,7 +397,7 @@ const getContactById = async(req, res) => {
             error.message
         );
 
-        res.status(500).json({
+        return res.status(500).json({
 
             message: 'Server error. Please try again.',
 
@@ -275,12 +409,39 @@ const getContactById = async(req, res) => {
 // =========================================
 // DELETE CONTACT / ENQUIRY
 // =========================================
+// PROTECTED
+//
+// Main admin:
+//   Can delete either branch.
+//
+// Receptionist:
+//   Can delete only from assigned branch.
+// =========================================
 
 const deleteContact = async(req, res) => {
+
     try {
 
         const branch =
             getAccessibleBranch(req);
+
+
+        // =========================================
+        // VALIDATE RECEPTIONIST BRANCH
+        // =========================================
+
+        if (
+            req.admin &&
+            req.admin.role === 'receptionist' &&
+            !branch
+        ) {
+
+            return res.status(403).json({
+
+                message: 'Your account is not assigned to a valid gym branch.',
+
+            });
+        }
 
 
         // =========================================
@@ -294,10 +455,21 @@ const deleteContact = async(req, res) => {
         };
 
 
+        // Receptionist:
+        // force assigned branch.
+        //
+        // Main admin:
+        // can access both branches.
         if (branch) {
-            query.gymBranch = branch;
+
+            query.gymBranch =
+                branch;
         }
 
+
+        // =========================================
+        // DELETE CONTACT
+        // =========================================
 
         const contact =
             await Contact.findOneAndDelete(
@@ -315,7 +487,7 @@ const deleteContact = async(req, res) => {
         }
 
 
-        res.status(200).json({
+        return res.status(200).json({
 
             message: 'Enquiry deleted successfully.',
 
@@ -328,7 +500,7 @@ const deleteContact = async(req, res) => {
             error.message
         );
 
-        res.status(500).json({
+        return res.status(500).json({
 
             message: 'Server error. Please try again.',
 

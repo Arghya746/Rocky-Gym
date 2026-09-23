@@ -1,6 +1,7 @@
 import cardioImage from '../assets/Cardio.jpg.jpeg';
 import trainerImage from '../assets/Trainers.jpg.jpeg';
 import strengthImage from '../assets/Strengths.jpg.jpeg';
+
 const features = [
   {
     number: '01',
@@ -34,14 +35,33 @@ const features = [
   },
 ];
 
-export default function HomeIntro() {
+export default function HomeIntro({ branchConfig }) {
+  const branchName =
+    branchConfig?.gym?.branchName ||
+    branchConfig?.name ||
+    'Alpha Gym';
+
+  const displayName =
+    branchConfig?.gym?.displayName ||
+    `Alpha Gym ${branchName}`;
+
+  const description =
+    branchConfig?.gym?.description ||
+    'A place built for people who are ready to challenge themselves, build strength, and transform their lives.';
+
   return (
-    <section id="features" className="section">
+    <section
+      id="features"
+      className="section"
+      data-branch={branchConfig?.id || ''}
+    >
       <div className="container">
 
         {/* ALPHA GYM INTRODUCTION */}
         <div className="section-heading intro-heading">
-          <div className="section-tag">WELCOME TO ALPHA GYM</div>
+          <div className="section-tag">
+            WELCOME TO {displayName.toUpperCase()}
+          </div>
 
           <h2>
             BUILT TO MAKE
@@ -49,8 +69,12 @@ export default function HomeIntro() {
           </h2>
 
           <p>
-            Welcome to Alpha Gym — a place built for people who are ready to
-            challenge themselves, build strength, and transform their lives.
+            Welcome to {displayName} — a place built for people who are ready
+            to challenge themselves, build strength, and transform their lives.
+          </p>
+
+          <p>
+            {description}
           </p>
 
           <p>
@@ -65,7 +89,9 @@ export default function HomeIntro() {
 
         {/* WHY ALPHA GYM */}
         <div className="section-heading why-heading">
-          <div className="section-tag">WHY ALPHA GYM</div>
+          <div className="section-tag">
+            WHY {branchName.toUpperCase()}
+          </div>
 
           <h2>
             MORE THAN
@@ -85,11 +111,13 @@ export default function HomeIntro() {
               key={feature.number}
               className={`feature-card ${feature.className}`}
             >
-              <div className="feature-number">{feature.number}</div>
+              <div className="feature-number">
+                {feature.number}
+              </div>
 
               <img
                 src={feature.image}
-                alt={feature.title}
+                alt={`${feature.title} at ${displayName}`}
                 className="feature-image"
               />
 
@@ -97,7 +125,9 @@ export default function HomeIntro() {
 
               <p>{feature.description}</p>
 
-              <a href={feature.link}>{feature.linkText}</a>
+              <a href={feature.link}>
+                {feature.linkText}
+              </a>
             </article>
           ))}
         </div>

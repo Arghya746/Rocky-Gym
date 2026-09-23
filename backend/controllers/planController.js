@@ -7,31 +7,26 @@ const Plan = require('../models/Plan');
 const VALID_BRANCHES = ['Kalyanpur', 'Gopalpur'];
 
 /**
- * Check whether the logged-in admin is the main admin.
- *
- * IMPORTANT:
- * Only include roles that your authentication system actually uses.
+ * Check whether the logged-in user is the main admin.
  */
 const isMainAdmin = (req) => {
-    return (
-        req.admin &&
-        req.admin.role === 'admin'
-    );
+    return req.admin && req.admin.role === 'admin';
 };
 
 /**
- * Get the branch assigned to the logged-in admin.
+ * Get the branch assigned to the logged-in user.
  *
  * Main admin:
- *   -> returns null because main admin can access both branches.
+ *   -> null because main admin can access both branches.
  *
- * Branch admin/staff:
- *   -> returns their assigned branch.
+ * Receptionist / branch staff:
+ *   -> their assigned branch.
  *
- * Branchless non-main account:
- *   -> returns empty string.
+ * Invalid / missing branch:
+ *   -> empty string.
  *
- * We intentionally DO NOT default to Kalyanpur.
+ * IMPORTANT:
+ * Never default to Kalyanpur.
  */
 const getAccessibleBranch = (req) => {
     if (isMainAdmin(req)) {
@@ -46,12 +41,41 @@ const getAccessibleBranch = (req) => {
 };
 
 /**
- * Validate branch name.
+ * Validate branch.
  */
 const isValidBranch = (branch) => {
     return VALID_BRANCHES.includes(branch);
 };
 
+/**
+ * Escape user input before using it in a RegExp.
+ */
+const escapeRegex = (value) => {
+    return String(value).replace(/[.*+?^${}()|[\]\\]/g, '\\$&');
+};
+
+/**
+ * Validate duration.
+ *
+ * Plans use whole months:
+ * 1, 3, 6, 12, etc.
+ */
+const isValidDuration = (value) => {
+    return (
+        Number.isInteger(value) &&
+        value >= 1
+    );
+};
+
+/**
+ * Validate price.
+ */
+const isValidPrice = (value) => {
+    return (
+        Number.isFinite(value) &&
+        value >= 0
+    );
+};
 
 /* =========================================================
    GET ACTIVE PLANS
@@ -62,29 +86,23 @@ const getPlans = async(req, res) => {
     try {
         const accessibleBranch = getAccessibleBranch(req);
 
-        /*
-         * A non-main admin MUST have an assigned branch.
-         */
+        // Non-main admin must have a branch.
         if (!isMainAdmin(req) && !accessibleBranch) {
             return res.status(403).json({
+                success: false,
                 message: 'Your account is not assigned to a gym branch. Please contact the main administrator.',
             });
         }
 
-        /*
-         * Main admin:
-         *   -> sees active plans from both branches.
-         *
-         * Branch admin:
-         *   -> sees only active plans from assigned branch.
-         */
         const query = {
             isActive: true,
         };
 
+        // Main admin -> both branches.
         if (!isMainAdmin(req)) {
             if (!isValidBranch(accessibleBranch)) {
                 return res.status(403).json({
+                    success: false,
                     message: 'Invalid or unsupported gym branch.',
                 });
             }
@@ -104,7 +122,6 @@ const getPlans = async(req, res) => {
             count: plans.length,
             plans,
         });
-
     } catch (error) {
         console.error('Get plans error:', error);
 
@@ -116,38 +133,32 @@ const getPlans = async(req, res) => {
     }
 };
 
-
 /* =========================================================
    GET ALL PLANS
    GET /api/plans/all
-   Includes inactive plans
+
+   Includes inactive plans.
    ========================================================= */
 
 const getAllPlans = async(req, res) => {
     try {
         const accessibleBranch = getAccessibleBranch(req);
 
-        /*
-         * Branchless non-main accounts cannot access plans.
-         */
         if (!isMainAdmin(req) && !accessibleBranch) {
             return res.status(403).json({
+                success: false,
                 message: 'Your account is not assigned to a gym branch. Please contact the main administrator.',
             });
         }
 
         const query = {};
 
-        /*
-         * Main admin:
-         *   -> all branches.
-         *
-         * Branch admin:
-         *   -> assigned branch only.
-         */
+        // Main admin -> both branches.
+        // Receptionist -> assigned branch only.
         if (!isMainAdmin(req)) {
             if (!isValidBranch(accessibleBranch)) {
                 return res.status(403).json({
+                    success: false,
                     message: 'Invalid or unsupported gym branch.',
                 });
             }
@@ -168,7 +179,6 @@ const getAllPlans = async(req, res) => {
             count: plans.length,
             plans,
         });
-
     } catch (error) {
         console.error('Get all plans error:', error);
 
@@ -180,7 +190,6 @@ const getAllPlans = async(req, res) => {
     }
 };
 
-
 /* =========================================================
    GET PLAN BY ID
    GET /api/plans/:id
@@ -189,14 +198,11 @@ const getAllPlans = async(req, res) => {
 const getPlanById = async(req, res) => {
     try {
         const { id } = req.params;
-
         const accessibleBranch = getAccessibleBranch(req);
 
-        /*
-         * Branchless non-main account cannot access a plan.
-         */
         if (!isMainAdmin(req) && !accessibleBranch) {
             return res.status(403).json({
+                success: false,
                 message: 'Your account is not assigned to a gym branch. Please contact the main administrator.',
             });
         }
@@ -205,14 +211,11 @@ const getPlanById = async(req, res) => {
             _id: id,
         };
 
-        /*
-         * Main admin can access either branch.
-         *
-         * Branch admin can access only their branch.
-         */
+        // Receptionist can only access their branch.
         if (!isMainAdmin(req)) {
             if (!isValidBranch(accessibleBranch)) {
                 return res.status(403).json({
+                    success: false,
                     message: 'Invalid or unsupported gym branch.',
                 });
             }
@@ -233,7 +236,6 @@ const getPlanById = async(req, res) => {
             success: true,
             plan,
         });
-
     } catch (error) {
         console.error('Get plan by ID error:', error);
 
@@ -244,7 +246,6 @@ const getPlanById = async(req, res) => {
         });
     }
 };
-
 
 /* =========================================================
    CREATE PLAN
@@ -265,9 +266,9 @@ const createPlan = async(req, res) => {
         const mainAdmin = isMainAdmin(req);
         const accessibleBranch = getAccessibleBranch(req);
 
-        /* -----------------------------------------------
+        /* --------------------------------------------------
            BASIC VALIDATION
-        ------------------------------------------------ */
+        -------------------------------------------------- */
 
         if (!name || !String(name).trim()) {
             return res.status(400).json({
@@ -298,25 +299,21 @@ const createPlan = async(req, res) => {
             });
         }
 
-        /* -----------------------------------------------
+        /* --------------------------------------------------
            DETERMINE BRANCH
-        ------------------------------------------------ */
+        -------------------------------------------------- */
 
         let selectedBranch;
 
         if (mainAdmin) {
-            /*
-             * Main admin must explicitly choose a branch.
-             *
-             * We no longer silently assign Kalyanpur.
-             */
-            selectedBranch = gymBranch ?
+            // Main admin MUST explicitly choose a branch.
+            selectedBranch =
+                gymBranch !== undefined &&
+                gymBranch !== null ?
                 String(gymBranch).trim() :
                 '';
         } else {
-            /*
-             * Non-main admin can ONLY use their assigned branch.
-             */
+            // Receptionist MUST use assigned branch.
             selectedBranch = accessibleBranch;
         }
 
@@ -334,54 +331,49 @@ const createPlan = async(req, res) => {
             });
         }
 
-        /*
-         * Non-main account must have a valid assigned branch.
-         */
-        if (!mainAdmin && !isValidBranch(accessibleBranch)) {
+        // Extra protection for non-main accounts.
+        if (!mainAdmin &&
+            !isValidBranch(accessibleBranch)
+        ) {
             return res.status(403).json({
                 success: false,
                 message: 'Your account is not assigned to a valid gym branch.',
             });
         }
 
-        /* -----------------------------------------------
+        /* --------------------------------------------------
            NORMALIZE VALUES
-        ------------------------------------------------ */
+        -------------------------------------------------- */
 
         const normalizedName = String(name).trim();
 
         const parsedDuration = Number(durationMonths);
         const parsedPrice = Number(price);
 
-        if (!Number.isFinite(parsedDuration) ||
-            parsedDuration < 1
-        ) {
+        if (!isValidDuration(parsedDuration)) {
             return res.status(400).json({
                 success: false,
-                message: 'Duration must be a valid number greater than or equal to 1.',
+                message: 'Duration must be a whole number greater than or equal to 1.',
             });
         }
 
-        if (!Number.isFinite(parsedPrice) ||
-            parsedPrice < 0
-        ) {
+        if (!isValidPrice(parsedPrice)) {
             return res.status(400).json({
                 success: false,
                 message: 'Price must be a valid number greater than or equal to 0.',
             });
         }
 
-        /* -----------------------------------------------
+        /* --------------------------------------------------
            DUPLICATE ACTIVE PLAN CHECK
-        ------------------------------------------------ */
+        -------------------------------------------------- */
+
+        const escapedName = escapeRegex(normalizedName);
 
         const existingPlan = await Plan.findOne({
             gymBranch: selectedBranch,
             name: {
-                $regex: `^${normalizedName.replace(
-                    /[.*+?^${}()|[\]\\]/g,
-                    '\\$&'
-                )}$`,
+                $regex: `^${escapedName}$`,
                 $options: 'i',
             },
             isActive: true,
@@ -394,16 +386,17 @@ const createPlan = async(req, res) => {
             });
         }
 
-        /* -----------------------------------------------
+        /* --------------------------------------------------
            CREATE PLAN
-        ------------------------------------------------ */
+        -------------------------------------------------- */
 
         const plan = await Plan.create({
             gymBranch: selectedBranch,
             name: normalizedName,
             durationMonths: parsedDuration,
             price: parsedPrice,
-            description: description !== undefined && description !== null ?
+            description: description !== undefined &&
+                description !== null ?
                 String(description).trim() :
                 '',
             isActive: isActive !== undefined ?
@@ -416,7 +409,6 @@ const createPlan = async(req, res) => {
             message: 'Membership plan created successfully.',
             plan,
         });
-
     } catch (error) {
         console.error('Create plan error:', error);
 
@@ -427,7 +419,6 @@ const createPlan = async(req, res) => {
         });
     }
 };
-
 
 /* =========================================================
    UPDATE PLAN
@@ -450,9 +441,10 @@ const updatePlan = async(req, res) => {
         const mainAdmin = isMainAdmin(req);
         const accessibleBranch = getAccessibleBranch(req);
 
-        /*
-         * Branchless non-main account cannot update plans.
-         */
+        /* --------------------------------------------------
+           BRANCH ACCESS VALIDATION
+        -------------------------------------------------- */
+
         if (!mainAdmin && !accessibleBranch) {
             return res.status(403).json({
                 success: false,
@@ -460,19 +452,14 @@ const updatePlan = async(req, res) => {
             });
         }
 
-        /* -----------------------------------------------
+        /* --------------------------------------------------
            FIND PLAN
-        ------------------------------------------------ */
+        -------------------------------------------------- */
 
         const query = {
             _id: id,
         };
 
-        /*
-         * Main admin can update either branch.
-         *
-         * Branch admin can update only their own branch.
-         */
         if (!mainAdmin) {
             if (!isValidBranch(accessibleBranch)) {
                 return res.status(403).json({
@@ -493,18 +480,14 @@ const updatePlan = async(req, res) => {
             });
         }
 
-        /* -----------------------------------------------
+        /* --------------------------------------------------
            DETERMINE FINAL BRANCH
-        ------------------------------------------------ */
+        -------------------------------------------------- */
 
         let finalBranch;
 
         if (mainAdmin) {
-            /*
-             * Main admin can change branch.
-             *
-             * If no branch was supplied, keep existing branch.
-             */
+            // Main admin may move a plan between branches.
             finalBranch =
                 gymBranch !== undefined &&
                 gymBranch !== null &&
@@ -512,9 +495,7 @@ const updatePlan = async(req, res) => {
                 String(gymBranch).trim() :
                 plan.gymBranch;
         } else {
-            /*
-             * Branch admin CANNOT move a plan to another branch.
-             */
+            // Receptionist cannot move plans.
             finalBranch = accessibleBranch;
         }
 
@@ -525,9 +506,9 @@ const updatePlan = async(req, res) => {
             });
         }
 
-        /* -----------------------------------------------
+        /* --------------------------------------------------
            DETERMINE FINAL VALUES
-        ------------------------------------------------ */
+        -------------------------------------------------- */
 
         const finalName =
             name !== undefined ?
@@ -559,9 +540,9 @@ const updatePlan = async(req, res) => {
             Boolean(isActive) :
             plan.isActive;
 
-        /* -----------------------------------------------
+        /* --------------------------------------------------
            VALIDATE FINAL VALUES
-        ------------------------------------------------ */
+        -------------------------------------------------- */
 
         if (!finalName) {
             return res.status(400).json({
@@ -570,53 +551,36 @@ const updatePlan = async(req, res) => {
             });
         }
 
-        if (!Number.isFinite(finalDuration) ||
-            finalDuration < 1
-        ) {
+        if (!isValidDuration(finalDuration)) {
             return res.status(400).json({
                 success: false,
-                message: 'Duration must be a valid number greater than or equal to 1.',
+                message: 'Duration must be a whole number greater than or equal to 1.',
             });
         }
 
-        if (!Number.isFinite(finalPrice) ||
-            finalPrice < 0
-        ) {
+        if (!isValidPrice(finalPrice)) {
             return res.status(400).json({
                 success: false,
                 message: 'Price must be a valid number greater than or equal to 0.',
             });
         }
 
-        /* -----------------------------------------------
+        /* --------------------------------------------------
            DUPLICATE ACTIVE PLAN CHECK
-        ------------------------------------------------ */
+        -------------------------------------------------- */
 
-        /*
-         * Only active plans need duplicate protection.
-         *
-         * This allows an inactive old plan to remain in the
-         * database while a new active plan with the same name
-         * is created.
-         */
         if (finalIsActive) {
-            const escapedName = finalName.replace(
-                /[.*+?^${}()|[\]\\]/g,
-                '\\$&'
-            );
+            const escapedName = escapeRegex(finalName);
 
             const duplicatePlan = await Plan.findOne({
                 _id: {
                     $ne: plan._id,
                 },
-
                 gymBranch: finalBranch,
-
                 name: {
                     $regex: `^${escapedName}$`,
                     $options: 'i',
                 },
-
                 isActive: true,
             });
 
@@ -628,9 +592,9 @@ const updatePlan = async(req, res) => {
             }
         }
 
-        /* -----------------------------------------------
+        /* --------------------------------------------------
            UPDATE PLAN
-        ------------------------------------------------ */
+        -------------------------------------------------- */
 
         plan.gymBranch = finalBranch;
         plan.name = finalName;
@@ -646,7 +610,6 @@ const updatePlan = async(req, res) => {
             message: 'Membership plan updated successfully.',
             plan,
         });
-
     } catch (error) {
         console.error('Update plan error:', error);
 
@@ -658,10 +621,12 @@ const updatePlan = async(req, res) => {
     }
 };
 
-
 /* =========================================================
    DELETE PLAN
    DELETE /api/plans/:id
+
+   Soft delete:
+   isActive = false
    ========================================================= */
 
 const deletePlan = async(req, res) => {
@@ -671,9 +636,10 @@ const deletePlan = async(req, res) => {
         const mainAdmin = isMainAdmin(req);
         const accessibleBranch = getAccessibleBranch(req);
 
-        /*
-         * Branchless non-main account cannot delete plans.
-         */
+        /* --------------------------------------------------
+           BRANCH ACCESS VALIDATION
+        -------------------------------------------------- */
+
         if (!mainAdmin && !accessibleBranch) {
             return res.status(403).json({
                 success: false,
@@ -681,21 +647,14 @@ const deletePlan = async(req, res) => {
             });
         }
 
-        /* -----------------------------------------------
+        /* --------------------------------------------------
            FIND PLAN
-        ------------------------------------------------ */
+        -------------------------------------------------- */
 
         const query = {
             _id: id,
         };
 
-        /*
-         * Main admin:
-         *   -> can delete/deactivate from either branch.
-         *
-         * Branch admin:
-         *   -> only their assigned branch.
-         */
         if (!mainAdmin) {
             if (!isValidBranch(accessibleBranch)) {
                 return res.status(403).json({
@@ -716,9 +675,9 @@ const deletePlan = async(req, res) => {
             });
         }
 
-        /* -----------------------------------------------
+        /* --------------------------------------------------
            SOFT DELETE
-        ------------------------------------------------ */
+        -------------------------------------------------- */
 
         plan.isActive = false;
 
@@ -729,7 +688,6 @@ const deletePlan = async(req, res) => {
             message: 'Membership plan deactivated successfully.',
             plan,
         });
-
     } catch (error) {
         console.error('Delete plan error:', error);
 
@@ -740,7 +698,6 @@ const deletePlan = async(req, res) => {
         });
     }
 };
-
 
 /* =========================================================
    EXPORT CONTROLLERS

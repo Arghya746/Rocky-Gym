@@ -10,59 +10,112 @@ const {
 
 const {
     protect,
+    authorizeBranch,
     requirePermission,
 } = require('../middleware/authMiddleware');
 
 const router = express.Router();
 
+/* =========================================================
+   PAYMENTS
+   ========================================================= */
 
-// =====================================
-// PAYMENTS
-// =====================================
+/* =========================================================
+   VIEW ALL PAYMENTS
+   GET /api/payments
 
-// View all payments
+   Main Admin:
+   - Both branches
+
+   Receptionist:
+   - Assigned branch only
+
+   Permission:
+   - payments.view
+   ========================================================= */
+
 router.get(
     '/',
     protect,
+    authorizeBranch,
     requirePermission('payments.view'),
     getPayments
 );
 
 
-// Add payment
+/* =========================================================
+   ADD PAYMENT
+   POST /api/payments
+
+   Main Admin:
+   - Must provide valid gymBranch
+
+   Receptionist:
+   - Uses assigned branch
+
+   Permission:
+   - payments.add
+   ========================================================= */
+
 router.post(
     '/',
     protect,
+    authorizeBranch,
     requirePermission('payments.add'),
     addPayment
 );
 
 
-// View single payment
+/* =========================================================
+   VIEW SINGLE PAYMENT
+   GET /api/payments/:id
+   ========================================================= */
+
 router.get(
     '/:id',
     protect,
+    authorizeBranch,
     requirePermission('payments.view'),
     getPaymentById
 );
 
 
-// Edit payment
+/* =========================================================
+   EDIT PAYMENT
+   PUT /api/payments/:id
+
+   Permission:
+   - payments.edit
+   ========================================================= */
+
 router.put(
     '/:id',
     protect,
+    authorizeBranch,
     requirePermission('payments.edit'),
     updatePayment
 );
 
 
-// Delete payment
+/* =========================================================
+   DELETE PAYMENT
+   DELETE /api/payments/:id
+
+   Permission:
+   - payments.delete
+   ========================================================= */
+
 router.delete(
     '/:id',
     protect,
+    authorizeBranch,
     requirePermission('payments.delete'),
     deletePayment
 );
 
+
+/* =========================================================
+   EXPORT ROUTER
+   ========================================================= */
 
 module.exports = router;

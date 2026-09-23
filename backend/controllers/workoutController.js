@@ -3,23 +3,122 @@ const Member = require('../models/Member');
 
 
 // =========================================
+// ALLOWED BRANCHES
+// =========================================
+
+const ALLOWED_BRANCHES = [
+    'Kalyanpur',
+    'Gopalpur',
+];
+
+
+// =========================================
+// NORMALIZE BRANCH
+// =========================================
+
+const normalizeBranch = (value) => {
+
+    if (!value) {
+        return null;
+    }
+
+    const normalized =
+        String(value)
+        .trim()
+        .toLowerCase();
+
+    if (normalized === 'kalyanpur') {
+        return 'Kalyanpur';
+    }
+
+    if (normalized === 'gopalpur') {
+        return 'Gopalpur';
+    }
+
+    return null;
+};
+
+
+// =========================================
 // GET ACCESSIBLE BRANCH
+// =========================================
+// Main admin:
+//   null = access to both branches
+//
+// Receptionist:
+//   assigned branch only
 // =========================================
 
 const getAccessibleBranch = (req) => {
 
     // Main admin can manage both branches
-    if (req.admin && req.admin.role === 'admin') {
+    if (
+        req.admin &&
+        req.admin.role === 'admin'
+    ) {
         return null;
     }
 
-    // Receptionist is restricted to assigned branch
-    if (req.admin && req.admin.gymBranch) {
-        return req.admin.gymBranch;
+    // Receptionist can access only
+    // their assigned branch
+    if (
+        req.admin &&
+        req.admin.role === 'receptionist'
+    ) {
+
+        return normalizeBranch(
+            req.admin.gymBranch
+        );
     }
 
-    // Fallback for old accounts
-    return 'Kalyanpur';
+    return null;
+};
+
+
+// =========================================
+// GET WRITE BRANCH
+// =========================================
+// Main admin:
+//   Must provide a valid branch.
+//
+// Receptionist:
+//   Always uses assigned branch.
+//   Cannot override it.
+// =========================================
+
+const getWriteBranch = (req, requestedBranch) => {
+
+    // =========================================
+    // MAIN ADMIN
+    // =========================================
+
+    if (
+        req.admin &&
+        req.admin.role === 'admin'
+    ) {
+
+        return normalizeBranch(
+            requestedBranch
+        );
+    }
+
+
+    // =========================================
+    // RECEPTIONIST
+    // =========================================
+
+    if (
+        req.admin &&
+        req.admin.role === 'receptionist'
+    ) {
+
+        return normalizeBranch(
+            req.admin.gymBranch
+        );
+    }
+
+
+    return null;
 };
 
 
@@ -28,6 +127,7 @@ const getAccessibleBranch = (req) => {
 // =========================================
 
 const addWorkout = async(req, res) => {
+
     try {
 
         const {
@@ -49,6 +149,7 @@ const addWorkout = async(req, res) => {
 
         if (!member ||
             !workoutName ||
+            !String(workoutName).trim() ||
             !workoutType
         ) {
 
@@ -64,39 +165,40 @@ const addWorkout = async(req, res) => {
         // DETERMINE BRANCH
         // =========================================
 
-        let selectedBranch;
-
-
-        if (
-            req.admin &&
-            req.admin.role === 'admin'
-        ) {
-
-            // Main admin can select branch
-            selectedBranch =
-                gymBranch || 'Kalyanpur';
-
-        } else {
-
-            // Receptionist uses assigned branch
-            selectedBranch =
-                (req.admin && req.admin.gymBranch) ?
-                req.admin.gymBranch :
-                'Kalyanpur';
-        }
+        const selectedBranch =
+            getWriteBranch(
+                req,
+                gymBranch
+            );
 
 
         // =========================================
         // VALIDATE BRANCH
         // =========================================
 
-        const allowedBranches = [
-            'Kalyanpur',
-            'Gopalpur',
-        ];
+        if (!selectedBranch) {
+
+            if (
+                req.admin &&
+                req.admin.role === 'receptionist'
+            ) {
+
+                return res.status(403).json({
+
+                    message: 'Your account is not assigned to a valid gym branch.',
+
+                });
+            }
+
+            return res.status(400).json({
+
+                message: 'A valid gym branch is required.',
+
+            });
+        }
 
 
-        if (!allowedBranches.includes(
+        if (!ALLOWED_BRANCHES.includes(
                 selectedBranch
             )) {
 
@@ -109,7 +211,7 @@ const addWorkout = async(req, res) => {
 
 
         // =========================================
-        // VERIFY MEMBER
+        // VERIFY MEMBER BELONGS TO SAME BRANCH
         // =========================================
 
         const existingMember =
@@ -143,7 +245,7 @@ const addWorkout = async(req, res) => {
 
                 member,
 
-                workoutName: workoutName.trim(),
+                workoutName: String(workoutName).trim(),
 
                 workoutType,
 
@@ -171,11 +273,11 @@ const addWorkout = async(req, res) => {
                 workout._id
             ).populate(
                 'member',
-                'name phone email'
+                'name phone email gymBranch'
             );
 
 
-        res.status(201).json({
+        return res.status(201).json({
 
             message: 'Workout added successfully.',
 
@@ -190,7 +292,7 @@ const addWorkout = async(req, res) => {
             error.message
         );
 
-        res.status(500).json({
+        return res.status(500).json({
 
             message: 'Server error. Please try again.',
 
@@ -204,6 +306,7 @@ const addWorkout = async(req, res) => {
 // =========================================
 
 const getWorkouts = async(req, res) => {
+
     try {
 
         const branch =
@@ -211,31 +314,51 @@ const getWorkouts = async(req, res) => {
 
 
         // =========================================
-        // BUILD QUERY
+        // VALIDATE RECEPTIONIST BRANCH
         // =========================================
 
-        const query = {};
+        if (
+            req.admin &&
+            req.admin.role === 'receptionist' &&
+            !branch
+        ) {
 
+            return res.status(403).json({
 
-        if (branch) {
-            query.gymBranch = branch;
+                message: 'Your account is not assigned to a valid gym branch.',
+
+            });
         }
 
 
+        // =========================================
+        // BUILD QUERY
+        // =========================================
+
+        const query =
+            branch ?
+            {
+                gymBranch: branch,
+            } :
+            {};
+
+
+        // =========================================
+        // FETCH WORKOUTS
+        // =========================================
+
         const workouts =
             await Workout.find(query)
-
-        .populate(
-            'member',
-            'name phone email'
-        )
-
-        .sort({
-            createdAt: -1,
-        });
+            .populate(
+                'member',
+                'name phone email gymBranch'
+            )
+            .sort({
+                createdAt: -1,
+            });
 
 
-        res.status(200).json({
+        return res.status(200).json({
 
             message: 'Workouts fetched successfully.',
 
@@ -250,7 +373,7 @@ const getWorkouts = async(req, res) => {
             error.message
         );
 
-        res.status(500).json({
+        return res.status(500).json({
 
             message: 'Server error. Please try again.',
 
@@ -264,10 +387,29 @@ const getWorkouts = async(req, res) => {
 // =========================================
 
 const getWorkoutById = async(req, res) => {
+
     try {
 
         const branch =
             getAccessibleBranch(req);
+
+
+        // =========================================
+        // VALIDATE RECEPTIONIST BRANCH
+        // =========================================
+
+        if (
+            req.admin &&
+            req.admin.role === 'receptionist' &&
+            !branch
+        ) {
+
+            return res.status(403).json({
+
+                message: 'Your account is not assigned to a valid gym branch.',
+
+            });
+        }
 
 
         // =========================================
@@ -281,18 +423,25 @@ const getWorkoutById = async(req, res) => {
         };
 
 
+        // Receptionist:
+        // assigned branch only.
         if (branch) {
-            query.gymBranch = branch;
+
+            query.gymBranch =
+                branch;
         }
 
 
+        // =========================================
+        // FIND WORKOUT
+        // =========================================
+
         const workout =
             await Workout.findOne(query)
-
-        .populate(
-            'member',
-            'name phone email'
-        );
+            .populate(
+                'member',
+                'name phone email gymBranch'
+            );
 
 
         if (!workout) {
@@ -305,7 +454,7 @@ const getWorkoutById = async(req, res) => {
         }
 
 
-        res.status(200).json({
+        return res.status(200).json({
 
             workout,
 
@@ -318,7 +467,7 @@ const getWorkoutById = async(req, res) => {
             error.message
         );
 
-        res.status(500).json({
+        return res.status(500).json({
 
             message: 'Server error. Please try again.',
 
@@ -332,10 +481,29 @@ const getWorkoutById = async(req, res) => {
 // =========================================
 
 const updateWorkout = async(req, res) => {
+
     try {
 
         const branch =
             getAccessibleBranch(req);
+
+
+        // =========================================
+        // VALIDATE RECEPTIONIST BRANCH
+        // =========================================
+
+        if (
+            req.admin &&
+            req.admin.role === 'receptionist' &&
+            !branch
+        ) {
+
+            return res.status(403).json({
+
+                message: 'Your account is not assigned to a valid gym branch.',
+
+            });
+        }
 
 
         // =========================================
@@ -350,7 +518,9 @@ const updateWorkout = async(req, res) => {
 
 
         if (branch) {
-            query.gymBranch = branch;
+
+            query.gymBranch =
+                branch;
         }
 
 
@@ -390,17 +560,29 @@ const updateWorkout = async(req, res) => {
 
         if (branch) {
 
-            // Receptionist cannot change branch
+            // Receptionist cannot change branch.
             finalBranch =
                 branch;
 
         } else {
 
-            // Main admin can change branch
+            // Main admin can keep the existing
+            // branch or explicitly change it.
             finalBranch =
-                gymBranch ||
-                workout.gymBranch ||
-                'Kalyanpur';
+                normalizeBranch(
+                    gymBranch ||
+                    workout.gymBranch
+                );
+
+
+            if (!finalBranch) {
+
+                return res.status(400).json({
+
+                    message: 'A valid gym branch is required.',
+
+                });
+            }
         }
 
 
@@ -408,13 +590,7 @@ const updateWorkout = async(req, res) => {
         // VALIDATE BRANCH
         // =========================================
 
-        const allowedBranches = [
-            'Kalyanpur',
-            'Gopalpur',
-        ];
-
-
-        if (!allowedBranches.includes(
+        if (!ALLOWED_BRANCHES.includes(
                 finalBranch
             )) {
 
@@ -431,6 +607,16 @@ const updateWorkout = async(req, res) => {
         // =========================================
 
         if (member !== undefined) {
+
+            if (!member) {
+
+                return res.status(400).json({
+
+                    message: 'Member is required.',
+
+                });
+            }
+
 
             const existingMember =
                 await Member.findOne({
@@ -465,8 +651,17 @@ const updateWorkout = async(req, res) => {
             workoutName !== undefined
         ) {
 
+            if (!String(workoutName).trim()) {
+
+                return res.status(400).json({
+
+                    message: 'Workout name cannot be empty.',
+
+                });
+            }
+
             workout.workoutName =
-                workoutName.trim();
+                String(workoutName).trim();
         }
 
 
@@ -570,11 +765,11 @@ const updateWorkout = async(req, res) => {
                 workout._id
             ).populate(
                 'member',
-                'name phone email'
+                'name phone email gymBranch'
             );
 
 
-        res.status(200).json({
+        return res.status(200).json({
 
             message: 'Workout updated successfully.',
 
@@ -589,7 +784,7 @@ const updateWorkout = async(req, res) => {
             error.message
         );
 
-        res.status(500).json({
+        return res.status(500).json({
 
             message: 'Server error. Please try again.',
 
@@ -603,10 +798,29 @@ const updateWorkout = async(req, res) => {
 // =========================================
 
 const deleteWorkout = async(req, res) => {
+
     try {
 
         const branch =
             getAccessibleBranch(req);
+
+
+        // =========================================
+        // VALIDATE RECEPTIONIST BRANCH
+        // =========================================
+
+        if (
+            req.admin &&
+            req.admin.role === 'receptionist' &&
+            !branch
+        ) {
+
+            return res.status(403).json({
+
+                message: 'Your account is not assigned to a valid gym branch.',
+
+            });
+        }
 
 
         // =========================================
@@ -620,10 +834,18 @@ const deleteWorkout = async(req, res) => {
         };
 
 
+        // Receptionist can delete only
+        // workouts belonging to assigned branch.
         if (branch) {
-            query.gymBranch = branch;
+
+            query.gymBranch =
+                branch;
         }
 
+
+        // =========================================
+        // DELETE WORKOUT
+        // =========================================
 
         const workout =
             await Workout.findOneAndDelete(
@@ -641,7 +863,7 @@ const deleteWorkout = async(req, res) => {
         }
 
 
-        res.status(200).json({
+        return res.status(200).json({
 
             message: 'Workout deleted successfully.',
 
@@ -654,7 +876,7 @@ const deleteWorkout = async(req, res) => {
             error.message
         );
 
-        res.status(500).json({
+        return res.status(500).json({
 
             message: 'Server error. Please try again.',
 

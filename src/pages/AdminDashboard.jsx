@@ -15,6 +15,8 @@ const DEFAULT_PERMISSIONS = {
   attendance: { view: true, add: true, edit: true, delete: false },
   workouts: { view: true, add: true, edit: true, delete: false },
   enquiries: { view: true, delete: false },
+  plans: { view: true, add: false, edit: false, delete: false },
+  offers: { view: true, add: false, edit: false, delete: false },
 };
 
 const normalizeBranch = (value) => {
@@ -25,7 +27,7 @@ const normalizeBranch = (value) => {
   if (normalized === 'kalyanpur') return 'Kalyanpur';
   if (normalized === 'gopalpur') return 'Gopalpur';
 
-  return String(value).trim();
+  return '';
 };
 
 const getBranchLabel = (value) => {
@@ -110,17 +112,19 @@ export default function AdminDashboard() {
   // Use the stored user first, then fall back to the JWT.
   // This prevents a receptionist from being incorrectly treated
   // as the main admin when adminUser was not stored in localStorage.
+  // The JWT is the authoritative source for role/branch.
+  // localStorage is only a compatibility fallback for older login responses.
   const userRole =
+    tokenPayload?.role ||
     loggedInUser?.role ||
     loggedInUser?.userRole ||
-    tokenPayload?.role ||
     null;
 
   const userBranchId = normalizeBranch(
+    tokenPayload?.gymBranch ||
     loggedInUser?.gymBranch ||
     loggedInUser?.branchName ||
     loggedInUser?.branch ||
-    tokenPayload?.gymBranch ||
     null
   );
 
@@ -156,10 +160,8 @@ export default function AdminDashboard() {
   const [branchError, setBranchError] =
     useState('');
 
-  // Branch filtering is enforced by the backend for receptionists.
-  // Main admin receives both branches and can switch the visible branch.
-  const getBranchQuery = () => '';
-
+  // Branch authorization is enforced by the backend.
+  // This helper only controls what the dashboard displays.
   const filterBySelectedBranch = (items) => {
     if (!Array.isArray(items)) {
       return [];
@@ -238,7 +240,7 @@ export default function AdminDashboard() {
     description: '',
     gymBranch: isMainAdmin && selectedBranchId !== 'all'
       ? selectedBranchId
-      : userBranchId || 'Kalyanpur',
+      : userBranchId || '',
     isActive: true,
   });
 
@@ -498,6 +500,18 @@ export default function AdminDashboard() {
       view: staffMember?.permissions?.enquiries?.view ?? true,
       delete: staffMember?.permissions?.enquiries?.delete ?? false,
     },
+    plans: {
+      view: staffMember?.permissions?.plans?.view ?? true,
+      add: staffMember?.permissions?.plans?.add ?? false,
+      edit: staffMember?.permissions?.plans?.edit ?? false,
+      delete: staffMember?.permissions?.plans?.delete ?? false,
+    },
+    offers: {
+      view: staffMember?.permissions?.offers?.view ?? true,
+      add: staffMember?.permissions?.offers?.add ?? false,
+      edit: staffMember?.permissions?.offers?.edit ?? false,
+      delete: staffMember?.permissions?.offers?.delete ?? false,
+    },
   });
 
   const fetchStaff = async () => {
@@ -549,10 +563,17 @@ export default function AdminDashboard() {
               )
             : null;
 
-          return currentStaff || staffList[0];
+          const nextStaff = currentStaff || staffList[0];
+
+          setPermissions(
+            normalizeStaffPermissions(nextStaff)
+          );
+
+          return nextStaff;
         });
       } else {
         setSelectedStaff(null);
+        setPermissions(DEFAULT_PERMISSIONS);
       }
 
     } catch (error) {
@@ -1332,7 +1353,7 @@ const handleOfferChange = (e) => {
       branchOverride ||
       (isMainAdmin && selectedBranchId !== 'all'
         ? selectedBranchId
-        : userBranchId || 'Kalyanpur');
+        : userBranchId || '');
 
     setPlanForm({
       name: '',
@@ -1682,8 +1703,21 @@ const handleOfferChange = (e) => {
 
       // Plan names can differ only by case/whitespace in MongoDB.
       // Normalize them before deciding that a required plan is missing.
+      const activeBranch = normalizeBranch(
+        isMainAdmin ? selectedBranchId : userBranchId
+      );
+
+      if (!activeBranch) {
+        throw new Error(
+          'Select Kalyanpur or Gopalpur before creating default offers.'
+        );
+      }
+
+      // Never mix plans from different branches.
       const activePlans = plans.filter(
-        (plan) => plan?.isActive !== false
+        (plan) =>
+          plan?.isActive !== false &&
+          normalizeBranch(plan?.gymBranch) === activeBranch
       );
 
       const monthlyPlan = activePlans.find(
@@ -1704,9 +1738,7 @@ const handleOfferChange = (e) => {
           .filter(Boolean);
 
         const branchLabel =
-          isMainAdmin && selectedBranchId !== 'all'
-            ? selectedBranchId
-            : userBranchId || 'current branch';
+          activeBranch;
 
         throw new Error(
           `Monthly and Quarterly plans are required for ${branchLabel}. ` +
@@ -3040,7 +3072,7 @@ const handleAttendanceChange = (e) => {
       gymBranch:
         isMainAdmin && selectedBranchId !== 'all'
           ? selectedBranchId
-          : userBranchId || current.gymBranch || 'Kalyanpur',
+          : userBranchId || current.gymBranch || '',
     }));
 
     fetchContacts();
@@ -4939,7 +4971,7 @@ const handleAttendanceChange = (e) => {
 
                 <strong>
                   {permissionCount}
-                  <small>/18</small>
+                  <small>/26</small>
                 </strong>
               </div>
 
@@ -5065,6 +5097,34 @@ const handleAttendanceChange = (e) => {
                   'Member enquiries',
                 permissions: [
                   'view',
+                  'delete',
+                ],
+              },
+
+              {
+                key: 'plans',
+                label: 'PLANS',
+                icon: '📋',
+                description:
+                  'Membership plans',
+                permissions: [
+                  'view',
+                  'add',
+                  'edit',
+                  'delete',
+                ],
+              },
+
+              {
+                key: 'offers',
+                label: 'OFFERS',
+                icon: '🎯',
+                description:
+                  'Promotional offers',
+                permissions: [
+                  'view',
+                  'add',
+                  'edit',
                   'delete',
                 ],
               },

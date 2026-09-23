@@ -43,14 +43,29 @@ const services = [
   },
 ];
 
-export default function ServicesSection() {
+export default function ServicesSection({ branchConfig }) {
+  const branchName =
+    branchConfig?.gym?.branchName ||
+    branchConfig?.name ||
+    'Alpha Gym';
+
+  const displayName =
+    branchConfig?.gym?.displayName ||
+    `Alpha Gym ${branchName}`;
+
   return (
-    <section id="services" className="section services-section">
+    <section
+      id="services"
+      className="section services-section"
+      data-branch={branchConfig?.id || ''}
+    >
       <div className="container">
 
         {/* SECTION HEADING */}
         <div className="section-heading services-heading">
-          <div className="section-tag">WHAT WE OFFER</div>
+          <div className="section-tag">
+            WHAT WE OFFER AT {branchName.toUpperCase()}
+          </div>
 
           <h2>
             TRAIN
@@ -59,8 +74,8 @@ export default function ServicesSection() {
 
           <p>
             Whether your goal is to build strength, improve endurance or get
-            expert guidance, Alpha Gym gives you the environment and support
-            to keep progressing.
+            expert guidance, {displayName} gives you the environment and
+            support to keep progressing.
           </p>
         </div>
 
@@ -72,7 +87,10 @@ export default function ServicesSection() {
               className={`service-card ${service.className}`}
             >
               <div className="service-top">
-                <span className="service-number">{service.number}</span>
+                <span className="service-number">
+                  {service.number}
+                </span>
+
                 <span className="service-line" />
               </div>
 
@@ -94,7 +112,10 @@ export default function ServicesSection() {
                   ))}
                 </ul>
 
-                <a href="#contact" className="service-link">
+                <a
+                  href="#contact"
+                  className="service-link"
+                >
                   GET STARTED <span>→</span>
                 </a>
               </div>
@@ -105,7 +126,9 @@ export default function ServicesSection() {
         {/* BOTTOM CTA */}
         <div className="services-cta">
           <div>
-            <span className="services-cta-label">READY TO START?</span>
+            <span className="services-cta-label">
+              READY TO START?
+            </span>
 
             <h3>
               YOUR
@@ -115,8 +138,11 @@ export default function ServicesSection() {
             </h3>
           </div>
 
-          <a href="#contact" className="services-cta-button">
-            CONTACT ALPHA GYM <span>→</span>
+          <a
+            href="#contact"
+            className="services-cta-button"
+          >
+            CONTACT {branchName.toUpperCase()} <span>→</span>
           </a>
         </div>
 

@@ -1,4 +1,4 @@
-const galleryItems = [
+const defaultGalleryItems = [
   {
     title: 'TRAINING AREA',
     category: 'GYM FLOOR',
@@ -31,14 +31,35 @@ const galleryItems = [
   },
 ];
 
-export default function GallerySection() {
+export default function GallerySection({ branchConfig }) {
+  const branchName =
+    branchConfig?.gym?.branchName ||
+    branchConfig?.name ||
+    'Alpha Gym';
+
+  const displayName =
+    branchConfig?.gym?.displayName ||
+    `Alpha Gym ${branchName}`;
+
+  const galleryItems =
+    Array.isArray(branchConfig?.gallery) &&
+    branchConfig.gallery.length > 0
+      ? branchConfig.gallery
+      : defaultGalleryItems;
+
   return (
-    <section id="gallery" className="section gallery-section">
+    <section
+      id="gallery"
+      className="section gallery-section"
+      data-branch={branchConfig?.id || ''}
+    >
       <div className="container">
 
         {/* SECTION HEADING */}
         <div className="section-heading gallery-heading">
-          <div className="section-tag">ALPHA GYM GALLERY</div>
+          <div className="section-tag">
+            {displayName.toUpperCase()} GALLERY
+          </div>
 
           <h2>
             SEE THE
@@ -47,7 +68,7 @@ export default function GallerySection() {
 
           <p>
             Take a look at the training environment, equipment and spaces
-            where Alpha members work hard and make progress every day.
+            where {branchName} members work hard and make progress every day.
           </p>
         </div>
 
@@ -55,20 +76,35 @@ export default function GallerySection() {
         <div className="gallery-grid">
           {galleryItems.map((item, index) => (
             <div
-              key={index}
-              className={`gallery-item ${item.className}`}
+              key={item.id || `${item.title}-${index}`}
+              className={`gallery-item ${item.className || ''}`}
             >
-              {/* Temporary visual area */}
-              <div className="gallery-placeholder">
-                <span className="gallery-number">
-                  0{index + 1}
-                </span>
+              {item.image ? (
+                <img
+                  src={item.image}
+                  alt={`${item.title} at ${displayName}`}
+                  className="gallery-image"
+                />
+              ) : (
+                <div className="gallery-placeholder">
+                  <span className="gallery-number">
+                    {String(index + 1).padStart(2, '0')}
+                  </span>
 
+                  <div className="gallery-overlay">
+                    <span>{item.category}</span>
+                    <h3>{item.title}</h3>
+                  </div>
+                </div>
+              )}
+
+              {/* Overlay for actual images */}
+              {item.image && (
                 <div className="gallery-overlay">
                   <span>{item.category}</span>
                   <h3>{item.title}</h3>
                 </div>
-              </div>
+              )}
             </div>
           ))}
         </div>

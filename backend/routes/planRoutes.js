@@ -3,6 +3,10 @@ const express = require('express');
 const router = express.Router();
 
 const protect = require('../middleware/authMiddleware');
+const {
+    authorizeBranch,
+    requirePermission,
+} = require('../middleware/authMiddleware');
 
 const {
     getPlans,
@@ -16,11 +20,17 @@ const {
 /* =========================================================
    ACTIVE PLANS
    GET /api/plans
+
+   - Main admin: both branches
+   - Receptionist: assigned branch only
+   - Requires plans.view
    ========================================================= */
 
 router.get(
     '/',
     protect,
+    authorizeBranch,
+    requirePermission('plans.view'),
     getPlans
 );
 
@@ -34,6 +44,8 @@ router.get(
 router.get(
     '/all',
     protect,
+    authorizeBranch,
+    requirePermission('plans.view'),
     getAllPlans
 );
 
@@ -45,17 +57,28 @@ router.get(
 router.get(
     '/:id',
     protect,
+    authorizeBranch,
+    requirePermission('plans.view'),
     getPlanById
 );
 
 /* =========================================================
    CREATE PLAN
    POST /api/plans
+
+   Main admin:
+     - Must provide a valid gymBranch
+
+   Receptionist:
+     - Uses their assigned branch
+     - Cannot create for another branch
    ========================================================= */
 
 router.post(
     '/',
     protect,
+    authorizeBranch,
+    requirePermission('plans.add'),
     createPlan
 );
 
@@ -67,6 +90,8 @@ router.post(
 router.put(
     '/:id',
     protect,
+    authorizeBranch,
+    requirePermission('plans.edit'),
     updatePlan
 );
 
@@ -74,12 +99,14 @@ router.put(
    DELETE / DEACTIVATE PLAN
    DELETE /api/plans/:id
 
-   Uses soft delete through the controller.
+   Controller performs soft delete.
    ========================================================= */
 
 router.delete(
     '/:id',
     protect,
+    authorizeBranch,
+    requirePermission('plans.delete'),
     deletePlan
 );
 

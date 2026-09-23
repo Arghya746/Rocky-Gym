@@ -1,4 +1,5 @@
 import { useEffect, useState } from 'react';
+
 import {
   BrowserRouter,
   Navigate,
@@ -8,6 +9,14 @@ import {
 } from 'react-router-dom';
 
 import './App.css';
+
+/* =========================================================
+   TRAINER ASSETS
+   ========================================================= */
+
+import akramTrainerImage from './assets/Akram trainer.jpeg';
+import gopalpurTrainerImage from './assets/Gopalpur trainer.jpeg';
+import nikitaTrainerImage from './assets/Nikita Trainer.jpeg';
 
 /* =========================================================
    PUBLIC COMPONENTS
@@ -32,7 +41,7 @@ import TimingsSection from './components/TimingsSection';
 import TrainersSection from './components/TrainersSection';
 
 /* =========================================================
-   ADMIN / AUTH COMPONENTS
+   ADMIN / AUTH
    ========================================================= */
 
 import ProtectedRoute from './components/ProtectedRoute';
@@ -42,39 +51,42 @@ import AdminLogin from './pages/AdminLogin';
 import MemberDetails from './pages/MemberDetails';
 import PaymentReceipt from './pages/PaymentReceipt';
 
-
 /* =========================================================
-   BRANCH CONFIGURATION
-   =========================================================
-   
-   Keep all branch-specific information here.
+   SHARED BRANCH CONFIGURATION
 
-   Components receive the selected branch through:
+   IMPORTANT:
+   Do NOT export BRANCH_CONFIG from App.jsx.
 
-   branchConfig={BRANCH_CONFIG.kalyanpur}
-
-   or
-
-   branchConfig={BRANCH_CONFIG.gopalpur}
-
-   This keeps the public website scalable without touching
-   AdminDashboard.jsx.
+   This avoids the Vite Fast Refresh warning:
+   "BRANCH_CONFIG export is incompatible"
    ========================================================= */
 
-export const BRANCH_CONFIG = {
+const BRANCH_CONFIG = {
+  /* =======================================================
+     KALYANPUR
+     ======================================================= */
+
   kalyanpur: {
     id: 'kalyanpur',
+
     name: 'Kalyanpur',
+
     slug: 'kalyanpur',
 
     title: 'Alpha Gym Kalyanpur',
 
     description:
-      'Alpha Gym Kalyanpur — premium fitness training, memberships, trainers, offers and gym facilities.',
+      'Alpha Gym Kalyanpur — gym information, trainers, memberships, offers, gallery and contact details.',
+
+    /* -------------------------------------------------------
+       GYM INFORMATION
+    ------------------------------------------------------- */
 
     gym: {
       name: 'Alpha Gym',
+
       branchName: 'Kalyanpur',
+
       displayName: 'Alpha Gym Kalyanpur',
 
       photo: '',
@@ -85,12 +97,20 @@ export const BRANCH_CONFIG = {
         'Premium fitness training and gym facilities at our Kalyanpur branch.',
     },
 
+    /* -------------------------------------------------------
+       OWNER
+    ------------------------------------------------------- */
+
     owner: {
       name: '',
       photo: '',
       phone: '',
       email: '',
     },
+
+    /* -------------------------------------------------------
+       ADMIN
+    ------------------------------------------------------- */
 
     admin: {
       name: '',
@@ -99,118 +119,241 @@ export const BRANCH_CONFIG = {
       phone: '',
     },
 
+    /* -------------------------------------------------------
+       TRAINERS
+       
+       KALYANPUR:
+       1. Akram
+       2. Nikita
+    ------------------------------------------------------- */
+
     trainers: [
       {
         id: 'kalyanpur-trainer-1',
-        name: '',
-        role: 'Personal Trainer',
-        photo: '',
-        experience: '',
-        specialization: '',
+
+        name: 'Akram',
+
+        role: 'STRENGTH & FITNESS COACH',
+
+        image: akramTrainerImage,
+
+        photo: akramTrainerImage,
+
+        experience: 'EXPERIENCED TRAINER',
+
+        specialization: 'STRENGTH & FITNESS',
+
+        className: 'trainer-orange',
       },
 
       {
         id: 'kalyanpur-trainer-2',
-        name: '',
-        role: 'Fitness Trainer',
-        photo: '',
-        experience: '',
-        specialization: '',
-      },
 
-      {
-        id: 'kalyanpur-trainer-3',
-        name: '',
-        role: 'Strength Trainer',
-        photo: '',
-        experience: '',
-        specialization: '',
+        name: 'Nikita',
+
+        role: 'FITNESS & PERSONAL TRAINING COACH',
+
+        image: nikitaTrainerImage,
+
+        photo: nikitaTrainerImage,
+
+        experience: 'EXPERIENCED TRAINER',
+
+        specialization: 'PERSONAL TRAINING',
+
+        className: 'trainer-purple',
       },
     ],
+
+    /* -------------------------------------------------------
+       MEMBERSHIP PLANS
+    ------------------------------------------------------- */
 
     membershipPlans: [
       {
         id: 'kalyanpur-monthly',
-        name: 'Monthly',
-        price: '',
-        duration: '1 Month',
-        description: '',
-      },
 
-      {
-        id: 'kalyanpur-quarterly',
-        name: 'Quarterly',
-        price: '',
-        duration: '3 Months',
-        description: '',
+        name: 'Monthly',
+
+        title: 'MONTHLY',
+
+        price: 1500,
+
+        durationMonths: 1,
+
+        duration: '1 Month',
+
+        label: 'STARTER',
+
+        popular: false,
+
+        perks: [
+          'Gym Access',
+          'Basic Workout Guidance',
+          'Attendance Tracking',
+          'No Long Commitment',
+        ],
       },
 
       {
         id: 'kalyanpur-half-yearly',
-        name: 'Half Yearly',
-        price: '',
+
+        name: 'Half-Yearly',
+
+        title: 'HALF-YEARLY',
+
+        price: 4500,
+
+        durationMonths: 6,
+
         duration: '6 Months',
-        description: '',
+
+        label: 'TRANSFORMATION',
+
+        popular: true,
+
+        perks: [
+          'Full Gym Access',
+          'Advanced Workout Plan',
+          'Digital Member Profile',
+          'Progress Tracking',
+        ],
       },
 
       {
         id: 'kalyanpur-yearly',
+
         name: 'Yearly',
-        price: '',
+
+        title: 'YEARLY',
+
+        price: 8000,
+
+        durationMonths: 12,
+
         duration: '12 Months',
-        description: '',
+
+        label: 'ULTIMATE',
+
+        popular: false,
+
+        perks: [
+          'Full Gym Access',
+          'Advanced Tracking',
+          'Digital Workout Plan',
+          'Best Value',
+        ],
       },
     ],
+
+    /* -------------------------------------------------------
+       OFFERS
+    ------------------------------------------------------- */
 
     offers: [
       {
-        id: 'kalyanpur-offer-1',
-        name: '',
-        title: '',
-        description: '',
-        price: '',
-        validUntil: '',
-      },
+        id: 'kalyanpur-quarterly-offer',
 
-      {
-        id: 'kalyanpur-offer-2',
-        name: '',
-        title: '',
-        description: '',
-        price: '',
+        name: 'Quarterly',
+
+        title: 'QUARTERLY',
+
+        durationMonths: 3,
+
+        offerPrice: 2499,
+
+        price: 2499,
+
+        description:
+          'Special quarterly membership offer available for a limited time.',
+
+        benefits: [
+          'Full Gym Access',
+          'Workout Plan',
+          'Digital Member Profile',
+          'Progress Tracking',
+        ],
+
         validUntil: '',
       },
     ],
 
+    /* -------------------------------------------------------
+       CONTACT
+    ------------------------------------------------------- */
+
     contact: {
-      phone: '',
-      email: '',
-      whatsapp: '',
-      address: '',
-      city: 'Kalyanpur',
+      phone: '89271-00145',
+
+      alternatePhone: '73877-66912',
+
+      email: 'alphagym.asn@gmail.com',
+
+      whatsapp: '89271-00145',
+
+      instagram: '@alpha_gym_asansol',
+
+      address:
+        '1st Floor, Anudeep Apartment, Plot 43, Shakespeare Sarani, Kalyanpur Housing, Asansol - 713305',
+
+      city: 'Asansol',
+
       state: 'West Bengal',
+
       country: 'India',
     },
 
+    /* -------------------------------------------------------
+       LOCATION
+    ------------------------------------------------------- */
+
     location: {
-      address: '',
-      city: 'Kalyanpur',
+      address:
+        '1st Floor, Anudeep Apartment, Plot 43, Shakespeare Sarani, Kalyanpur Housing, Asansol - 713305',
+
+      landmark:
+        'Near Kalyanpur Adi Durgapuja Pandal',
+
+      city: 'Asansol',
+
       state: 'West Bengal',
+
       country: 'India',
+
       mapUrl: '',
+
       latitude: '',
+
       longitude: '',
     },
 
+    /* -------------------------------------------------------
+       TIMINGS
+    ------------------------------------------------------- */
+
     timings: {
+      morning: '6:00 AM – 12:00 PM',
+
+      evening: '4:00 PM – 10:00 PM',
+
       monday: '',
+
       tuesday: '',
+
       wednesday: '',
+
       thursday: '',
+
       friday: '',
+
       saturday: '',
+
       sunday: '',
     },
+
+    /* -------------------------------------------------------
+       GALLERY
+    ------------------------------------------------------- */
 
     gallery: [
       {
@@ -239,24 +382,31 @@ export const BRANCH_CONFIG = {
     ],
   },
 
-
   /* =======================================================
      GOPALPUR
      ======================================================= */
 
   gopalpur: {
     id: 'gopalpur',
+
     name: 'Gopalpur',
+
     slug: 'gopalpur',
 
     title: 'Alpha Gym Gopalpur',
 
     description:
-      'Alpha Gym Gopalpur — premium fitness training, memberships, trainers, offers and gym facilities.',
+      'Alpha Gym Gopalpur — gym information, trainers, memberships, offers, gallery and contact details.',
+
+    /* -------------------------------------------------------
+       GYM INFORMATION
+    ------------------------------------------------------- */
 
     gym: {
       name: 'Alpha Gym',
+
       branchName: 'Gopalpur',
+
       displayName: 'Alpha Gym Gopalpur',
 
       photo: '',
@@ -267,12 +417,20 @@ export const BRANCH_CONFIG = {
         'Premium fitness training and gym facilities at our Gopalpur branch.',
     },
 
+    /* -------------------------------------------------------
+       OWNER
+    ------------------------------------------------------- */
+
     owner: {
       name: '',
       photo: '',
       phone: '',
       email: '',
     },
+
+    /* -------------------------------------------------------
+       ADMIN
+    ------------------------------------------------------- */
 
     admin: {
       name: '',
@@ -281,118 +439,241 @@ export const BRANCH_CONFIG = {
       phone: '',
     },
 
+    /* -------------------------------------------------------
+       TRAINERS
+
+       GOPALPUR:
+       1. Nikita
+       2. Gopalpur Trainer Profile
+    ------------------------------------------------------- */
+
     trainers: [
       {
         id: 'gopalpur-trainer-1',
-        name: '',
-        role: 'Personal Trainer',
-        photo: '',
-        experience: '',
-        specialization: '',
+
+        name: 'Nikita',
+
+        role: 'FITNESS & PERSONAL TRAINING COACH',
+
+        image: nikitaTrainerImage,
+
+        photo: nikitaTrainerImage,
+
+        experience: 'EXPERIENCED TRAINER',
+
+        specialization: 'PERSONAL TRAINING',
+
+        className: 'trainer-purple',
       },
 
       {
         id: 'gopalpur-trainer-2',
-        name: '',
-        role: 'Fitness Trainer',
-        photo: '',
-        experience: '',
-        specialization: '',
-      },
 
-      {
-        id: 'gopalpur-trainer-3',
-        name: '',
-        role: 'Strength Trainer',
-        photo: '',
-        experience: '',
-        specialization: '',
+        name: 'TRAINER PROFILE',
+
+        role: 'FITNESS & PERSONAL TRAINING COACH',
+
+        image: gopalpurTrainerImage,
+
+        photo: gopalpurTrainerImage,
+
+        experience: 'EXPERIENCED TRAINER',
+
+        specialization: 'FITNESS TRAINING',
+
+        className: 'trainer-cyan',
       },
     ],
+
+    /* -------------------------------------------------------
+       MEMBERSHIP PLANS
+    ------------------------------------------------------- */
 
     membershipPlans: [
       {
         id: 'gopalpur-monthly',
-        name: 'Monthly',
-        price: '',
-        duration: '1 Month',
-        description: '',
-      },
 
-      {
-        id: 'gopalpur-quarterly',
-        name: 'Quarterly',
-        price: '',
-        duration: '3 Months',
-        description: '',
+        name: 'Monthly',
+
+        title: 'MONTHLY',
+
+        price: 1500,
+
+        durationMonths: 1,
+
+        duration: '1 Month',
+
+        label: 'STARTER',
+
+        popular: false,
+
+        perks: [
+          'Gym Access',
+          'Basic Workout Guidance',
+          'Attendance Tracking',
+          'No Long Commitment',
+        ],
       },
 
       {
         id: 'gopalpur-half-yearly',
-        name: 'Half Yearly',
-        price: '',
+
+        name: 'Half-Yearly',
+
+        title: 'HALF-YEARLY',
+
+        price: 4500,
+
+        durationMonths: 6,
+
         duration: '6 Months',
-        description: '',
+
+        label: 'TRANSFORMATION',
+
+        popular: true,
+
+        perks: [
+          'Full Gym Access',
+          'Advanced Workout Plan',
+          'Digital Member Profile',
+          'Progress Tracking',
+        ],
       },
 
       {
         id: 'gopalpur-yearly',
+
         name: 'Yearly',
-        price: '',
+
+        title: 'YEARLY',
+
+        price: 8000,
+
+        durationMonths: 12,
+
         duration: '12 Months',
-        description: '',
+
+        label: 'ULTIMATE',
+
+        popular: false,
+
+        perks: [
+          'Full Gym Access',
+          'Advanced Tracking',
+          'Digital Workout Plan',
+          'Best Value',
+        ],
       },
     ],
+
+    /* -------------------------------------------------------
+       OFFERS
+    ------------------------------------------------------- */
 
     offers: [
       {
-        id: 'gopalpur-offer-1',
-        name: '',
-        title: '',
-        description: '',
-        price: '',
-        validUntil: '',
-      },
+        id: 'gopalpur-quarterly-offer',
 
-      {
-        id: 'gopalpur-offer-2',
-        name: '',
-        title: '',
-        description: '',
-        price: '',
+        name: 'Quarterly',
+
+        title: 'QUARTERLY',
+
+        durationMonths: 3,
+
+        offerPrice: 2499,
+
+        price: 2499,
+
+        description:
+          'Special quarterly membership offer available for a limited time.',
+
+        benefits: [
+          'Full Gym Access',
+          'Workout Plan',
+          'Digital Member Profile',
+          'Progress Tracking',
+        ],
+
         validUntil: '',
       },
     ],
 
+    /* -------------------------------------------------------
+       CONTACT
+    ------------------------------------------------------- */
+
     contact: {
-      phone: '',
-      email: '',
-      whatsapp: '',
-      address: '',
-      city: 'Gopalpur',
+      phone: '89271-00145',
+
+      alternatePhone: '73877-66912',
+
+      email: 'alphagym.asn@gmail.com',
+
+      whatsapp: '89271-00145',
+
+      instagram: '@alpha_gym_asansol',
+
+      address:
+        '2nd Floor, Rozi Niwas, Mother Teresa Road, Chelidanga, Asansol - 713304',
+
+      city: 'Asansol',
+
       state: 'West Bengal',
+
       country: 'India',
     },
 
+    /* -------------------------------------------------------
+       LOCATION
+    ------------------------------------------------------- */
+
     location: {
-      address: '',
-      city: 'Gopalpur',
+      address:
+        '2nd Floor, Rozi Niwas, Mother Teresa Road, Chelidanga, Asansol - 713304',
+
+      landmark:
+        'Above Wine Shop, Opposite Pizza Xpress Pizzeria',
+
+      city: 'Asansol',
+
       state: 'West Bengal',
+
       country: 'India',
+
       mapUrl: '',
+
       latitude: '',
+
       longitude: '',
     },
 
+    /* -------------------------------------------------------
+       TIMINGS
+    ------------------------------------------------------- */
+
     timings: {
+      morning: '6:00 AM – 11:00 AM',
+
+      evening: '4:00 PM – 10:00 PM',
+
       monday: '',
+
       tuesday: '',
+
       wednesday: '',
+
       thursday: '',
+
       friday: '',
+
       saturday: '',
+
       sunday: '',
     },
+
+    /* -------------------------------------------------------
+       GALLERY
+    ------------------------------------------------------- */
 
     gallery: [
       {
@@ -422,7 +703,6 @@ export const BRANCH_CONFIG = {
   },
 };
 
-
 /* =========================================================
    PUBLIC HOME PAGE
    ========================================================= */
@@ -436,6 +716,10 @@ function HomePage({
 }) {
   return (
     <>
+      {/* =================================================
+          NAVBAR
+      ================================================= */}
+
       <Navbar
         theme={theme}
         onToggleTheme={onToggleTheme}
@@ -443,81 +727,127 @@ function HomePage({
       />
 
       <main>
+        {/* =================================================
+            HERO
+        ================================================= */}
+
         <Hero branchConfig={branchConfig} />
+
+        {/* =================================================
+            MARQUEE
+        ================================================= */}
 
         <Marquee branchConfig={branchConfig} />
 
+        {/* =================================================
+            HOME INTRO
+        ================================================= */}
+
         <HomeIntro branchConfig={branchConfig} />
 
-        <AboutUsSection
-          branchConfig={branchConfig}
-        />
+        {/* =================================================
+            ABOUT
+        ================================================= */}
 
-        <ServicesSection
-          branchConfig={branchConfig}
-        />
+        <AboutUsSection branchConfig={branchConfig} />
 
-        <TimingsSection
-          branchConfig={branchConfig}
-        />
+        {/* =================================================
+            SERVICES
+        ================================================= */}
 
-        <GallerySection
-          branchConfig={branchConfig}
-        />
+        <ServicesSection branchConfig={branchConfig} />
 
-        <TrainersSection
-          branchConfig={branchConfig}
-        />
+        {/* =================================================
+            TIMINGS
+        ================================================= */}
+
+        <TimingsSection branchConfig={branchConfig} />
+
+        {/* =================================================
+            GALLERY
+        ================================================= */}
+
+        <GallerySection branchConfig={branchConfig} />
+
+        {/* =================================================
+            TRAINERS
+        ================================================= */}
+
+        <TrainersSection branchConfig={branchConfig} />
+
+        {/* =================================================
+            OFFERS
+        ================================================= */}
 
         <OffersSection
           branchConfig={branchConfig}
           onClaimOffer={onClaimOffer}
         />
 
+        {/* =================================================
+            PRICING
+        ================================================= */}
+
         <PricingSection
           branchConfig={branchConfig}
           onSelectPlan={onSelectPlan}
         />
 
-        <SoftwareSection
-          branchConfig={branchConfig}
-        />
+        {/* =================================================
+            SOFTWARE
+        ================================================= */}
 
-        <MotivationSection
-          branchConfig={branchConfig}
-        />
+        <SoftwareSection branchConfig={branchConfig} />
 
-        <TestimonialSection
-          branchConfig={branchConfig}
-        />
+        {/* =================================================
+            MOTIVATION
+        ================================================= */}
 
-        <FAQSection
-          branchConfig={branchConfig}
-        />
+        <MotivationSection branchConfig={branchConfig} />
 
-        <ContactSection
-          branchConfig={branchConfig}
-        />
+        {/* =================================================
+            TESTIMONIALS
+        ================================================= */}
+
+        <TestimonialSection branchConfig={branchConfig} />
+
+        {/* =================================================
+            FAQ
+        ================================================= */}
+
+        <FAQSection branchConfig={branchConfig} />
+
+        {/* =================================================
+            CONTACT
+        ================================================= */}
+
+        <ContactSection branchConfig={branchConfig} />
       </main>
+
+      {/* =====================================================
+          FOOTER
+      ===================================================== */}
 
       <footer>
         <div className="container footer-content">
           <p>
             © 2026 {branchConfig.gym.displayName}
-            {' • Premium fitness experience'}
+            {' '}• Premium fitness experience
           </p>
 
-          <span>
-            {branchConfig.gym.tagline}
-          </span>
+          <span>{branchConfig.gym.tagline}</span>
         </div>
 
         <div className="container disclaimer">
           * Schedule and offers may vary. Please contact{' '}
-          {branchConfig.gym.displayName} for the latest
-          membership information.
+          {branchConfig.gym.displayName}{' '}
+          for the latest membership information.
         </div>
       </footer>
+
+      {/* =====================================================
+          TOAST
+      ===================================================== */}
 
       <div
         id="toast"
@@ -529,9 +859,8 @@ function HomePage({
   );
 }
 
-
 /* =========================================================
-   ROUTE META / SEO
+   SEO / ROUTE META
    ========================================================= */
 
 function RouteMeta() {
@@ -540,38 +869,35 @@ function RouteMeta() {
   useEffect(() => {
     const pathname = location.pathname;
 
-    const isAdminRoute =
-      pathname.startsWith('/admin');
+    const isAdminRoute = pathname.startsWith('/admin');
 
-    const branchConfig =
-      pathname === '/kalyanpur'
-        ? BRANCH_CONFIG.kalyanpur
-        : pathname === '/gopalpur'
-          ? BRANCH_CONFIG.gopalpur
-          : null;
+    let branchConfig = null;
 
+    if (pathname === '/kalyanpur') {
+      branchConfig = BRANCH_CONFIG.kalyanpur;
+    }
 
-    /* -------------------------------------------------------
-       ROBOTS META
-    ------------------------------------------------------- */
+    if (pathname === '/gopalpur') {
+      branchConfig = BRANCH_CONFIG.gopalpur;
+    }
 
-    let robotsMeta =
-      document.querySelector(
-        'meta[name="robots"]'
-      );
+    /* -----------------------------------------------------
+       ROBOTS
+    ----------------------------------------------------- */
+
+    let robotsMeta = document.querySelector(
+      'meta[name="robots"]'
+    );
 
     if (!robotsMeta) {
-      robotsMeta =
-        document.createElement('meta');
+      robotsMeta = document.createElement('meta');
 
       robotsMeta.setAttribute(
         'name',
         'robots'
       );
 
-      document.head.appendChild(
-        robotsMeta
-      );
+      document.head.appendChild(robotsMeta);
     }
 
     robotsMeta.setAttribute(
@@ -581,91 +907,80 @@ function RouteMeta() {
         : 'index, follow'
     );
 
-
-    /* -------------------------------------------------------
-       PAGE TITLE
-    ------------------------------------------------------- */
+    /* -----------------------------------------------------
+       TITLE
+    ----------------------------------------------------- */
 
     if (branchConfig) {
-      document.title =
-        branchConfig.title;
+      document.title = branchConfig.title;
     } else if (pathname === '/') {
-      document.title =
-        'Choose Your Gym • Alpha Gym';
-    } else if (
-      pathname === '/admin/login'
-    ) {
-      document.title =
-        'Admin Login • Alpha Gym';
+      document.title = 'Choose Your Gym • Alpha Gym';
+    } else if (pathname === '/admin/login') {
+      document.title = 'Admin Login • Alpha Gym';
     } else if (isAdminRoute) {
-      document.title =
-        'Admin Dashboard • Alpha Gym';
+      document.title = 'Admin Dashboard • Alpha Gym';
     } else {
-      document.title =
-        'Alpha Gym';
+      document.title = 'Alpha Gym';
     }
 
+    /* -----------------------------------------------------
+       DESCRIPTION
+    ----------------------------------------------------- */
 
-    /* -------------------------------------------------------
-       META DESCRIPTION
-    ------------------------------------------------------- */
-
-    let descriptionMeta =
-      document.querySelector(
-        'meta[name="description"]'
-      );
+    let descriptionMeta = document.querySelector(
+      'meta[name="description"]'
+    );
 
     if (!descriptionMeta) {
-      descriptionMeta =
-        document.createElement('meta');
+      descriptionMeta = document.createElement('meta');
 
       descriptionMeta.setAttribute(
         'name',
         'description'
       );
 
-      document.head.appendChild(
-        descriptionMeta
-      );
+      document.head.appendChild(descriptionMeta);
     }
 
-    descriptionMeta.setAttribute(
-      'content',
-      branchConfig
-        ? branchConfig.description
-        : pathname === '/'
-          ? 'Choose your Alpha Gym branch — Kalyanpur or Gopalpur.'
-          : isAdminRoute
-            ? 'Alpha Gym administration portal.'
-            : 'Alpha Gym premium fitness experience.'
-    );
+    if (branchConfig) {
+      descriptionMeta.setAttribute(
+        'content',
+        branchConfig.description
+      );
+    } else if (pathname === '/') {
+      descriptionMeta.setAttribute(
+        'content',
+        'Choose your Alpha Gym branch — Kalyanpur or Gopalpur.'
+      );
+    } else {
+      descriptionMeta.setAttribute(
+        'content',
+        'Alpha Gym premium fitness experience.'
+      );
+    }
   }, [location.pathname]);
 
   return null;
 }
 
-
 /* =========================================================
-   MAIN APP
+   APP
    ========================================================= */
 
 function App() {
-
   /* =======================================================
-     THEME
+     THEME STATE
   ======================================================= */
 
   const [theme, setTheme] = useState(() => {
     return (
-      localStorage.getItem(
-        'fitness-theme'
-      ) || 'dark'
+      localStorage.getItem('fitness-theme') ||
+      'dark'
     );
   });
 
-
   /* =======================================================
-     APPLY THEME
+     THEME EFFECT
   ======================================================= */
 
   useEffect(() => {
@@ -680,57 +995,43 @@ function App() {
     );
   }, [theme]);
 
-
   /* =======================================================
      TOAST
   ======================================================= */
 
   const showToast = (message) => {
-    const toast =
-      document.getElementById(
-        'toast'
-      );
+    const toast = document.getElementById('toast');
 
     if (!toast) {
       return;
     }
 
-    toast.textContent =
-      message;
+    toast.textContent = message;
 
-    toast.classList.add(
-      'show'
-    );
+    toast.classList.add('show');
 
     window.clearTimeout(
       showToast.timeoutId
     );
 
-    showToast.timeoutId =
-      window.setTimeout(() => {
-        toast.classList.remove(
-          'show'
-        );
-      }, 2800);
+    showToast.timeoutId = window.setTimeout(() => {
+      toast.classList.remove('show');
+    }, 2800);
   };
 
-
   /* =======================================================
-     PLAN SELECTION
+     MEMBERSHIP PLAN
   ======================================================= */
 
   const handleSelectPlan = (
     plan,
     price
   ) => {
-    const numericPrice =
-      Number(price);
+    const numericPrice = Number(price);
 
     const formattedPrice =
       Number.isFinite(numericPrice)
-        ? numericPrice.toLocaleString(
-            'en-IN'
-          )
+        ? numericPrice.toLocaleString('en-IN')
         : price;
 
     showToast(
@@ -747,9 +1048,8 @@ function App() {
     }, 100);
   };
 
-
   /* =======================================================
-     OFFER SELECTION
+     OFFER
   ======================================================= */
 
   const handleClaimOffer = (
@@ -769,7 +1069,6 @@ function App() {
     }, 100);
   };
 
-
   /* =======================================================
      THEME TOGGLE
   ======================================================= */
@@ -783,32 +1082,26 @@ function App() {
     );
   };
 
-
   /* =======================================================
      ROUTES
   ======================================================= */
 
   return (
     <BrowserRouter>
-
       <RouteMeta />
 
       <Routes>
-
         {/* =================================================
             GYM SELECTION
         ================================================= */}
 
         <Route
           path="/"
-          element={
-            <GymSelection />
-          }
+          element={<GymSelection />}
         />
 
-
         {/* =================================================
-            KALYANPUR
+            KALYANPUR BRANCH
         ================================================= */}
 
         <Route
@@ -818,13 +1111,17 @@ function App() {
               branchConfig={
                 BRANCH_CONFIG.kalyanpur
               }
+
               onSelectPlan={
                 handleSelectPlan
               }
+
               onClaimOffer={
                 handleClaimOffer
               }
+
               theme={theme}
+
               onToggleTheme={
                 toggleTheme
               }
@@ -832,9 +1129,8 @@ function App() {
           }
         />
 
-
         {/* =================================================
-            GOPALPUR
+            GOPALPUR BRANCH
         ================================================= */}
 
         <Route
@@ -844,13 +1140,17 @@ function App() {
               branchConfig={
                 BRANCH_CONFIG.gopalpur
               }
+
               onSelectPlan={
                 handleSelectPlan
               }
+
               onClaimOffer={
                 handleClaimOffer
               }
+
               theme={theme}
+
               onToggleTheme={
                 toggleTheme
               }
@@ -858,23 +1158,19 @@ function App() {
           }
         />
 
-
         {/* =================================================
             ADMIN LOGIN
         ================================================= */}
 
         <Route
           path="/admin/login"
-          element={
-            <AdminLogin />
-          }
+          element={<AdminLogin />}
         />
-
 
         {/* =================================================
             ADMIN DASHBOARD
 
-            DO NOT MODIFY AdminDashboard.jsx
+            AdminDashboard.jsx remains unchanged.
         ================================================= */}
 
         <Route
@@ -885,7 +1181,6 @@ function App() {
             </ProtectedRoute>
           }
         />
-
 
         {/* =================================================
             MEMBER DETAILS
@@ -900,7 +1195,6 @@ function App() {
           }
         />
 
-
         {/* =================================================
             PAYMENT RECEIPT
         ================================================= */}
@@ -913,7 +1207,6 @@ function App() {
             </ProtectedRoute>
           }
         />
-
 
         {/* =================================================
             UNKNOWN ROUTES
@@ -928,12 +1221,9 @@ function App() {
             />
           }
         />
-
       </Routes>
-
     </BrowserRouter>
   );
 }
-
 
 export default App;

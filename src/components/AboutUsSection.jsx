@@ -1,10 +1,30 @@
-export default function AboutUsSection() {
+export default function AboutUsSection({ branchConfig }) {
+  const branchName =
+    branchConfig?.gym?.branchName ||
+    branchConfig?.name ||
+    'Alpha Gym';
+
+  const displayName =
+    branchConfig?.gym?.displayName ||
+    `Alpha Gym ${branchName}`;
+
+  const branchDescription =
+    branchConfig?.gym?.description ||
+    'A fitness environment built around equality, safety, learning, patience, growth and real results.';
+
   return (
-    <section id="about" className="section about-section">
+    <section
+      id="about"
+      className="section about-section"
+      data-branch={branchConfig?.id || ''}
+    >
       <div className="container">
 
+        {/* ABOUT HEADING */}
         <div className="section-heading">
-          <div className="section-tag">ABOUT ALPHA GYM</div>
+          <div className="section-tag">
+            ABOUT {displayName.toUpperCase()}
+          </div>
 
           <h2>
             MORE THAN
@@ -12,8 +32,7 @@ export default function AboutUsSection() {
           </h2>
 
           <p>
-            A fitness environment built around equality, safety, learning,
-            patience, growth and real results.
+            {branchDescription}
           </p>
         </div>
 
@@ -21,9 +40,13 @@ export default function AboutUsSection() {
 
           {/* GYM STORY */}
           <div className="about-block">
-            <div className="about-label">OUR STORY</div>
+            <div className="about-label">
+              OUR STORY
+            </div>
 
-            <h3>THE BEGINNING</h3>
+            <h3>
+              THE BEGINNING
+            </h3>
 
             <p>
               Alpha Gym opened its doors on <strong>24th October 2022</strong>.
@@ -45,15 +68,22 @@ export default function AboutUsSection() {
 
           {/* USP */}
           <div className="about-block about-highlight">
-            <div className="about-label">OUR USP</div>
+            <div className="about-label">
+              OUR USP
+            </div>
 
-            <h3>CUSTOMERS FIRST</h3>
+            <h3>
+              CUSTOMERS FIRST
+            </h3>
 
             <p>
               Alpha's USP isn't about its equipment brands, huge area, or
-              interior. However, <strong>IT'S THE CUSTOMER-ORIENTED SERVICES,
-              THE TRANSFORMATION RESULTS OF CLIENTS, AND CREATING AN
-              ENVIRONMENT THAT PRACTICES EQUALITY AND SAFETY.</strong>
+              interior. However,{' '}
+              <strong>
+                IT'S THE CUSTOMER-ORIENTED SERVICES, THE TRANSFORMATION
+                RESULTS OF CLIENTS, AND CREATING AN ENVIRONMENT THAT PRACTICES
+                EQUALITY AND SAFETY.
+              </strong>
             </p>
 
             <p>
@@ -66,9 +96,13 @@ export default function AboutUsSection() {
 
           {/* PHILOSOPHY */}
           <div className="about-block">
-            <div className="about-label">OUR PHILOSOPHY</div>
+            <div className="about-label">
+              OUR PHILOSOPHY
+            </div>
 
-            <h3>REAL FITNESS. REAL RESULTS.</h3>
+            <h3>
+              REAL FITNESS. REAL RESULTS.
+            </h3>
 
             <p>
               Our goal as a gym is to promote a real and practical
@@ -80,22 +114,26 @@ export default function AboutUsSection() {
 
           {/* BASIC THINGS TO KNOW */}
           <div className="about-block">
-            <div className="about-label">BASIC THINGS TO KNOW ABOUT US</div>
+            <div className="about-label">
+              BASIC THINGS TO KNOW ABOUT US
+            </div>
 
-            <h3>WHAT MAKES ALPHA DIFFERENT</h3>
+            <h3>
+              WHAT MAKES {branchName.toUpperCase()} DIFFERENT
+            </h3>
 
             <p>
-              Alpha Gym is a unisex gym where various forms and techniques are
-              taught. We do not force you to take personal training; instead,
-              we encourage you to understand the benefits of having a coach and
-              receiving proper guidance.
+              {displayName} is a unisex gym where various forms and techniques
+              are taught. We do not force you to take personal training;
+              instead, we encourage you to understand the benefits of having a
+              coach and receiving proper guidance.
             </p>
 
             <p>
               Our facility is fully air-conditioned because we do not believe
-              in suffocating you all. We have both male and female trainers who
-              are learned, experienced, and dedicated to helping you achieve
-              your fitness goals.
+              in suffocating you all. We have both male and female trainers
+              who are learned, experienced, and dedicated to helping you
+              achieve your fitness goals.
             </p>
           </div>
 
@@ -107,7 +145,7 @@ export default function AboutUsSection() {
             </h3>
 
             <p>
-              At ALPHA GYM, we believe in creating more than just
+              At {displayName}, we believe in creating more than just
               transformations—we create an environment of equality, safety,
               learning, patience, growth, and real results.
             </p>

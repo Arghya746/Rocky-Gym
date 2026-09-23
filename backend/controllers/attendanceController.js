@@ -1,31 +1,127 @@
 const Attendance = require('../models/Attendance');
+const Member = require('../models/Member');
 
 
-// ===============================
+// =========================================
+// ALLOWED BRANCHES
+// =========================================
+
+const ALLOWED_BRANCHES = [
+    'Kalyanpur',
+    'Gopalpur',
+];
+
+
+// =========================================
+// NORMALIZE BRANCH
+// =========================================
+
+const normalizeBranch = (value) => {
+
+    if (!value) {
+        return null;
+    }
+
+    const normalized =
+        String(value)
+        .trim()
+        .toLowerCase();
+
+    if (normalized === 'kalyanpur') {
+        return 'Kalyanpur';
+    }
+
+    if (normalized === 'gopalpur') {
+        return 'Gopalpur';
+    }
+
+    return null;
+};
+
+
+// =========================================
 // GET ACCESSIBLE BRANCH
-// ===============================
+// =========================================
 
 const getAccessibleBranch = (req) => {
 
     // Main admin can manage both branches
-    if (req.admin && req.admin.role === 'admin') {
+    if (
+        req.admin &&
+        req.admin.role === 'admin'
+    ) {
         return null;
     }
 
-    // Receptionist is restricted to assigned branch
-    if (req.admin && req.admin.gymBranch) {
-        return req.admin.gymBranch;
+    // Receptionist can access only
+    // their assigned branch
+    if (
+        req.admin &&
+        req.admin.role === 'receptionist'
+    ) {
+
+        return normalizeBranch(
+            req.admin.gymBranch
+        );
     }
 
-    // Fallback for old accounts
-    return 'Kalyanpur';
+    return null;
 };
 
-// ===============================
+
+// =========================================
+// GET WRITE BRANCH
+// =========================================
+// Main admin:
+//   Must provide a valid branch.
+//
+// Receptionist:
+//   Always uses assigned branch.
+//   Cannot override it.
+// =========================================
+
+const getWriteBranch = (req, requestedBranch) => {
+
+    // =========================================
+    // MAIN ADMIN
+    // =========================================
+
+    if (
+        req.admin &&
+        req.admin.role === 'admin'
+    ) {
+
+        return normalizeBranch(
+            requestedBranch
+        );
+    }
+
+
+    // =========================================
+    // RECEPTIONIST
+    // =========================================
+
+    if (
+        req.admin &&
+        req.admin.role === 'receptionist'
+    ) {
+
+        return normalizeBranch(
+            req.admin.gymBranch
+        );
+    }
+
+
+    return null;
+};
+
+
+// =========================================
 // MARK ATTENDANCE
-// ===============================
+// =========================================
 
 const markAttendance = async(req, res) => {
+
     try {
 
         const {
@@ -38,9 +134,9 @@ const markAttendance = async(req, res) => {
         } = req.body;
 
 
-        // ===============================
+        // =========================================
         // VALIDATION
-        // ===============================
+        // =========================================
 
         if (!member) {
 
@@ -52,39 +148,44 @@ const markAttendance = async(req, res) => {
         }
 
 
-        // ===============================
+        // =========================================
         // DETERMINE BRANCH
-        // ===============================
+        // =========================================
 
-        let selectedBranch;
+        const selectedBranch =
+            getWriteBranch(
+                req,
+                gymBranch
+            );
 
-        if (req.admin && req.admin.role === 'admin') {
 
-            // Main admin can select branch
-            selectedBranch =
-                gymBranch || 'Kalyanpur';
+        // =========================================
+        // VALIDATE BRANCH
+        // =========================================
 
-        } else {
+        if (!selectedBranch) {
 
-            // Receptionist uses assigned branch
-            selectedBranch =
-                (req.admin && req.admin.gymBranch) ?
-                req.admin.gymBranch :
-                'Kalyanpur';
+            if (
+                req.admin &&
+                req.admin.role === 'receptionist'
+            ) {
+
+                return res.status(403).json({
+
+                    message: 'Your account is not assigned to a valid gym branch.',
+
+                });
+            }
+
+            return res.status(400).json({
+
+                message: 'A valid gym branch is required.',
+
+            });
         }
 
 
-        // ===============================
-        // VALIDATE BRANCH
-        // ===============================
-
-        const allowedBranches = [
-            'Kalyanpur',
-            'Gopalpur',
-        ];
-
-
-        if (!allowedBranches.includes(
+        if (!ALLOWED_BRANCHES.includes(
                 selectedBranch
             )) {
 
@@ -96,9 +197,33 @@ const markAttendance = async(req, res) => {
         }
 
 
-        // ===============================
+        // =========================================
+        // VERIFY MEMBER BELONGS TO SAME BRANCH
+        // =========================================
+
+        const memberRecord =
+            await Member.findOne({
+
+                _id: member,
+
+                gymBranch: selectedBranch,
+
+            });
+
+
+        if (!memberRecord) {
+
+            return res.status(400).json({
+
+                message: 'Member not found in the selected gym branch.',
+
+            });
+        }
+
+
+        // =========================================
         // CREATE ATTENDANCE
-        // ===============================
+        // =========================================
 
         const attendance =
             await Attendance.create({
@@ -118,7 +243,7 @@ const markAttendance = async(req, res) => {
             });
 
 
-        res.status(201).json({
+        return res.status(201).json({
 
             message: 'Attendance marked successfully.',
 
@@ -133,7 +258,7 @@ const markAttendance = async(req, res) => {
             error.message
         );
 
-        res.status(500).json({
+        return res.status(500).json({
 
             message: 'Server error. Please try again.',
 
@@ -142,23 +267,51 @@ const markAttendance = async(req, res) => {
 };
 
 
-// ===============================
+// =========================================
 // GET ALL ATTENDANCE
-// ===============================
+// =========================================
 
 const getAttendance = async(req, res) => {
+
     try {
 
         const branch =
             getAccessibleBranch(req);
 
 
-        // ===============================
+        // =========================================
+        // VALIDATE RECEPTIONIST BRANCH
+        // =========================================
+
+        if (
+            req.admin &&
+            req.admin.role === 'receptionist' &&
+            !branch
+        ) {
+
+            return res.status(403).json({
+
+                message: 'Your account is not assigned to a valid gym branch.',
+
+            });
+        }
+
+
+        // =========================================
         // BUILD QUERY
-        // ===============================
+        // =========================================
 
-        const query = branch ? { gymBranch: branch } : {};
+        const query =
+            branch ?
+            {
+                gymBranch: branch,
+            } :
+            {};
 
+
+        // =========================================
+        // FETCH ATTENDANCE
+        // =========================================
 
         const attendance =
             await Attendance.find(query)
@@ -171,7 +324,7 @@ const getAttendance = async(req, res) => {
             });
 
 
-        res.status(200).json({
+        return res.status(200).json({
 
             message: 'Attendance fetched successfully.',
 
@@ -186,7 +339,7 @@ const getAttendance = async(req, res) => {
             error.message
         );
 
-        res.status(500).json({
+        return res.status(500).json({
 
             message: 'Server error. Please try again.',
 
@@ -195,30 +348,59 @@ const getAttendance = async(req, res) => {
 };
 
 
-// ===============================
+// =========================================
 // GET SINGLE ATTENDANCE
-// ===============================
+// =========================================
 
 const getAttendanceById = async(req, res) => {
+
     try {
 
         const branch =
             getAccessibleBranch(req);
 
 
-        // ===============================
+        // =========================================
+        // VALIDATE RECEPTIONIST BRANCH
+        // =========================================
+
+        if (
+            req.admin &&
+            req.admin.role === 'receptionist' &&
+            !branch
+        ) {
+
+            return res.status(403).json({
+
+                message: 'Your account is not assigned to a valid gym branch.',
+
+            });
+        }
+
+
+        // =========================================
         // BUILD QUERY
-        // ===============================
+        // =========================================
 
         const query = {
+
             _id: req.params.id,
+
         };
 
 
+        // Receptionist can only access
+        // attendance from assigned branch.
         if (branch) {
-            query.gymBranch = branch;
+
+            query.gymBranch =
+                branch;
         }
 
+
+        // =========================================
+        // FIND ATTENDANCE
+        // =========================================
 
         const attendance =
             await Attendance.findOne(query)
@@ -238,7 +420,7 @@ const getAttendanceById = async(req, res) => {
         }
 
 
-        res.status(200).json({
+        return res.status(200).json({
 
             attendance,
 
@@ -251,7 +433,7 @@ const getAttendanceById = async(req, res) => {
             error.message
         );
 
-        res.status(500).json({
+        return res.status(500).json({
 
             message: 'Server error. Please try again.',
 
@@ -260,28 +442,51 @@ const getAttendanceById = async(req, res) => {
 };
 
 
-// ===============================
+// =========================================
 // UPDATE ATTENDANCE
-// ===============================
+// =========================================
 
 const updateAttendance = async(req, res) => {
+
     try {
 
         const branch =
             getAccessibleBranch(req);
 
 
-        // ===============================
-        // FIND ATTENDANCE
-        // ===============================
+        // =========================================
+        // VALIDATE RECEPTIONIST BRANCH
+        // =========================================
+
+        if (
+            req.admin &&
+            req.admin.role === 'receptionist' &&
+            !branch
+        ) {
+
+            return res.status(403).json({
+
+                message: 'Your account is not assigned to a valid gym branch.',
+
+            });
+        }
+
+
+        // =========================================
+        // FIND EXISTING ATTENDANCE
+        // =========================================
 
         const query = {
+
             _id: req.params.id,
+
         };
 
 
         if (branch) {
-            query.gymBranch = branch;
+
+            query.gymBranch =
+                branch;
         }
 
 
@@ -299,40 +504,56 @@ const updateAttendance = async(req, res) => {
         }
 
 
-        // ===============================
-        // PREVENT RECEPTIONIST
-        // FROM CHANGING BRANCH
-        // ===============================
+        // =========================================
+        // BUILD UPDATE DATA
+        // =========================================
 
-        let updateData = {
+        const updateData = {
             ...req.body,
         };
 
 
+        let updateBranch;
+
+
+        // =========================================
+        // RECEPTIONIST
+        // =========================================
+
         if (branch) {
 
-            updateData.gymBranch =
+            // Never allow receptionist to
+            // change the attendance branch.
+            updateBranch =
                 branch;
 
-        } else if (!updateData.gymBranch) {
+        } else {
 
-            updateData.gymBranch =
-                existingAttendance.gymBranch;
+            // Main admin can change branch,
+            // but only to a valid branch.
+            updateBranch =
+                normalizeBranch(
+                    updateData.gymBranch ||
+                    existingAttendance.gymBranch
+                );
+
+            if (!updateBranch) {
+
+                return res.status(400).json({
+
+                    message: 'A valid gym branch is required.',
+
+                });
+            }
         }
 
 
-        // ===============================
+        // =========================================
         // VALIDATE BRANCH
-        // ===============================
+        // =========================================
 
-        const allowedBranches = [
-            'Kalyanpur',
-            'Gopalpur',
-        ];
-
-
-        if (!allowedBranches.includes(
-                updateData.gymBranch
+        if (!ALLOWED_BRANCHES.includes(
+                updateBranch
             )) {
 
             return res.status(400).json({
@@ -343,9 +564,40 @@ const updateAttendance = async(req, res) => {
         }
 
 
-        // ===============================
-        // UPDATE
-        // ===============================
+        updateData.gymBranch =
+            updateBranch;
+
+
+        // =========================================
+        // VERIFY MEMBER IF MEMBER IS CHANGED
+        // =========================================
+
+        if (updateData.member) {
+
+            const memberRecord =
+                await Member.findOne({
+
+                    _id: updateData.member,
+
+                    gymBranch: updateBranch,
+
+                });
+
+
+            if (!memberRecord) {
+
+                return res.status(400).json({
+
+                    message: 'Member not found in the selected gym branch.',
+
+                });
+            }
+        }
+
+
+        // =========================================
+        // UPDATE ATTENDANCE
+        // =========================================
 
         const attendance =
             await Attendance.findByIdAndUpdate(
@@ -365,7 +617,7 @@ const updateAttendance = async(req, res) => {
             );
 
 
-        res.status(200).json({
+        return res.status(200).json({
 
             message: 'Attendance updated successfully.',
 
@@ -380,7 +632,7 @@ const updateAttendance = async(req, res) => {
             error.message
         );
 
-        res.status(500).json({
+        return res.status(500).json({
 
             message: 'Server error. Please try again.',
 
@@ -389,30 +641,59 @@ const updateAttendance = async(req, res) => {
 };
 
 
-// ===============================
+// =========================================
 // DELETE ATTENDANCE
-// ===============================
+// =========================================
 
 const deleteAttendance = async(req, res) => {
+
     try {
 
         const branch =
             getAccessibleBranch(req);
 
 
-        // ===============================
+        // =========================================
+        // VALIDATE RECEPTIONIST BRANCH
+        // =========================================
+
+        if (
+            req.admin &&
+            req.admin.role === 'receptionist' &&
+            !branch
+        ) {
+
+            return res.status(403).json({
+
+                message: 'Your account is not assigned to a valid gym branch.',
+
+            });
+        }
+
+
+        // =========================================
         // BUILD QUERY
-        // ===============================
+        // =========================================
 
         const query = {
+
             _id: req.params.id,
+
         };
 
 
+        // Receptionist can delete only
+        // attendance belonging to their branch.
         if (branch) {
-            query.gymBranch = branch;
+
+            query.gymBranch =
+                branch;
         }
 
+
+        // =========================================
+        // DELETE ATTENDANCE
+        // =========================================
 
         const attendance =
             await Attendance.findOneAndDelete(
@@ -430,7 +711,7 @@ const deleteAttendance = async(req, res) => {
         }
 
 
-        res.status(200).json({
+        return res.status(200).json({
 
             message: 'Attendance deleted successfully.',
 
@@ -443,7 +724,7 @@ const deleteAttendance = async(req, res) => {
             error.message
         );
 
-        res.status(500).json({
+        return res.status(500).json({
 
             message: 'Server error. Please try again.',
 
@@ -452,9 +733,9 @@ const deleteAttendance = async(req, res) => {
 };
 
 
-// ===============================
+// =========================================
 // EXPORT CONTROLLERS
-// ===============================
+// =========================================
 
 module.exports = {
 

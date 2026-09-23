@@ -10,59 +10,112 @@ const {
 
 const {
     protect,
+    authorizeBranch,
     requirePermission,
 } = require('../middleware/authMiddleware');
 
 const router = express.Router();
 
+/* =========================================================
+   ATTENDANCE
+   ========================================================= */
 
-// =====================================
-// ATTENDANCE
-// =====================================
+/* =========================================================
+   MARK ATTENDANCE
+   POST /api/attendance
 
-// Mark attendance
+   Main Admin:
+   - Must provide valid gymBranch
+
+   Receptionist:
+   - Uses assigned branch
+
+   Permission:
+   - attendance.add
+   ========================================================= */
+
 router.post(
     '/',
     protect,
+    authorizeBranch,
     requirePermission('attendance.add'),
     markAttendance
 );
 
 
-// View attendance
+/* =========================================================
+   VIEW ATTENDANCE
+   GET /api/attendance
+
+   Main Admin:
+   - Both branches
+
+   Receptionist:
+   - Assigned branch only
+
+   Permission:
+   - attendance.view
+   ========================================================= */
+
 router.get(
     '/',
     protect,
+    authorizeBranch,
     requirePermission('attendance.view'),
     getAttendance
 );
 
 
-// View single attendance record
+/* =========================================================
+   VIEW SINGLE ATTENDANCE RECORD
+   GET /api/attendance/:id
+   ========================================================= */
+
 router.get(
     '/:id',
     protect,
+    authorizeBranch,
     requirePermission('attendance.view'),
     getAttendanceById
 );
 
 
-// Edit attendance
+/* =========================================================
+   EDIT ATTENDANCE
+   PUT /api/attendance/:id
+
+   Permission:
+   - attendance.edit
+   ========================================================= */
+
 router.put(
     '/:id',
     protect,
+    authorizeBranch,
     requirePermission('attendance.edit'),
     updateAttendance
 );
 
 
-// Delete attendance
+/* =========================================================
+   DELETE ATTENDANCE
+   DELETE /api/attendance/:id
+
+   Permission:
+   - attendance.delete
+   ========================================================= */
+
 router.delete(
     '/:id',
     protect,
+    authorizeBranch,
     requirePermission('attendance.delete'),
     deleteAttendance
 );
 
+
+/* =========================================================
+   EXPORT ROUTER
+   ========================================================= */
 
 module.exports = router;
