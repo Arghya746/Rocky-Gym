@@ -2,6 +2,7 @@ const express = require('express');
 
 const {
     getStaff,
+    updateStaffBranches,
     updateStaffPermissions,
     updateStaffStatus,
 } = require('../controllers/staffController');
@@ -19,7 +20,12 @@ const router = express.Router();
 // MAIN ADMIN ONLY
 // =====================================
 
-// Get all receptionists
+
+// =====================================
+// GET ALL RECEPTIONISTS
+// GET /api/admin/staff
+// =====================================
+
 router.get(
     '/',
     protect,
@@ -28,7 +34,24 @@ router.get(
 );
 
 
-// Update receptionist permissions
+// =====================================
+// UPDATE RECEPTIONIST BRANCHES
+// PUT /api/admin/staff/:id/branches
+// =====================================
+
+router.put(
+    '/:id/branches',
+    protect,
+    authorize('admin'),
+    updateStaffBranches
+);
+
+
+// =====================================
+// UPDATE RECEPTIONIST PERMISSIONS
+// PUT /api/admin/staff/:id/permissions
+// =====================================
+
 router.put(
     '/:id/permissions',
     protect,
@@ -37,7 +60,11 @@ router.put(
 );
 
 
-// Activate / deactivate receptionist
+// =====================================
+// ACTIVATE / DEACTIVATE RECEPTIONIST
+// PUT /api/admin/staff/:id/status
+// =====================================
+
 router.put(
     '/:id/status',
     protect,
