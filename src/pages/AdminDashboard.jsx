@@ -15,8 +15,6 @@ const DEFAULT_PERMISSIONS = {
   attendance: { view: true, add: true, edit: true, delete: false },
   workouts: { view: true, add: true, edit: true, delete: false },
   enquiries: { view: true, delete: false },
-  plans: { view: true, add: false, edit: false, delete: false },
-  offers: { view: true, add: false, edit: false, delete: false },
 };
 
 const normalizeBranch = (value) => {
@@ -27,7 +25,7 @@ const normalizeBranch = (value) => {
   if (normalized === 'kalyanpur') return 'Kalyanpur';
   if (normalized === 'gopalpur') return 'Gopalpur';
 
-  return '';
+  return String(value).trim();
 };
 
 const getBranchLabel = (value) => {
@@ -107,30 +105,65 @@ export default function AdminDashboard() {
     );
   }
 
-  // IMPORTANT:
-  // The backend JWT now contains both role and gymBranch.
-  // Use the stored user first, then fall back to the JWT.
-  // This prevents a receptionist from being incorrectly treated
-  // as the main admin when adminUser was not stored in localStorage.
-  // The JWT is the authoritative source for role/branch.
-  // localStorage is only a compatibility fallback for older login responses.
+  // =========================================================
+  // AUTH / MULTI-BRANCH ACCESS
+  // =========================================================
+
   const userRole =
-    tokenPayload?.role ||
     loggedInUser?.role ||
     loggedInUser?.userRole ||
+    tokenPayload?.role ||
     null;
 
-  const userBranchId = normalizeBranch(
-    tokenPayload?.gymBranch ||
+  // New multi-branch field for receptionists.
+  // Backward-compatible fallback to the old single gymBranch field.
+  const storedGymBranches = Array.isArray(loggedInUser?.gymBranches)
+    ? loggedInUser.gymBranches
+    : [];
+
+  const tokenGymBranches = Array.isArray(tokenPayload?.gymBranches)
+    ? tokenPayload.gymBranches
+    : [];
+
+  const normalizedStoredBranches = storedGymBranches
+    .map(normalizeBranch)
+    .filter((branch) => GYM_BRANCHES.some((item) => item._id === branch));
+
+  const normalizedTokenBranches = tokenGymBranches
+    .map(normalizeBranch)
+    .filter((branch) => GYM_BRANCHES.some((item) => item._id === branch));
+
+  const legacyUserBranch = normalizeBranch(
     loggedInUser?.gymBranch ||
     loggedInUser?.branchName ||
     loggedInUser?.branch ||
+    tokenPayload?.gymBranch ||
     null
   );
 
+  const accessibleBranches = Array.from(
+    new Set(
+      (normalizedStoredBranches.length > 0
+        ? normalizedStoredBranches
+        : normalizedTokenBranches.length > 0
+          ? normalizedTokenBranches
+          : legacyUserBranch
+            ? [legacyUserBranch]
+            : []
+      ).filter((branch) =>
+        GYM_BRANCHES.some((item) => item._id === branch)
+      )
+    )
+  );
+
+  // Kept for compatibility with existing code that expects a single branch.
+  // For a multi-branch receptionist this is simply the first accessible branch.
+  const userBranchId = accessibleBranches[0] || '';
+
   const userBranchName =
-    userBranchId ||
-    'BRANCH NOT ASSIGNED';
+    accessibleBranches.length > 0
+      ? accessibleBranches.join(' / ')
+      : 'BRANCH NOT ASSIGNED';
 
   const isMainAdmin =
     userRole === 'admin' ||
@@ -143,81 +176,96 @@ export default function AdminDashboard() {
 
   const branches = GYM_BRANCHES;
 
+  // Main admin can see ALL branches or select one.
+  // Receptionists/staff can select only from their assigned branches.
+  const initialBranchId = isMainAdmin
+    ? 'all'
+    : accessibleBranches[0] || '';
+
   const [selectedBranchId, setSelectedBranchId] =
-    useState(() =>
-      isMainAdmin
-        ? 'all'
-        : userBranchId
-    );
+    useState(initialBranchId);
 
   const [selectedBranchName, setSelectedBranchName] =
-    useState(() =>
-      isMainAdmin
-        ? 'ALL BRANCHES'
-        : userBranchName
-    );
+    useState(() => {
+      if (isMainAdmin) return 'ALL BRANCHES';
+      return accessibleBranches[0] || 'BRANCH NOT ASSIGNED';
+    });
 
   const [branchError, setBranchError] =
     useState('');
 
-  // Branch authorization is enforced by the backend.
-  // This helper only controls what the dashboard displays.
+  // Branch filtering is also enforced by the backend.
+  // This frontend filter keeps the visible dashboard consistent with the
+  // currently selected branch.
+  const getBranchQuery = () => {
+    if (isMainAdmin) {
+      return selectedBranchId && selectedBranchId !== 'all'
+        ? `?gymBranch=${encodeURIComponent(selectedBranchId)}`
+        : '';
+    }
+
+    return selectedBranchId
+      ? `?gymBranch=${encodeURIComponent(selectedBranchId)}`
+      : '';
+  };
+
   const filterBySelectedBranch = (items) => {
     if (!Array.isArray(items)) {
       return [];
     }
 
-    // Receptionists are permanently locked to their assigned branch.
-    if (!isMainAdmin) {
-      if (!userBranchId) {
-        return [];
-      }
-
-      return items.filter((item) => {
-        const branch =
-          item?.gymBranch ||
-          item?.branchName ||
-          item?.branch;
-        return normalizeBranch(branch) === userBranchId;
-      });
-    }
-
-    // Main admin can see both branches.
-    if (selectedBranchId === 'all') {
+    // Main admin + ALL BRANCHES.
+    if (isMainAdmin && selectedBranchId === 'all') {
       return items;
     }
 
-    // Main admin can switch between Kalyanpur and Gopalpur.
+    // Both main admin and receptionist views are filtered by the active branch.
+    if (!selectedBranchId) {
+      return [];
+    }
+
+    if (
+      !isMainAdmin &&
+      !accessibleBranches.includes(normalizeBranch(selectedBranchId))
+    ) {
+      return [];
+    }
+
     return items.filter((item) => {
       const branch =
         item?.gymBranch ||
         item?.branchName ||
         item?.branch;
-      return normalizeBranch(branch) === normalizeBranch(selectedBranchId);
+
+      return normalizeBranch(branch) ===
+        normalizeBranch(selectedBranchId);
     });
   };
 
   const getWriteBranchId = () => {
     if (isMainAdmin) {
-      if (
-        !selectedBranchId ||
-        selectedBranchId === 'all'
-      ) {
+      if (!selectedBranchId || selectedBranchId === 'all') {
         throw new Error(
           'Select Kalyanpur or Gopalpur before creating a record.'
         );
       }
 
-      return selectedBranchId;
+      return normalizeBranch(selectedBranchId);
     }
 
-    if (!userBranchId) {
+    if (!selectedBranchId) {
       throw new Error(
         'Your account is not assigned to a gym branch.'
       );
     }
 
-    return userBranchId;
+    if (!accessibleBranches.includes(normalizeBranch(selectedBranchId))) {
+      throw new Error(
+        'You do not have access to the selected gym branch.'
+      );
+    }
+
+    return normalizeBranch(selectedBranchId);
   };
 
   const [contacts, setContacts] = useState([]);
@@ -238,9 +286,9 @@ export default function AdminDashboard() {
     durationMonths: '',
     price: '',
     description: '',
-    gymBranch: isMainAdmin && selectedBranchId !== 'all'
+    gymBranch: selectedBranchId && selectedBranchId !== 'all'
       ? selectedBranchId
-      : userBranchId || '',
+      : userBranchId || 'Kalyanpur',
     isActive: true,
   });
 
@@ -419,6 +467,10 @@ export default function AdminDashboard() {
   const [staffError, setStaffError] = useState('');
   const [savingPermissions, setSavingPermissions] = useState(false);
 
+  // Main-admin-only receptionist multi-branch assignment
+  const [staffBranches, setStaffBranches] = useState([]);
+  const [savingStaffBranches, setSavingStaffBranches] = useState(false);
+
 
   // =========================================================
   // WORKOUT STATES
@@ -500,18 +552,6 @@ export default function AdminDashboard() {
       view: staffMember?.permissions?.enquiries?.view ?? true,
       delete: staffMember?.permissions?.enquiries?.delete ?? false,
     },
-    plans: {
-      view: staffMember?.permissions?.plans?.view ?? true,
-      add: staffMember?.permissions?.plans?.add ?? false,
-      edit: staffMember?.permissions?.plans?.edit ?? false,
-      delete: staffMember?.permissions?.plans?.delete ?? false,
-    },
-    offers: {
-      view: staffMember?.permissions?.offers?.view ?? true,
-      add: staffMember?.permissions?.offers?.add ?? false,
-      edit: staffMember?.permissions?.offers?.edit ?? false,
-      delete: staffMember?.permissions?.offers?.delete ?? false,
-    },
   });
 
   const fetchStaff = async () => {
@@ -569,11 +609,19 @@ export default function AdminDashboard() {
             normalizeStaffPermissions(nextStaff)
           );
 
+          setStaffBranches(
+            Array.isArray(nextStaff?.gymBranches)
+              ? nextStaff.gymBranches.map(normalizeBranch).filter(Boolean)
+              : normalizeBranch(nextStaff?.gymBranch)
+                ? [normalizeBranch(nextStaff.gymBranch)]
+                : []
+          );
+
           return nextStaff;
         });
       } else {
         setSelectedStaff(null);
-        setPermissions(DEFAULT_PERMISSIONS);
+        setStaffBranches([]);
       }
 
     } catch (error) {
@@ -581,6 +629,113 @@ export default function AdminDashboard() {
       setStaffError(
         error.message || 'Unable to load staff accounts.'
       );
+    }
+  };
+
+  const handleAssignStaffBranches = async () => {
+    if (!selectedStaff) {
+      setStaffError('Please select a receptionist first.');
+      setStaffSuccess('');
+      return;
+    }
+
+    if (!isMainAdmin) {
+      setStaffError(
+        'Only the main admin can assign or change receptionist branches.'
+      );
+      setStaffSuccess('');
+      return;
+    }
+
+    const targetRole = String(selectedStaff.role || '').toLowerCase();
+
+    if (targetRole !== 'receptionist' && targetRole !== 'staff') {
+      setStaffError(
+        'Only receptionist accounts can be assigned gym branches.'
+      );
+      setStaffSuccess('');
+      return;
+    }
+
+    const nextBranches = Array.from(
+      new Set(
+        staffBranches
+          .map(normalizeBranch)
+          .filter((branch) =>
+            GYM_BRANCHES.some((item) => item._id === branch)
+          )
+      )
+    );
+
+    if (nextBranches.length === 0) {
+      setStaffError('Select at least one gym branch.');
+      setStaffSuccess('');
+      return;
+    }
+
+    try {
+      setSavingStaffBranches(true);
+      setStaffError('');
+      setStaffSuccess('');
+
+      const token = localStorage.getItem('adminToken');
+
+      if (!token) {
+        throw new Error('Admin session expired. Please login again.');
+      }
+
+      const response = await fetch(
+        `${API_URL}/api/admin/staff/${selectedStaff._id}/branches`,
+        {
+          method: 'PUT',
+          headers: {
+            'Content-Type': 'application/json',
+            Authorization: `Bearer ${token}`,
+          },
+          body: JSON.stringify({
+            gymBranches: nextBranches,
+          }),
+        }
+      );
+
+      const data = await response.json();
+
+      if (!response.ok) {
+        throw new Error(
+          data.message || 'Failed to update receptionist branches.'
+        );
+      }
+
+      const updatedStaff = data.staff || {
+        ...selectedStaff,
+        gymBranches: nextBranches,
+        gymBranch: null,
+      };
+
+      setStaffBranches(nextBranches);
+
+      setStaff((currentStaff) =>
+        currentStaff.map((member) =>
+          member._id === updatedStaff._id
+            ? updatedStaff
+            : member
+        )
+      );
+
+      setSelectedStaff(updatedStaff);
+
+      setStaffSuccess(
+        `${updatedStaff.name || 'Receptionist'} can now work at ${nextBranches.join(' and ')}.`
+      );
+      setStaffError('');
+    } catch (error) {
+      console.error('Assign staff branches error:', error);
+      setStaffError(
+        error.message || 'Unable to update receptionist branches.'
+      );
+      setStaffSuccess('');
+    } finally {
+      setSavingStaffBranches(false);
     }
   };
 
@@ -1351,9 +1506,9 @@ const handleOfferChange = (e) => {
   const resetPlanForm = (branchOverride) => {
     const defaultBranch =
       branchOverride ||
-      (isMainAdmin && selectedBranchId !== 'all'
+      (selectedBranchId && selectedBranchId !== 'all'
         ? selectedBranchId
-        : userBranchId || '');
+        : userBranchId || 'Kalyanpur');
 
     setPlanForm({
       name: '',
@@ -1703,21 +1858,8 @@ const handleOfferChange = (e) => {
 
       // Plan names can differ only by case/whitespace in MongoDB.
       // Normalize them before deciding that a required plan is missing.
-      const activeBranch = normalizeBranch(
-        isMainAdmin ? selectedBranchId : userBranchId
-      );
-
-      if (!activeBranch) {
-        throw new Error(
-          'Select Kalyanpur or Gopalpur before creating default offers.'
-        );
-      }
-
-      // Never mix plans from different branches.
       const activePlans = plans.filter(
-        (plan) =>
-          plan?.isActive !== false &&
-          normalizeBranch(plan?.gymBranch) === activeBranch
+        (plan) => plan?.isActive !== false
       );
 
       const monthlyPlan = activePlans.find(
@@ -1738,7 +1880,9 @@ const handleOfferChange = (e) => {
           .filter(Boolean);
 
         const branchLabel =
-          activeBranch;
+          isMainAdmin && selectedBranchId !== 'all'
+            ? selectedBranchId
+            : userBranchId || 'current branch';
 
         throw new Error(
           `Monthly and Quarterly plans are required for ${branchLabel}. ` +
@@ -3072,7 +3216,7 @@ const handleAttendanceChange = (e) => {
       gymBranch:
         isMainAdmin && selectedBranchId !== 'all'
           ? selectedBranchId
-          : userBranchId || current.gymBranch || '',
+          : userBranchId || current.gymBranch || 'Kalyanpur',
     }));
 
     fetchContacts();
@@ -3131,9 +3275,7 @@ const handleAttendanceChange = (e) => {
           </p>
 
           <div className="admin-current-branch">
-            {isMainAdmin
-              ? `BRANCH: ${selectedBranchName}`
-              : `BRANCH: ${userBranchName}`}
+            {`BRANCH: ${selectedBranchName}`}
           </div>
 
         </div>
@@ -3176,18 +3318,21 @@ const handleAttendanceChange = (e) => {
                   fontSize: '13px',
                 }}
               >
-                {isMainAdmin
-                  ? selectedBranchName
-                  : userBranchName}
+                {selectedBranchName}
               </strong>
             </div>
 
-            {isMainAdmin ? (
+            {isMainAdmin || accessibleBranches.length > 1 ? (
               <select
                 className="admin-branch-select"
-                value={selectedBranchId || 'all'}
+                value={selectedBranchId || (isMainAdmin ? 'all' : '')}
                 onChange={(e) => {
                   const value = e.target.value;
+
+                  if (!isMainAdmin && !accessibleBranches.includes(value)) {
+                    setBranchError('You do not have access to that gym branch.');
+                    return;
+                  }
 
                   setBranchError('');
                   setSelectedBranchId(value);
@@ -3204,20 +3349,28 @@ const handleAttendanceChange = (e) => {
                     );
                   }
                 }}
-                aria-label="Select gym branch"
+                aria-label="Select active gym branch"
               >
-                <option value="all">
-                  ALL BRANCHES
-                </option>
-
-                {branches.map((branch) => (
-                  <option
-                    key={branch._id}
-                    value={branch._id}
-                  >
-                    {branch.name}
+                {isMainAdmin && (
+                  <option value="all">
+                    ALL BRANCHES
                   </option>
-                ))}
+                )}
+
+                {branches
+                  .filter((branch) =>
+                    isMainAdmin
+                      ? true
+                      : accessibleBranches.includes(branch._id)
+                  )
+                  .map((branch) => (
+                    <option
+                      key={branch._id}
+                      value={branch._id}
+                    >
+                      {branch.name}
+                    </option>
+                  ))}
               </select>
             ) : (
               <span
@@ -4777,6 +4930,10 @@ const handleAttendanceChange = (e) => {
                     normalizeStaffPermissions(member)
                   );
 
+                  setStaffBranch(
+                    normalizeBranch(member?.gymBranch)
+                  );
+
                   setStaffSuccess('');
                   setStaffError('');
                 }}
@@ -4971,7 +5128,7 @@ const handleAttendanceChange = (e) => {
 
                 <strong>
                   {permissionCount}
-                  <small>/26</small>
+                  <small>/18</small>
                 </strong>
               </div>
 
@@ -4991,6 +5148,71 @@ const handleAttendanceChange = (e) => {
 
           </div>
 
+
+          {/* RECEPTIONIST BRANCH ASSIGNMENT */}
+
+          {(String(selectedStaff.role || '').toLowerCase() === 'receptionist' ||
+            String(selectedStaff.role || '').toLowerCase() === 'staff') && (
+            <div className="staff-branch-assignment">
+
+              <div className="staff-branch-assignment-copy">
+                <span className="staff-panel-label">
+                  BRANCH ASSIGNMENT
+                </span>
+
+                <h3>
+                  GYM <span>BRANCHES.</span>
+                </h3>
+
+                <p>
+                  Assign this receptionist to one or more Alpha Gym branches.
+                  A receptionist can switch only between the branches assigned here.
+                </p>
+              </div>
+
+              <div className="staff-branch-assignment-controls">
+                <div className="staff-branch-checkboxes">
+                  {branches.map((branch) => (
+                    <label
+                      key={branch._id}
+                      className="staff-branch-checkbox"
+                    >
+                      <input
+                        type="checkbox"
+                        checked={staffBranches.includes(branch._id)}
+                        onChange={(event) => {
+                          setStaffBranches((current) =>
+                            event.target.checked
+                              ? Array.from(new Set([...current, branch._id]))
+                              : current.filter((item) => item !== branch._id)
+                          );
+                          setStaffSuccess('');
+                          setStaffError('');
+                        }}
+                        disabled={savingStaffBranches}
+                      />
+                      <span>{branch.name}</span>
+                    </label>
+                  ))}
+                </div>
+
+                <button
+                  type="button"
+                  className="staff-save-button staff-branch-save-button"
+                  onClick={handleAssignStaffBranches}
+                  disabled={
+                    savingStaffBranches ||
+                    staffBranches.length === 0
+                  }
+                >
+                  {savingStaffBranches
+                    ? 'SAVING...'
+                    : 'SAVE BRANCHES  →'}
+                </button>
+              </div>
+
+            </div>
+          )}
 
           {/* PERMISSION HEADING */}
 
@@ -5097,34 +5319,6 @@ const handleAttendanceChange = (e) => {
                   'Member enquiries',
                 permissions: [
                   'view',
-                  'delete',
-                ],
-              },
-
-              {
-                key: 'plans',
-                label: 'PLANS',
-                icon: '📋',
-                description:
-                  'Membership plans',
-                permissions: [
-                  'view',
-                  'add',
-                  'edit',
-                  'delete',
-                ],
-              },
-
-              {
-                key: 'offers',
-                label: 'OFFERS',
-                icon: '🎯',
-                description:
-                  'Promotional offers',
-                permissions: [
-                  'view',
-                  'add',
-                  'edit',
                   'delete',
                 ],
               },

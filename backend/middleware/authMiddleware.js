@@ -1,23 +1,37 @@
 const jwt = require('jsonwebtoken');
 const Admin = require('../models/Admin');
 
-
-// ======================================================
-// VALID BRANCHES
-// ======================================================
+/* ============================================================
+   CONSTANTS
+   ============================================================ */
 
 const VALID_BRANCHES = [
     'Kalyanpur',
     'Gopalpur',
 ];
 
+const MAIN_ADMIN_ROLES = [
+    'admin',
+    'main_admin',
+    'super_admin',
+];
 
-// ======================================================
-// NORMALIZE BRANCH
-// ======================================================
+const RECEPTION_ROLES = [
+    'receptionist',
+    'staff',
+];
+
+const VALID_ROLES = [
+    ...MAIN_ADMIN_ROLES,
+    ...RECEPTION_ROLES,
+];
+
+
+/* ============================================================
+   NORMALIZE BRANCH
+   ============================================================ */
 
 const normalizeBranch = (value) => {
-
     if (!value) {
         return null;
     }
@@ -38,20 +52,81 @@ const normalizeBranch = (value) => {
 };
 
 
-// ======================================================
-// PROTECT ROUTES
-// ======================================================
+/* ============================================================
+   NORMALIZE MULTIPLE BRANCHES
+   ============================================================ */
+
+const normalizeBranches = (values) => {
+    if (!Array.isArray(values)) {
+        return [];
+    }
+
+    return Array.from(
+        new Set(
+            values
+            .map(normalizeBranch)
+            .filter(Boolean)
+        )
+    );
+};
+
+
+/* ============================================================
+   MAIN ADMIN CHECK
+   ============================================================ */
+
+const isMainAdmin = (role) => {
+    return MAIN_ADMIN_ROLES.includes(role);
+};
+
+
+/* ============================================================
+   RECEPTION / STAFF CHECK
+   ============================================================ */
+
+const isReceptionRole = (role) => {
+    return RECEPTION_ROLES.includes(role);
+};
+
+
+/* ============================================================
+   GET REQUESTED BRANCH
+   ============================================================ */
+
+const getRequestedBranch = (req) => {
+    const queryBranch =
+        req.query.gymBranch;
+
+    const bodyBranch =
+        req.body.gymBranch;
+
+    const paramBranch =
+        req.params.gymBranch;
+
+    const headerBranch =
+        req.headers['x-gym-branch'];
+
+    return normalizeBranch(
+        queryBranch ||
+        bodyBranch ||
+        paramBranch ||
+        headerBranch ||
+        ''
+    );
+};
+
+
+/* ============================================================
+   PROTECT ROUTES
+   ============================================================ */
 
 const protect = async(req, res, next) => {
-
     try {
-
-        // ==================================================
-        // JWT SECRET CHECK
-        // ==================================================
+        /* --------------------------------------------------------
+           JWT SECRET
+           -------------------------------------------------------- */
 
         if (!process.env.JWT_SECRET) {
-
             console.error(
                 'JWT_SECRET is not configured.'
             );
@@ -62,43 +137,41 @@ const protect = async(req, res, next) => {
         }
 
 
-        // ==================================================
-        // AUTHORIZATION HEADER
-        // ==================================================
+        /* --------------------------------------------------------
+           AUTHORIZATION HEADER
+           -------------------------------------------------------- */
 
         const authHeader =
             req.headers.authorization;
 
-
         if (!authHeader ||
             !authHeader.startsWith('Bearer ')
         ) {
-
             return res.status(401).json({
                 message: 'Not authorized. No token provided.',
             });
         }
 
 
-        // ==================================================
-        // EXTRACT TOKEN
-        // ==================================================
+        /* --------------------------------------------------------
+           EXTRACT TOKEN
+           -------------------------------------------------------- */
 
         const token =
-            authHeader.substring(7).trim();
-
+            authHeader
+            .substring(7)
+            .trim();
 
         if (!token) {
-
             return res.status(401).json({
                 message: 'Not authorized. Invalid token.',
             });
         }
 
 
-        // ==================================================
-        // VERIFY TOKEN
-        // ==================================================
+        /* --------------------------------------------------------
+           VERIFY JWT
+           -------------------------------------------------------- */
 
         const decoded =
             jwt.verify(
@@ -106,110 +179,123 @@ const protect = async(req, res, next) => {
                 process.env.JWT_SECRET
             );
 
-
-        // ==================================================
-        // VALIDATE TOKEN ID
-        // ==================================================
-
-        if (!decoded || !decoded.id) {
-
+        if (!decoded ||
+            !decoded.id
+        ) {
             return res.status(401).json({
                 message: 'Invalid authentication token.',
             });
         }
 
 
-        // ==================================================
-        // FIND CURRENT USER
-        // ==================================================
-        //
-        // IMPORTANT:
-        //
-        // The database account is authoritative.
-        //
-        // We do NOT trust role/branch from the JWT
-        // when the database record is available.
-        //
+        /* --------------------------------------------------------
+           LOAD CURRENT DATABASE ACCOUNT
+           --------------------------------------------------------
+
+           IMPORTANT:
+           Database data is authoritative.
+
+           We do not trust role/branch information
+           stored inside the JWT if the account exists.
+        -------------------------------------------------------- */
 
         const admin =
-            await Admin.findById(decoded.id).select(
-                '-password'
-            );
-
+            await Admin.findById(
+                decoded.id
+            ).select('-password');
 
         if (!admin) {
-
             return res.status(401).json({
                 message: 'User account not found.',
             });
         }
 
 
-        // ==================================================
-        // ACCOUNT STATUS
-        // ==================================================
+        /* --------------------------------------------------------
+           ACCOUNT STATUS
+           -------------------------------------------------------- */
 
         if (admin.status !== 'active') {
-
             return res.status(403).json({
                 message: 'Your account has been deactivated.',
             });
         }
 
 
-        // ==================================================
-        // VALIDATE DATABASE ROLE
-        // ==================================================
+        /* --------------------------------------------------------
+           ROLE VALIDATION
+           -------------------------------------------------------- */
 
-        if (!['admin', 'receptionist'].includes(
+        if (!VALID_ROLES.includes(
                 admin.role
             )) {
-
             return res.status(403).json({
                 message: 'Invalid account role.',
             });
         }
 
 
-        // ==================================================
-        // RESOLVE BRANCH
-        // ==================================================
+        /* --------------------------------------------------------
+           RESOLVE ACCESSIBLE BRANCHES
+           -------------------------------------------------------- */
 
-        let adminBranch = null;
+        let accessibleBranches = [];
 
 
-        // --------------------------------------------------
-        // MAIN ADMIN
-        // --------------------------------------------------
+        /* --------------------------------------------------------
+           MAIN ADMIN
+           --------------------------------------------------------
 
-        if (admin.role === 'admin') {
+           Main admins can work with both branches.
+        -------------------------------------------------------- */
 
-            // Main admin controls both branches.
-            adminBranch = null;
+        if (
+            isMainAdmin(
+                admin.role
+            )
+        ) {
+            accessibleBranches = [
+                ...VALID_BRANCHES,
+            ];
         }
 
 
-        // --------------------------------------------------
-        // RECEPTIONIST
-        // --------------------------------------------------
+        /* --------------------------------------------------------
+           RECEPTIONIST / STAFF
+           -------------------------------------------------------- */
 
-        if (admin.role === 'receptionist') {
+        if (
+            isReceptionRole(
+                admin.role
+            )
+        ) {
+            const storedBranches =
+                normalizeBranches(
+                    admin.gymBranches
+                );
 
-            adminBranch =
+            /* ----------------------------------------------------
+               LEGACY FALLBACK
+            ---------------------------------------------------- */
+
+            const legacyBranch =
                 normalizeBranch(
                     admin.gymBranch
                 );
 
+            accessibleBranches =
+                storedBranches.length > 0 ?
+                storedBranches :
+                legacyBranch ? [legacyBranch] : [];
 
-            // IMPORTANT:
-            //
-            // NEVER fall back to Kalyanpur.
-            //
-            // An unassigned receptionist must not
-            // automatically gain access to a branch.
 
-            if (!adminBranch) {
+            /* ----------------------------------------------------
+               REQUIRE BRANCH ACCESS
+            ---------------------------------------------------- */
 
+            if (
+                accessibleBranches.length === 0
+            ) {
                 return res.status(403).json({
                     message: 'Your account is not assigned to a valid gym branch. Please contact the administrator.',
                 });
@@ -217,77 +303,147 @@ const protect = async(req, res, next) => {
         }
 
 
-        // ==================================================
-        // ATTACH AUTHENTICATED USER
-        // ==================================================
+        /* --------------------------------------------------------
+           REQUESTED / ACTIVE BRANCH
+           -------------------------------------------------------- */
+
+        const requestedBranch =
+            getRequestedBranch(req);
+
+        let activeBranch = null;
+
+
+        /* --------------------------------------------------------
+           MAIN ADMIN ACTIVE BRANCH
+           -------------------------------------------------------- */
+
+        if (
+            isMainAdmin(
+                admin.role
+            )
+        ) {
+            if (requestedBranch) {
+                activeBranch =
+                    requestedBranch;
+            }
+        }
+
+
+        /* --------------------------------------------------------
+           RECEPTIONIST / STAFF ACTIVE BRANCH
+           -------------------------------------------------------- */
+
+        if (
+            isReceptionRole(
+                admin.role
+            )
+        ) {
+            if (requestedBranch) {
+
+                if (!accessibleBranches.includes(
+                        requestedBranch
+                    )) {
+                    return res.status(403).json({
+                        message: 'Access denied. You cannot access another gym branch.',
+                    });
+                }
+
+                activeBranch =
+                    requestedBranch;
+
+            } else {
+                /*
+                 * Default to the first assigned branch.
+                 */
+                activeBranch =
+                    accessibleBranches[0];
+            }
+        }
+
+
+        /* --------------------------------------------------------
+           ATTACH AUTHENTICATED USER
+           -------------------------------------------------------- */
 
         req.admin = admin;
 
 
-        // ==================================================
-        // ATTACH AUTHORITATIVE ROLE
-        // ==================================================
+        /* --------------------------------------------------------
+           ATTACH ROLE
+           -------------------------------------------------------- */
 
         req.adminRole =
             admin.role;
 
 
-        // ==================================================
-        // ATTACH AUTHORITATIVE BRANCH
-        // ==================================================
+        /* --------------------------------------------------------
+           ATTACH ACCESSIBLE BRANCHES
+           -------------------------------------------------------- */
+
+        req.adminBranches =
+            accessibleBranches;
+
+
+        /* --------------------------------------------------------
+           ATTACH ACTIVE BRANCH
+           -------------------------------------------------------- */
 
         req.adminBranch =
-            adminBranch;
+            activeBranch;
 
 
-        // ==================================================
-        // OPTIONAL JWT INFORMATION
-        // ==================================================
-        //
-        // Keep decoded token available if another
-        // controller needs it.
-        //
-        // Do NOT use decoded.role or decoded.gymBranch
-        // for authorization when req.admin is available.
-        //
+        /* --------------------------------------------------------
+           ATTACH VERIFIED JWT
+           -------------------------------------------------------- */
 
-        req.auth = decoded;
+        req.auth =
+            decoded;
 
 
-        // ==================================================
-        // CONTINUE
-        // ==================================================
+        /* --------------------------------------------------------
+           CONTINUE
+           -------------------------------------------------------- */
 
-        next();
+        return next();
 
     } catch (error) {
-
         console.error(
             'Auth Error:',
             error.message
         );
 
 
-        // JWT-specific errors
-        if (
-            error.name === 'TokenExpiredError'
-        ) {
+        /* --------------------------------------------------------
+           EXPIRED TOKEN
+           -------------------------------------------------------- */
 
+        if (
+            error.name ===
+            'TokenExpiredError'
+        ) {
             return res.status(401).json({
                 message: 'Token has expired. Please login again.',
             });
         }
 
 
-        if (
-            error.name === 'JsonWebTokenError'
-        ) {
+        /* --------------------------------------------------------
+           INVALID TOKEN
+           -------------------------------------------------------- */
 
+        if (
+            error.name ===
+            'JsonWebTokenError'
+        ) {
             return res.status(401).json({
                 message: 'Invalid authentication token.',
             });
         }
 
+
+        /* --------------------------------------------------------
+           OTHER AUTH ERROR
+           -------------------------------------------------------- */
 
         return res.status(401).json({
             message: 'Invalid or expired token.',
@@ -296,149 +452,108 @@ const protect = async(req, res, next) => {
 };
 
 
-// ======================================================
-// ROLE AUTHORIZATION
-// ======================================================
+/* ============================================================
+   ROLE AUTHORIZATION
+   ============================================================ */
 
 const authorize = (...allowedRoles) => {
-
     return (req, res, next) => {
 
-        // ================================================
-        // AUTHENTICATION REQUIRED
-        // ================================================
-
         if (!req.admin) {
-
             return res.status(401).json({
                 message: 'Not authorized.',
             });
         }
 
-
-        // ================================================
-        // DATABASE ROLE
-        // ================================================
-
         const role =
             req.admin.role;
 
-
-        // ================================================
-        // ROLE CHECK
-        // ================================================
-
         if (!allowedRoles.includes(role)) {
-
             return res.status(403).json({
                 message: 'Access denied. You do not have permission.',
             });
         }
 
-
-        // ================================================
-        // CONTINUE
-        // ================================================
-
-        next();
+        return next();
     };
 };
 
 
-// ======================================================
-// PERMISSION CHECK
-// ======================================================
-//
-// Examples:
-//
-// requirePermission('members.view')
-// requirePermission('members.add')
-//
-// requirePermission('plans.view')
-// requirePermission('plans.add')
-//
-// requirePermission('offers.view')
-// requirePermission('offers.add')
-//
+/* ============================================================
+   PERMISSION CHECK
+   ============================================================ */
 
 const requirePermission = (permission) => {
-
     return (req, res, next) => {
 
-        // ================================================
-        // AUTHENTICATION REQUIRED
-        // ================================================
+        /* --------------------------------------------------------
+           AUTHENTICATION
+           -------------------------------------------------------- */
 
         if (!req.admin) {
-
             return res.status(401).json({
                 message: 'Not authorized.',
             });
         }
 
 
-        // ================================================
-        // VALID PERMISSION FORMAT
-        // ================================================
+        /* --------------------------------------------------------
+           VALID PERMISSION
+           -------------------------------------------------------- */
 
         if (
             typeof permission !== 'string' ||
             !permission.trim()
         ) {
-
             return res.status(500).json({
                 message: 'Invalid permission configuration.',
             });
         }
 
 
-        // ================================================
-        // MAIN ADMIN
-        // ================================================
-        //
-        // Main admin has full permissions.
-        //
-        // Branch isolation is still enforced by
-        // controllers such as Plan/Offer controllers.
-        //
+        /* --------------------------------------------------------
+           MAIN ADMIN BYPASS
+           -------------------------------------------------------- */
 
         if (
-            req.admin.role === 'admin'
+            isMainAdmin(
+                req.admin.role
+            )
         ) {
-
             return next();
         }
 
 
-        // ================================================
-        // RECEPTIONIST PERMISSIONS
-        // ================================================
+        /* --------------------------------------------------------
+           STAFF PERMISSIONS
+           -------------------------------------------------------- */
 
         const permissions =
             req.admin.permissions || {};
 
-
-        // ================================================
-        // READ NESTED PERMISSION
-        // ================================================
 
         const parts =
             permission
             .split('.')
             .filter(Boolean);
 
-
         let current =
             permissions;
 
 
-        for (const part of parts) {
+        /* --------------------------------------------------------
+           READ NESTED PERMISSION
+           -------------------------------------------------------- */
 
+        for (
+            const part of parts
+        ) {
             if (!current ||
                 typeof current !== 'object'
             ) {
+                current =
+                    undefined;
 
-                current = undefined;
                 break;
             }
 
@@ -447,144 +562,189 @@ const requirePermission = (permission) => {
         }
 
 
-        // ================================================
-        // PERMISSION DENIED
-        // ================================================
+        /* --------------------------------------------------------
+           DENIED
+           -------------------------------------------------------- */
 
         if (current !== true) {
-
             return res.status(403).json({
                 message: 'Access denied. You do not have permission.',
             });
         }
 
 
-        // ================================================
-        // PERMISSION GRANTED
-        // ================================================
+        /* --------------------------------------------------------
+           GRANTED
+           -------------------------------------------------------- */
 
-        next();
+        return next();
     };
 };
 
 
-// ======================================================
-// BRANCH ACCESS CHECK
-// ======================================================
-//
-// Use this middleware when a route receives a branch
-// from the request.
-//
-// Examples:
-//
-// /api/members?gymBranch=Kalyanpur
-//
-// /api/plans?gymBranch=Gopalpur
-//
-// Main admin:
-//     Can access either valid branch.
-//
-// Receptionist:
-//     Can access ONLY req.adminBranch.
-//
-// IMPORTANT:
-// The controller should still enforce branch filtering
-// for database queries.
-//
+/* ============================================================
+   BRANCH ACCESS CHECK
+   ============================================================ */
 
 const authorizeBranch = (req, res, next) => {
 
-    // ================================================
-    // AUTHENTICATION REQUIRED
-    // ================================================
+    /* --------------------------------------------------------
+       AUTHENTICATION
+       -------------------------------------------------------- */
 
     if (!req.admin) {
-
         return res.status(401).json({
             message: 'Not authorized.',
         });
     }
 
 
-    // ================================================
-    // MAIN ADMIN
-    // ================================================
-    //
-    // Main admin can work with both branches.
-    //
+    /* --------------------------------------------------------
+       MAIN ADMIN
+       -------------------------------------------------------- */
 
     if (
-        req.admin.role === 'admin'
+        isMainAdmin(
+            req.admin.role
+        )
     ) {
+        const requestedBranch =
+            getRequestedBranch(req);
 
-        return next();
+        /*
+         * No branch means the main admin may
+         * intentionally operate on all branches.
+         */
+        if (!requestedBranch) {
+            return next();
+        }
+
+        if (
+            VALID_BRANCHES.includes(
+                requestedBranch
+            )
+        ) {
+            req.adminBranch =
+                requestedBranch;
+
+            return next();
+        }
+
+        return res.status(400).json({
+            message: 'Invalid gym branch.',
+        });
     }
 
 
-    // ================================================
-    // RECEPTIONIST MUST HAVE BRANCH
-    // ================================================
+    /* --------------------------------------------------------
+       RECEPTIONIST / STAFF
+       -------------------------------------------------------- */
 
-    if (!req.adminBranch) {
+    if (!isReceptionRole(
+            req.admin.role
+        )) {
+        return res.status(403).json({
+            message: 'Invalid account role.',
+        });
+    }
 
+
+    /* --------------------------------------------------------
+       GET ACCESSIBLE BRANCHES
+       -------------------------------------------------------- */
+
+    let accessibleBranches =
+        normalizeBranches(
+            req.admin.gymBranches
+        );
+
+
+    /* --------------------------------------------------------
+       LEGACY FALLBACK
+       -------------------------------------------------------- */
+
+    if (
+        accessibleBranches.length === 0
+    ) {
+        const legacyBranch =
+            normalizeBranch(
+                req.admin.gymBranch
+            );
+
+        if (legacyBranch) {
+            accessibleBranches = [
+                legacyBranch,
+            ];
+        }
+    }
+
+
+    /* --------------------------------------------------------
+       NO BRANCH ACCESS
+       -------------------------------------------------------- */
+
+    if (
+        accessibleBranches.length === 0
+    ) {
         return res.status(403).json({
             message: 'Your account is not assigned to a gym branch.',
         });
     }
 
 
-    // ================================================
-    // GET REQUESTED BRANCH
-    // ================================================
+    /* --------------------------------------------------------
+       REQUESTED BRANCH
+       -------------------------------------------------------- */
 
     const requestedBranch =
-        normalizeBranch(
-            req.query.gymBranch ||
-            req.body.gymBranch ||
-            req.params.gymBranch
-        );
+        getRequestedBranch(req);
 
 
-    // ================================================
-    // NO EXPLICIT BRANCH
-    // ================================================
-    //
-    // Don't automatically trust a client-supplied
-    // branch. The controller can use req.adminBranch.
-    //
+    /* --------------------------------------------------------
+       NO EXPLICIT BRANCH
+       --------------------------------------------------------
+
+       protect() has already selected the active branch.
+    -------------------------------------------------------- */
 
     if (!requestedBranch) {
+        if (req.adminBranch) {
+            return next();
+        }
 
-        return next();
+        return res.status(400).json({
+            message: 'Please select a gym branch.',
+        });
     }
 
 
-    // ================================================
-    // BRANCH MISMATCH
-    // ================================================
+    /* --------------------------------------------------------
+       VERIFY ACCESS
+       -------------------------------------------------------- */
 
-    if (
-        requestedBranch !==
-        req.adminBranch
-    ) {
-
+    if (!accessibleBranches.includes(
+            requestedBranch
+        )) {
         return res.status(403).json({
             message: 'Access denied. You cannot access another gym branch.',
         });
     }
 
 
-    // ================================================
-    // CONTINUE
-    // ================================================
+    /* --------------------------------------------------------
+       SET ACTIVE BRANCH
+       -------------------------------------------------------- */
 
-    next();
+    req.adminBranch =
+        requestedBranch;
+
+    return next();
 };
 
 
-// ======================================================
-// EXPORTS
-// ======================================================
+/* ============================================================
+   EXPORTS
+   ============================================================ */
 
 module.exports = protect;
 
@@ -599,3 +759,12 @@ module.exports.requirePermission =
 
 module.exports.authorizeBranch =
     authorizeBranch;
+
+module.exports.normalizeBranch =
+    normalizeBranch;
+
+module.exports.normalizeBranches =
+    normalizeBranches;
+
+module.exports.isMainAdmin =
+    isMainAdmin;

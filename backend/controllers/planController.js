@@ -1,65 +1,168 @@
+const mongoose = require('mongoose');
 const Plan = require('../models/Plan');
+
+/* =========================================================
+   BRANCH CONFIG
+   ========================================================= */
+
+const VALID_BRANCHES = ['Kalyanpur', 'Gopalpur'];
+
+const MAIN_ADMIN_ROLES = [
+    'admin',
+    'main_admin',
+    'super_admin',
+];
+
+const BRANCH_USER_ROLES = [
+    'receptionist',
+    'staff',
+];
+
+/* =========================================================
+   ROLE HELPERS
+   ========================================================= */
+
+const normalizeRole = (role) => {
+    if (!role) return '';
+
+    return String(role)
+        .trim()
+        .toLowerCase();
+};
+
+const isMainAdmin = (req) => {
+    const role = normalizeRole(req.admin.role);
+
+    return MAIN_ADMIN_ROLES.includes(role);
+};
+
+const isBranchUser = (req) => {
+    const role = normalizeRole(req.admin.role);
+
+    return BRANCH_USER_ROLES.includes(role);
+};
 
 /* =========================================================
    BRANCH HELPERS
    ========================================================= */
 
-const VALID_BRANCHES = ['Kalyanpur', 'Gopalpur'];
+const normalizeBranch = (branch) => {
+    if (!branch) return '';
 
-/**
- * Check whether the logged-in user is the main admin.
- */
-const isMainAdmin = (req) => {
-    return req.admin && req.admin.role === 'admin';
+    const normalized = String(branch)
+        .trim()
+        .toLowerCase();
+
+    if (normalized === 'kalyanpur') {
+        return 'Kalyanpur';
+    }
+
+    if (normalized === 'gopalpur') {
+        return 'Gopalpur';
+    }
+
+    return String(branch).trim();
+};
+
+const isValidBranch = (branch) => {
+    return VALID_BRANCHES.includes(
+        normalizeBranch(branch)
+    );
 };
 
 /**
- * Get the branch assigned to the logged-in user.
- *
  * Main admin:
- *   -> null because main admin can access both branches.
+ *   -> null = access to both branches
  *
- * Receptionist / branch staff:
- *   -> their assigned branch.
+ * Receptionist / staff:
+ *   -> assigned branch
  *
- * Invalid / missing branch:
- *   -> empty string.
- *
- * IMPORTANT:
- * Never default to Kalyanpur.
+ * Missing branch:
+ *   -> ''
  */
 const getAccessibleBranch = (req) => {
     if (isMainAdmin(req)) {
         return null;
     }
 
-    if (req.admin && req.admin.gymBranch) {
-        return String(req.admin.gymBranch).trim();
+    if (req.admin.gymBranch) {
+        return normalizeBranch(req.admin.gymBranch);
     }
 
     return '';
 };
 
-/**
- * Validate branch.
- */
-const isValidBranch = (branch) => {
-    return VALID_BRANCHES.includes(branch);
+/* =========================================================
+   AUTHORIZATION HELPER
+   ========================================================= */
+
+const validatePlanAccess = (req, res) => {
+    const role = normalizeRole(req.admin.role);
+
+    if (MAIN_ADMIN_ROLES.includes(role)) {
+        return true;
+    }
+
+    if (!BRANCH_USER_ROLES.includes(role)) {
+        res.status(403).json({
+            success: false,
+            message: 'You are not authorized to access membership plans.',
+        });
+
+        return false;
+    }
+
+    const branch = getAccessibleBranch(req);
+
+    if (!branch) {
+        res.status(403).json({
+            success: false,
+            message: 'Your account is not assigned to a gym branch. Please contact the main administrator.',
+        });
+
+        return false;
+    }
+
+    if (!isValidBranch(branch)) {
+        res.status(403).json({
+            success: false,
+            message: 'Invalid or unsupported gym branch.',
+        });
+
+        return false;
+    }
+
+    return true;
 };
 
-/**
- * Escape user input before using it in a RegExp.
- */
-const escapeRegex = (value) => {
-    return String(value).replace(/[.*+?^${}()|[\]\\]/g, '\\$&');
+/* =========================================================
+   VALUE HELPERS
+   ========================================================= */
+
+const parseBoolean = (value, defaultValue = undefined) => {
+    if (value === undefined || value === null || value === '') {
+        return defaultValue;
+    }
+
+    if (typeof value === 'boolean') {
+        return value;
+    }
+
+    if (typeof value === 'string') {
+        const normalized = value.trim().toLowerCase();
+
+        if (normalized === 'true') {
+            return true;
+        }
+
+        if (normalized === 'false') {
+            return false;
+        }
+    }
+
+    return defaultValue;
 };
 
-/**
- * Validate duration.
- *
- * Plans use whole months:
- * 1, 3, 6, 12, etc.
- */
 const isValidDuration = (value) => {
     return (
         Number.isInteger(value) &&
@@ -67,14 +170,25 @@ const isValidDuration = (value) => {
     );
 };
 
-/**
- * Validate price.
- */
 const isValidPrice = (value) => {
     return (
         Number.isFinite(value) &&
         value >= 0
     );
+};
+
+/**
+ * Escape user input before using it in RegExp.
+ */
+const escapeRegex = (value) => {
+    return String(value).replace(
+        /[.*+?^${}()|[\]\\]/g,
+        '\\$&'
+    );
+};
+
+const isValidObjectId = (id) => {
+    return mongoose.Types.ObjectId.isValid(id);
 };
 
 /* =========================================================
@@ -84,29 +198,17 @@ const isValidPrice = (value) => {
 
 const getPlans = async(req, res) => {
     try {
-        const accessibleBranch = getAccessibleBranch(req);
-
-        // Non-main admin must have a branch.
-        if (!isMainAdmin(req) && !accessibleBranch) {
-            return res.status(403).json({
-                success: false,
-                message: 'Your account is not assigned to a gym branch. Please contact the main administrator.',
-            });
+        if (!validatePlanAccess(req, res)) {
+            return;
         }
+
+        const accessibleBranch = getAccessibleBranch(req);
 
         const query = {
             isActive: true,
         };
 
-        // Main admin -> both branches.
         if (!isMainAdmin(req)) {
-            if (!isValidBranch(accessibleBranch)) {
-                return res.status(403).json({
-                    success: false,
-                    message: 'Invalid or unsupported gym branch.',
-                });
-            }
-
             query.gymBranch = accessibleBranch;
         }
 
@@ -136,33 +238,19 @@ const getPlans = async(req, res) => {
 /* =========================================================
    GET ALL PLANS
    GET /api/plans/all
-
-   Includes inactive plans.
    ========================================================= */
 
 const getAllPlans = async(req, res) => {
     try {
-        const accessibleBranch = getAccessibleBranch(req);
-
-        if (!isMainAdmin(req) && !accessibleBranch) {
-            return res.status(403).json({
-                success: false,
-                message: 'Your account is not assigned to a gym branch. Please contact the main administrator.',
-            });
+        if (!validatePlanAccess(req, res)) {
+            return;
         }
+
+        const accessibleBranch = getAccessibleBranch(req);
 
         const query = {};
 
-        // Main admin -> both branches.
-        // Receptionist -> assigned branch only.
         if (!isMainAdmin(req)) {
-            if (!isValidBranch(accessibleBranch)) {
-                return res.status(403).json({
-                    success: false,
-                    message: 'Invalid or unsupported gym branch.',
-                });
-            }
-
             query.gymBranch = accessibleBranch;
         }
 
@@ -197,13 +285,16 @@ const getAllPlans = async(req, res) => {
 
 const getPlanById = async(req, res) => {
     try {
-        const { id } = req.params;
-        const accessibleBranch = getAccessibleBranch(req);
+        if (!validatePlanAccess(req, res)) {
+            return;
+        }
 
-        if (!isMainAdmin(req) && !accessibleBranch) {
-            return res.status(403).json({
+        const { id } = req.params;
+
+        if (!isValidObjectId(id)) {
+            return res.status(400).json({
                 success: false,
-                message: 'Your account is not assigned to a gym branch. Please contact the main administrator.',
+                message: 'Invalid membership plan ID.',
             });
         }
 
@@ -211,16 +302,8 @@ const getPlanById = async(req, res) => {
             _id: id,
         };
 
-        // Receptionist can only access their branch.
         if (!isMainAdmin(req)) {
-            if (!isValidBranch(accessibleBranch)) {
-                return res.status(403).json({
-                    success: false,
-                    message: 'Invalid or unsupported gym branch.',
-                });
-            }
-
-            query.gymBranch = accessibleBranch;
+            query.gymBranch = getAccessibleBranch(req);
         }
 
         const plan = await Plan.findOne(query);
@@ -254,6 +337,10 @@ const getPlanById = async(req, res) => {
 
 const createPlan = async(req, res) => {
     try {
+        if (!validatePlanAccess(req, res)) {
+            return;
+        }
+
         const {
             name,
             durationMonths,
@@ -306,14 +393,12 @@ const createPlan = async(req, res) => {
         let selectedBranch;
 
         if (mainAdmin) {
-            // Main admin MUST explicitly choose a branch.
             selectedBranch =
                 gymBranch !== undefined &&
                 gymBranch !== null ?
-                String(gymBranch).trim() :
+                normalizeBranch(gymBranch) :
                 '';
         } else {
-            // Receptionist MUST use assigned branch.
             selectedBranch = accessibleBranch;
         }
 
@@ -328,16 +413,6 @@ const createPlan = async(req, res) => {
             return res.status(400).json({
                 success: false,
                 message: 'Invalid gym branch. Allowed branches are Kalyanpur and Gopalpur.',
-            });
-        }
-
-        // Extra protection for non-main accounts.
-        if (!mainAdmin &&
-            !isValidBranch(accessibleBranch)
-        ) {
-            return res.status(403).json({
-                success: false,
-                message: 'Your account is not assigned to a valid gym branch.',
             });
         }
 
@@ -363,6 +438,11 @@ const createPlan = async(req, res) => {
                 message: 'Price must be a valid number greater than or equal to 0.',
             });
         }
+
+        const parsedIsActive = parseBoolean(
+            isActive,
+            true
+        );
 
         /* --------------------------------------------------
            DUPLICATE ACTIVE PLAN CHECK
@@ -397,11 +477,8 @@ const createPlan = async(req, res) => {
             price: parsedPrice,
             description: description !== undefined &&
                 description !== null ?
-                String(description).trim() :
-                '',
-            isActive: isActive !== undefined ?
-                Boolean(isActive) :
-                true,
+                String(description).trim() : '',
+            isActive: parsedIsActive,
         });
 
         return res.status(201).json({
@@ -411,6 +488,13 @@ const createPlan = async(req, res) => {
         });
     } catch (error) {
         console.error('Create plan error:', error);
+
+        if (error.code === 11000) {
+            return res.status(409).json({
+                success: false,
+                message: 'An active membership plan with the same name already exists for this branch.',
+            });
+        }
 
         return res.status(500).json({
             success: false,
@@ -427,7 +511,18 @@ const createPlan = async(req, res) => {
 
 const updatePlan = async(req, res) => {
     try {
+        if (!validatePlanAccess(req, res)) {
+            return;
+        }
+
         const { id } = req.params;
+
+        if (!isValidObjectId(id)) {
+            return res.status(400).json({
+                success: false,
+                message: 'Invalid membership plan ID.',
+            });
+        }
 
         const {
             name,
@@ -442,17 +537,6 @@ const updatePlan = async(req, res) => {
         const accessibleBranch = getAccessibleBranch(req);
 
         /* --------------------------------------------------
-           BRANCH ACCESS VALIDATION
-        -------------------------------------------------- */
-
-        if (!mainAdmin && !accessibleBranch) {
-            return res.status(403).json({
-                success: false,
-                message: 'Your account is not assigned to a gym branch. Please contact the main administrator.',
-            });
-        }
-
-        /* --------------------------------------------------
            FIND PLAN
         -------------------------------------------------- */
 
@@ -461,13 +545,6 @@ const updatePlan = async(req, res) => {
         };
 
         if (!mainAdmin) {
-            if (!isValidBranch(accessibleBranch)) {
-                return res.status(403).json({
-                    success: false,
-                    message: 'Invalid or unsupported gym branch.',
-                });
-            }
-
             query.gymBranch = accessibleBranch;
         }
 
@@ -487,15 +564,13 @@ const updatePlan = async(req, res) => {
         let finalBranch;
 
         if (mainAdmin) {
-            // Main admin may move a plan between branches.
             finalBranch =
                 gymBranch !== undefined &&
                 gymBranch !== null &&
                 String(gymBranch).trim() !== '' ?
-                String(gymBranch).trim() :
-                plan.gymBranch;
+                normalizeBranch(gymBranch) :
+                normalizeBranch(plan.gymBranch);
         } else {
-            // Receptionist cannot move plans.
             finalBranch = accessibleBranch;
         }
 
@@ -537,7 +612,7 @@ const updatePlan = async(req, res) => {
 
         const finalIsActive =
             isActive !== undefined ?
-            Boolean(isActive) :
+            parseBoolean(isActive, plan.isActive) :
             plan.isActive;
 
         /* --------------------------------------------------
@@ -562,6 +637,13 @@ const updatePlan = async(req, res) => {
             return res.status(400).json({
                 success: false,
                 message: 'Price must be a valid number greater than or equal to 0.',
+            });
+        }
+
+        if (typeof finalIsActive !== 'boolean') {
+            return res.status(400).json({
+                success: false,
+                message: 'isActive must be true or false.',
             });
         }
 
@@ -613,6 +695,13 @@ const updatePlan = async(req, res) => {
     } catch (error) {
         console.error('Update plan error:', error);
 
+        if (error.code === 11000) {
+            return res.status(409).json({
+                success: false,
+                message: 'An active membership plan with the same name already exists for this branch.',
+            });
+        }
+
         return res.status(500).json({
             success: false,
             message: 'Failed to update membership plan.',
@@ -631,38 +720,27 @@ const updatePlan = async(req, res) => {
 
 const deletePlan = async(req, res) => {
     try {
+        if (!validatePlanAccess(req, res)) {
+            return;
+        }
+
         const { id } = req.params;
 
-        const mainAdmin = isMainAdmin(req);
-        const accessibleBranch = getAccessibleBranch(req);
-
-        /* --------------------------------------------------
-           BRANCH ACCESS VALIDATION
-        -------------------------------------------------- */
-
-        if (!mainAdmin && !accessibleBranch) {
-            return res.status(403).json({
+        if (!isValidObjectId(id)) {
+            return res.status(400).json({
                 success: false,
-                message: 'Your account is not assigned to a gym branch. Please contact the main administrator.',
+                message: 'Invalid membership plan ID.',
             });
         }
 
-        /* --------------------------------------------------
-           FIND PLAN
-        -------------------------------------------------- */
+        const mainAdmin = isMainAdmin(req);
+        const accessibleBranch = getAccessibleBranch(req);
 
         const query = {
             _id: id,
         };
 
         if (!mainAdmin) {
-            if (!isValidBranch(accessibleBranch)) {
-                return res.status(403).json({
-                    success: false,
-                    message: 'Invalid or unsupported gym branch.',
-                });
-            }
-
             query.gymBranch = accessibleBranch;
         }
 
@@ -674,10 +752,6 @@ const deletePlan = async(req, res) => {
                 message: 'Membership plan not found.',
             });
         }
-
-        /* --------------------------------------------------
-           SOFT DELETE
-        -------------------------------------------------- */
 
         plan.isActive = false;
 

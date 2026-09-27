@@ -12,7 +12,6 @@ const paymentSchema = new mongoose.Schema({
         required: true,
     },
 
-
     // =========================================
     // MEMBER
     // =========================================
@@ -22,7 +21,6 @@ const paymentSchema = new mongoose.Schema({
         ref: 'Member',
         required: true,
     },
-
 
     // =========================================
     // PAYMENT INFORMATION
@@ -43,7 +41,12 @@ const paymentSchema = new mongoose.Schema({
 
     paymentMethod: {
         type: String,
-        enum: ['Cash', 'UPI', 'Card', 'Bank Transfer'],
+        enum: [
+            'Cash',
+            'UPI',
+            'Card',
+            'Bank Transfer',
+        ],
         required: true,
     },
 
@@ -54,7 +57,11 @@ const paymentSchema = new mongoose.Schema({
 
     status: {
         type: String,
-        enum: ['Paid', 'Pending', 'Failed'],
+        enum: [
+            'Paid',
+            'Pending',
+            'Failed',
+        ],
         default: 'Paid',
     },
 
@@ -67,4 +74,21 @@ const paymentSchema = new mongoose.Schema({
     timestamps: true,
 });
 
-module.exports = mongoose.model('Payment', paymentSchema);
+// =========================================
+// INDEXES
+// =========================================
+
+paymentSchema.index({
+    gymBranch: 1,
+});
+
+paymentSchema.index({
+    gymBranch: 1,
+    paymentDate: -1,
+});
+
+module.exports =
+    mongoose.model(
+        'Payment',
+        paymentSchema
+    );

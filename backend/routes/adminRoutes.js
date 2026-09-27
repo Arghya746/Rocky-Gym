@@ -5,82 +5,39 @@ const {
     loginAdmin,
 } = require('../controllers/adminController');
 
-const {
-    protect,
-    authorize,
-} = require('../middleware/authMiddleware');
-
 const router = express.Router();
 
+/* ============================================================
+   ADMIN AUTHENTICATION
+   ============================================================ */
 
-// ======================================================
-// ADMIN AUTHENTICATION
-// ======================================================
+/*
+   POST /api/admin/login
 
-// Public login
-router.post(
-    '/login',
-    loginAdmin
-);
+   Used by:
+   - Main Admin
+   - Receptionist
+   - Other supported admin/staff accounts
 
-
-// ======================================================
-// STAFF / ADMIN REGISTRATION
-// ======================================================
-//
-// Only an authenticated main admin can create accounts.
-//
-// IMPORTANT:
-// Do NOT make /register public.
-//
-// Main admin:
-//     role = admin
-//
-// Receptionist:
-//     role = receptionist
-//     gymBranch = Kalyanpur / Gopalpur
-//
-
-router.post(
-    '/register',
-    protect,
-    authorize('admin'),
-    registerAdmin
-);
+   Controller:
+   loginAdmin
+*/
+router.post('/login', loginAdmin);
 
 
-// ======================================================
-// PROTECTED PROFILE
-// ======================================================
-//
-// Returns the currently authenticated account.
-//
-// Branch and role information comes from the
-// authenticated database account.
-//
+/*
+   POST /api/admin/register
 
-router.get(
-    '/profile',
-    protect,
-    (req, res) => {
+   Creates a new admin/staff account.
 
-        return res.status(200).json({
+   Controller:
+   registerAdmin
+*/
+router.post('/register', registerAdmin);
 
-            message: 'Admin authentication successful.',
 
-            admin: {
-                id: req.admin._id,
-                name: req.admin.name,
-                email: req.admin.email,
-                role: req.admin.role,
-                gymBranch: req.admin.gymBranch,
-                status: req.admin.status,
-                permissions: req.admin.permissions,
-            },
-
-        });
-    }
-);
-
+/* ============================================================
+   EXPORT
+   ============================================================ */
 
 module.exports = router;

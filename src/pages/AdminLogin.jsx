@@ -2,21 +2,133 @@ import { useState } from 'react';
 import { useNavigate } from 'react-router-dom';
 import API_URL from '../config/api';
 
+/* =========================================================
+   VALID GYM BRANCHES
+   ========================================================= */
+
+const ALLOWED_BRANCHES = [
+    'Kalyanpur',
+    'Gopalpur',
+];
+
+/* =========================================================
+   MAIN ADMIN ROLES
+   ========================================================= */
+
+const MAIN_ADMIN_ROLES = [
+    'admin',
+    'main_admin',
+    'super_admin',
+];
+
+/* =========================================================
+   HELPER FUNCTIONS
+   ========================================================= */
+
+/**
+ * Normalize a branch name safely.
+ */
+const normalizeBranch = (branch) => {
+    if (!branch) {
+        return '';
+    }
+
+    return String(branch).trim();
+};
+
+/**
+ * Normalize and validate multiple branches.
+ */
+const normalizeBranches = (branches) => {
+    if (!Array.isArray(branches)) {
+        return [];
+    }
+
+    return [
+        ...new Set(
+            branches
+                .map(normalizeBranch)
+                .filter((branch) =>
+                    ALLOWED_BRANCHES.includes(branch)
+                )
+        ),
+    ];
+};
+
+/**
+ * Clear all authentication-related localStorage.
+ *
+ * This prevents stale branch/role information from a
+ * previous login from affecting the next login.
+ */
+const clearLoginStorage = () => {
+    localStorage.removeItem('adminToken');
+    localStorage.removeItem('adminData');
+    localStorage.removeItem('gymBranch');
+    localStorage.removeItem('adminRole');
+    localStorage.removeItem('accessibleBranches');
+    localStorage.removeItem('adminPermissions');
+    localStorage.removeItem('adminLoggedIn');
+};
+
+/* =========================================================
+   ADMIN LOGIN
+   ========================================================= */
+
 export default function AdminLogin() {
     const navigate = useNavigate();
+
+    /* =======================================================
+       FORM STATE
+    ======================================================= */
 
     const [email, setEmail] = useState('');
     const [password, setPassword] = useState('');
 
+    /* =======================================================
+       UI STATE
+    ======================================================= */
+
     const [loading, setLoading] = useState(false);
     const [error, setError] = useState('');
+
+    /* =======================================================
+       LOGIN HANDLER
+    ======================================================= */
 
     const handleLogin = async (e) => {
         e.preventDefault();
 
+        if (loading) {
+            return;
+        }
+
         try {
             setLoading(true);
             setError('');
+
+            /* -------------------------------------------------
+               BASIC VALIDATION
+            ------------------------------------------------- */
+
+            const normalizedEmail =
+                email.trim().toLowerCase();
+
+            if (!normalizedEmail) {
+                throw new Error(
+                    'Please enter your email address.'
+                );
+            }
+
+            if (!password) {
+                throw new Error(
+                    'Please enter your password.'
+                );
+            }
+
+            /* -------------------------------------------------
+               LOGIN REQUEST
+            ------------------------------------------------- */
 
             const response = await fetch(
                 `${API_URL}/api/admin/login`,
@@ -28,59 +140,93 @@ export default function AdminLogin() {
                     },
 
                     body: JSON.stringify({
-                        email: email.trim(),
+                        email: normalizedEmail,
                         password,
                     }),
                 }
             );
 
-            const data = await response.json();
+            /* -------------------------------------------------
+               SAFE RESPONSE PARSING
+            ------------------------------------------------- */
 
-            if (!response.ok) {
+            let data = {};
+
+            try {
+                data = await response.json();
+            } catch {
                 throw new Error(
-                    data.message || 'Login failed.'
+                    'The server returned an invalid response. Please try again.'
                 );
             }
 
-            // =====================================
-            // ADMIN DATA FROM BACKEND
-            // =====================================
+            /* -------------------------------------------------
+               BACKEND ERROR
+            ------------------------------------------------- */
+
+            if (!response.ok) {
+                throw new Error(
+                    data.message ||
+                    data.error ||
+                    `Login failed (${response.status}).`
+                );
+            }
+
+            /* -------------------------------------------------
+               VALIDATE TOKEN
+            ------------------------------------------------- */
+
+            if (!data.token) {
+                throw new Error(
+                    'Login succeeded but no authentication token was returned.'
+                );
+            }
+
+            /* =================================================
+               ADMIN DATA FROM BACKEND
+            ================================================= */
 
             const admin = data.admin || {};
 
-            // =====================================
-            // ROLE
-            // =====================================
+            /* =================================================
+               ROLE
+            ================================================= */
 
-            const role =
+            const role = normalizeBranch(
                 admin.role ||
-                data.role ||
-                'receptionist';
+                data.role
+            ).toLowerCase();
 
-            // =====================================
-            // ALLOWED BRANCHES
-            // =====================================
+            if (!role) {
+                throw new Error(
+                    'No user role was returned by the server.'
+                );
+            }
 
-            const allowedBranches = [
-                'Kalyanpur',
-                'Gopalpur',
-            ];
-
-            // =====================================
-            // DETERMINE BRANCH ACCESS
-            // =====================================
+            /* =================================================
+               DETERMINE BRANCH ACCESS
+            ================================================= */
 
             let gymBranch = null;
             let accessibleBranches = [];
 
-            // =====================================
-            // MAIN ADMIN
-            // =====================================
+            /* =================================================
+               MAIN ADMIN
+            ================================================= */
 
-            if (role === 'admin') {
+            if (
+                MAIN_ADMIN_ROLES.includes(role)
+            ) {
                 /*
-                    Main Admin has access to
-                    BOTH gym branches.
+                    Main administrators have access to
+                    both gym branches.
+
+                    There is intentionally no active branch
+                    yet. AdminDashboard can select:
+
+                    Kalyanpur
+                    Gopalpur
+                    ALL BRANCHES
                 */
 
                 accessibleBranches = [
@@ -88,122 +234,182 @@ export default function AdminLogin() {
                     'Gopalpur',
                 ];
 
-                /*
-                    Main admin is not restricted
-                    to one branch.
-                */
-
                 gymBranch = null;
             }
 
-            // =====================================
-            // RECEPTIONIST
-            // =====================================
+            /* =================================================
+               RECEPTIONIST / STAFF
+            ================================================= */
 
             else {
                 /*
-                    Receptionist must have an
-                    assigned gym branch.
+                    New multi-branch system:
+
+                    gymBranches:
+                    [
+                        'Kalyanpur',
+                        'Gopalpur'
+                    ]
+
+                    A receptionist can be assigned to
+                    one or multiple branches.
                 */
 
-                gymBranch =
-                    admin.gymBranch ||
-                    data.gymBranch ||
-                    null;
+                const backendBranches =
+                    admin.gymBranches ||
+                    data.gymBranches ||
+                    [];
+
+                /*
+                    Primary multi-branch source.
+                */
+
+                accessibleBranches =
+                    normalizeBranches(
+                        backendBranches
+                    );
+
+                /*
+                    BACKWARD COMPATIBILITY
+
+                    If an older account does not yet have
+                    gymBranches but still has gymBranch,
+                    allow that single branch.
+                */
 
                 if (
-                    !gymBranch ||
-                    !allowedBranches.includes(
-                        gymBranch
-                    )
+                    accessibleBranches.length === 0
+                ) {
+                    const legacyBranch =
+                        normalizeBranch(
+                            admin.gymBranch ||
+                            data.gymBranch
+                        );
+
+                    if (
+                        ALLOWED_BRANCHES.includes(
+                            legacyBranch
+                        )
+                    ) {
+                        accessibleBranches = [
+                            legacyBranch,
+                        ];
+                    }
+                }
+
+                /* -------------------------------------------------
+                   VALIDATE BRANCH ACCESS
+                ------------------------------------------------- */
+
+                if (
+                    accessibleBranches.length === 0
                 ) {
                     throw new Error(
-                        'Invalid gym branch assigned to this receptionist account.'
+                        'Your account is not assigned to a valid gym branch. Please contact the administrator.'
                     );
                 }
 
                 /*
-                    Receptionist can access
-                    ONLY their assigned branch.
+                    First assigned branch becomes the initial
+                    active branch.
+
+                    AdminDashboard can allow the receptionist
+                    to switch between all assigned branches.
                 */
 
-                accessibleBranches = [
-                    gymBranch,
-                ];
+                gymBranch =
+                    accessibleBranches[0];
             }
 
-            // =====================================
-            // PERMISSIONS
-            // =====================================
+            /* =================================================
+               PERMISSIONS
+            ================================================= */
 
             const permissions =
-                admin.permissions || {};
+                admin.permissions &&
+                typeof admin.permissions === 'object'
+                    ? admin.permissions
+                    : {};
 
-            // =====================================
-            // COMPLETE ADMIN DATA
-            // =====================================
+            /* =================================================
+               COMPLETE ADMIN DATA
+            ================================================= */
 
             const adminData = {
                 ...admin,
 
                 role,
 
+                /*
+                    Current active branch.
+
+                    Main admin:
+                    null
+
+                    Receptionist:
+                    first assigned branch
+                */
                 gymBranch,
 
+                /*
+                    Complete multi-branch access.
+                */
+                gymBranches:
+                    accessibleBranches,
+
+                /*
+                    Used by AdminDashboard.
+                */
                 accessibleBranches,
 
                 permissions,
             };
 
-            // =====================================
-            // SAVE JWT TOKEN
-            // =====================================
+            /* =================================================
+               CLEAR OLD LOGIN DATA
+            ================================================= */
+
+            clearLoginStorage();
+
+            /* =================================================
+               SAVE JWT TOKEN
+            ================================================= */
 
             localStorage.setItem(
                 'adminToken',
                 data.token
             );
 
-            // =====================================
-            // SAVE COMPLETE ADMIN DATA
-            // =====================================
+            /* =================================================
+               SAVE COMPLETE ADMIN DATA
+            ================================================= */
 
             localStorage.setItem(
                 'adminData',
                 JSON.stringify(adminData)
             );
 
-            // =====================================
-            // SAVE ROLE
-            // =====================================
+            /* =================================================
+               SAVE ROLE
+            ================================================= */
 
             localStorage.setItem(
                 'adminRole',
                 role
             );
 
-            // =====================================
-            // SAVE CURRENT BRANCH
-            // =====================================
-
-            /*
-                Main Admin:
-                    gymBranch = ''
-
-                Receptionist:
-                    Kalyanpur
-                    OR
-                    Gopalpur
-            */
+            /* =================================================
+               SAVE ACTIVE BRANCH
+            ================================================= */
 
             localStorage.setItem(
                 'gymBranch',
                 gymBranch || ''
             );
 
-            // =====================================
-            // SAVE ACCESSIBLE BRANCHES
-            // =====================================
+            /* =================================================
+               SAVE ACCESSIBLE BRANCHES
+            ================================================= */
 
             localStorage.setItem(
                 'accessibleBranches',
@@ -212,9 +418,9 @@ export default function AdminLogin() {
                 )
             );
 
-            // =====================================
-            // SAVE PERMISSIONS
-            // =====================================
+            /* =================================================
+               SAVE PERMISSIONS
+            ================================================= */
 
             localStorage.setItem(
                 'adminPermissions',
@@ -223,64 +429,46 @@ export default function AdminLogin() {
                 )
             );
 
-            // =====================================
-            // SAVE LOGIN STATUS
-            // =====================================
+            /* =================================================
+               SAVE LOGIN STATUS
+            ================================================= */
 
             localStorage.setItem(
                 'adminLoggedIn',
                 'true'
             );
 
-            // =====================================
-            // REDIRECT
-            // =====================================
+            /* =================================================
+               REDIRECT TO DASHBOARD
+            ================================================= */
 
             navigate('/admin', {
                 replace: true,
             });
 
         } catch (error) {
+            /* =================================================
+               LOGIN ERROR
+            ================================================= */
+
             console.error(
                 'Admin Login Error:',
                 error
             );
 
-            // =====================================
-            // CLEAR STALE LOGIN DATA
-            // =====================================
+            /* -------------------------------------------------
+               CLEAR STALE AUTH DATA
+            ------------------------------------------------- */
 
-            localStorage.removeItem(
-                'adminToken'
-            );
+            clearLoginStorage();
 
-            localStorage.removeItem(
-                'adminData'
-            );
-
-            localStorage.removeItem(
-                'gymBranch'
-            );
-
-            localStorage.removeItem(
-                'adminRole'
-            );
-
-            localStorage.removeItem(
-                'accessibleBranches'
-            );
-
-            localStorage.removeItem(
-                'adminPermissions'
-            );
-
-            localStorage.removeItem(
-                'adminLoggedIn'
-            );
+            /* -------------------------------------------------
+               SHOW ERROR
+            ------------------------------------------------- */
 
             setError(
-                error.message ||
-                'Unable to login.'
+                error?.message ||
+                'Unable to login. Please check your credentials and try again.'
             );
 
         } finally {
@@ -288,14 +476,26 @@ export default function AdminLogin() {
         }
     };
 
+    /* =========================================================
+       UI
+       ========================================================= */
+
     return (
         <div className="admin-login">
 
             <div className="admin-login-card">
 
+                {/* =================================================
+                    BRAND
+                ================================================= */}
+
                 <span className="section-tag">
                     ALPHA GYM
                 </span>
+
+                {/* =================================================
+                    TITLE
+                ================================================= */}
 
                 <h1>
                     ADMIN <span>LOGIN.</span>
@@ -306,11 +506,17 @@ export default function AdminLogin() {
                     management dashboard.
                 </p>
 
+                {/* =================================================
+                    LOGIN FORM
+                ================================================= */}
+
                 <form
                     onSubmit={handleLogin}
                 >
 
-                    {/* EMAIL */}
+                    {/* =================================================
+                        EMAIL
+                    ================================================= */}
 
                     <div className="admin-login-field">
 
@@ -330,12 +536,14 @@ export default function AdminLogin() {
                             }
                             required
                             autoComplete="email"
+                            disabled={loading}
                         />
 
                     </div>
 
-
-                    {/* PASSWORD */}
+                    {/* =================================================
+                        PASSWORD
+                    ================================================= */}
 
                     <div className="admin-login-field">
 
@@ -355,21 +563,28 @@ export default function AdminLogin() {
                             }
                             required
                             autoComplete="current-password"
+                            disabled={loading}
                         />
 
                     </div>
 
-
-                    {/* ERROR */}
+                    {/* =================================================
+                        ERROR
+                    ================================================= */}
 
                     {error && (
-                        <div className="admin-login-error">
+                        <div
+                            className="admin-login-error"
+                            role="alert"
+                            aria-live="polite"
+                        >
                             {error}
                         </div>
                     )}
 
-
-                    {/* LOGIN BUTTON */}
+                    {/* =================================================
+                        LOGIN BUTTON
+                    ================================================= */}
 
                     <button
                         type="submit"
@@ -383,12 +598,15 @@ export default function AdminLogin() {
 
                 </form>
 
-
-                {/* STATUS */}
+                {/* =================================================
+                    SECURITY STATUS
+                ================================================= */}
 
                 <div className="admin-login-status">
 
-                    <span>●</span>
+                    <span>
+                        ●
+                    </span>
 
                     SECURE ADMIN ACCESS
 

@@ -1,188 +1,467 @@
 const mongoose = require('mongoose');
 
-const VALID_BRANCHES = ['Kalyanpur', 'Gopalpur'];
-const VALID_ROLES = ['admin', 'receptionist'];
+/* ============================================================
+   CONSTANTS
+   ============================================================ */
 
-const permissionSchema = new mongoose.Schema({
-    view: {
-        type: Boolean,
-        default: true,
-    },
-    add: {
-        type: Boolean,
-        default: true,
-    },
-    edit: {
-        type: Boolean,
-        default: true,
-    },
-    delete: {
-        type: Boolean,
-        default: false,
-    },
-}, {
-    _id: false,
-});
+const VALID_GYM_BRANCHES = [
+    'Kalyanpur',
+    'Gopalpur',
+];
 
-const enquiryPermissionSchema = new mongoose.Schema({
-    view: {
-        type: Boolean,
-        default: true,
+const MAIN_ADMIN_ROLES = [
+    'admin',
+    'main_admin',
+    'super_admin',
+];
+
+const RECEPTIONIST_ROLES = [
+    'receptionist',
+    'staff',
+];
+
+
+/* ============================================================
+   DEFAULT RECEPTIONIST PERMISSIONS
+   ============================================================ */
+
+const DEFAULT_RECEPTIONIST_PERMISSIONS = {
+    members: {
+        view: true,
+        add: true,
+        edit: true,
+        delete: false,
     },
-    delete: {
-        type: Boolean,
-        default: false,
+
+    payments: {
+        view: true,
+        add: true,
+        edit: true,
+        delete: false,
     },
-}, {
-    _id: false,
-});
+
+    attendance: {
+        view: true,
+        add: true,
+        edit: true,
+        delete: false,
+    },
+
+    workouts: {
+        view: true,
+        add: true,
+        edit: true,
+        delete: false,
+    },
+
+    enquiries: {
+        view: true,
+        delete: false,
+    },
+
+    plans: {
+        view: true,
+        add: false,
+        edit: false,
+        delete: false,
+    },
+
+    offers: {
+        view: true,
+        add: false,
+        edit: false,
+        delete: false,
+    },
+};
+
+
+/* ============================================================
+   ADMIN SCHEMA
+   ============================================================ */
 
 const adminSchema = new mongoose.Schema({
-    // =========================================
-    // BASIC INFORMATION
-    // =========================================
+        /* --------------------------------------------------------
+           BASIC INFORMATION
+           -------------------------------------------------------- */
 
-    name: {
-        type: String,
-        required: true,
-        trim: true,
-    },
-
-    email: {
-        type: String,
-        required: true,
-        unique: true,
-        lowercase: true,
-        trim: true,
-    },
-
-    password: {
-        type: String,
-        required: true,
-    },
-
-    // =========================================
-    // ROLE
-    // =========================================
-
-    role: {
-        type: String,
-        enum: VALID_ROLES,
-        default: 'receptionist',
-        required: true,
-        trim: true,
-    },
-
-    // =========================================
-    // GYM BRANCH
-    // =========================================
-    //
-    // Main admin:
-    //   gymBranch = null
-    //
-    // Receptionist:
-    //   gymBranch = Kalyanpur / Gopalpur
-    //
-    // This prevents the system from silently
-    // assigning a user to the wrong branch.
-    //
-
-    gymBranch: {
-        type: String,
-        enum: VALID_BRANCHES,
-        default: null,
-        trim: true,
-    },
-
-    // =========================================
-    // ACCOUNT STATUS
-    // =========================================
-
-    status: {
-        type: String,
-        enum: ['active', 'inactive'],
-        default: 'active',
-        required: true,
-    },
-
-    // =========================================
-    // PERMISSIONS
-    // =========================================
-
-    permissions: {
-        members: {
-            type: permissionSchema,
-            default: () => ({}),
+        name: {
+            type: String,
+            required: true,
+            trim: true,
         },
 
-        payments: {
-            type: permissionSchema,
-            default: () => ({}),
+        email: {
+            type: String,
+            required: true,
+            unique: true,
+            trim: true,
+            lowercase: true,
         },
 
-        attendance: {
-            type: permissionSchema,
-            default: () => ({}),
+        password: {
+            type: String,
+            required: true,
         },
 
-        workouts: {
-            type: permissionSchema,
-            default: () => ({}),
+
+        /* --------------------------------------------------------
+           ROLE
+           -------------------------------------------------------- */
+
+        role: {
+            type: String,
+
+            enum: [
+                'admin',
+                'main_admin',
+                'super_admin',
+                'receptionist',
+                'staff',
+            ],
+
+            default: 'receptionist',
         },
 
-        enquiries: {
-            type: enquiryPermissionSchema,
-            default: () => ({}),
+
+        /* ========================================================
+           MULTI-BRANCH ACCESS
+           ========================================================
+
+           AUTHORITATIVE FIELD.
+
+           Receptionist:
+
+               gymBranches: [
+                   'Kalyanpur',
+                   'Gopalpur'
+               ]
+
+           Main admin:
+
+               gymBranches: []
+
+           A receptionist may therefore access multiple branches,
+           while the dashboard chooses one active branch.
+        ======================================================== */
+
+        gymBranches: {
+            type: [{
+                type: String,
+                enum: VALID_GYM_BRANCHES,
+                trim: true,
+            }, ],
+
+            default: [],
+
+            validate: {
+                validator: function(branches) {
+                    if (!Array.isArray(branches)) {
+                        return false;
+                    }
+
+                    return (
+                        new Set(branches).size ===
+                        branches.length
+                    );
+                },
+
+                message: 'gymBranches cannot contain duplicate branches.',
+            },
         },
 
-        // =====================================
-        // PLANS
-        // =====================================
 
-        plans: {
-            type: permissionSchema,
-            default: () => ({}),
+        /* ========================================================
+           LEGACY SINGLE-BRANCH FIELD
+           ========================================================
+
+           Kept temporarily for backward compatibility.
+
+           One branch:
+
+               gymBranches: ['Kalyanpur']
+               gymBranch: 'Kalyanpur'
+
+           Multiple branches:
+
+               gymBranches: ['Kalyanpur', 'Gopalpur']
+               gymBranch: null
+        ======================================================== */
+
+        gymBranch: {
+            type: String,
+
+            enum: [
+                'Kalyanpur',
+                'Gopalpur',
+                null,
+            ],
+
+            default: null,
         },
 
-        // =====================================
-        // OFFERS
-        // =====================================
 
-        offers: {
-            type: permissionSchema,
-            default: () => ({}),
+        /* --------------------------------------------------------
+           ACCOUNT STATUS
+           -------------------------------------------------------- */
+
+        status: {
+            type: String,
+
+            enum: [
+                'active',
+                'inactive',
+            ],
+
+            default: 'active',
+        },
+
+
+        /* --------------------------------------------------------
+           PERMISSIONS
+           -------------------------------------------------------- */
+
+        permissions: {
+            type: mongoose.Schema.Types.Mixed,
+
+            default: () => ({
+                ...DEFAULT_RECEPTIONIST_PERMISSIONS,
+
+                members: {
+                    ...DEFAULT_RECEPTIONIST_PERMISSIONS.members,
+                },
+
+                payments: {
+                    ...DEFAULT_RECEPTIONIST_PERMISSIONS.payments,
+                },
+
+                attendance: {
+                    ...DEFAULT_RECEPTIONIST_PERMISSIONS.attendance,
+                },
+
+                workouts: {
+                    ...DEFAULT_RECEPTIONIST_PERMISSIONS.workouts,
+                },
+
+                enquiries: {
+                    ...DEFAULT_RECEPTIONIST_PERMISSIONS.enquiries,
+                },
+
+                plans: {
+                    ...DEFAULT_RECEPTIONIST_PERMISSIONS.plans,
+                },
+
+                offers: {
+                    ...DEFAULT_RECEPTIONIST_PERMISSIONS.offers,
+                },
+            }),
         },
     },
 
-}, {
-    timestamps: true,
-});
+    {
+        timestamps: true,
+    }
+);
 
 
-// =========================================
-// VALIDATION
-// =========================================
-//
-// Receptionist MUST have a branch.
-// Main admin does not need a branch.
-//
+/* ============================================================
+   BRANCH NORMALIZATION HELPER
+   ============================================================ */
 
-adminSchema.pre('validate', function(next) {
+const normalizeBranch = (value) => {
+    if (!value) {
+        return null;
+    }
 
-    if (this.role === 'receptionist' && !this.gymBranch) {
-        return next(
-            new Error(
-                'Receptionist must be assigned to a gym branch.'
+    const normalized = String(value)
+        .trim()
+        .toLowerCase();
+
+    if (normalized === 'kalyanpur') {
+        return 'Kalyanpur';
+    }
+
+    if (normalized === 'gopalpur') {
+        return 'Gopalpur';
+    }
+
+    return null;
+};
+
+
+/* ============================================================
+   BRANCH VALIDATION / NORMALIZATION
+   ============================================================
+
+   IMPORTANT:
+   Do NOT add next() here.
+
+   Your installed Mongoose version executes this validation
+   middleware without a callback.
+============================================================ */
+
+adminSchema.pre(
+    'validate',
+    function() {
+
+        /* ========================================================
+           RECEPTIONIST / STAFF
+           ======================================================== */
+
+        if (
+            RECEPTIONIST_ROLES.includes(
+                this.role
             )
-        );
-    }
+        ) {
+            let branches = Array.isArray(
+                    this.gymBranches
+                ) ?
+                this.gymBranches
+                .filter(Boolean)
+                .map(normalizeBranch)
+                .filter(Boolean) :
+                [];
 
-    if (this.role === 'admin') {
-        this.gymBranch = null;
-    }
+            /* ----------------------------------------------------
+               LEGACY COMPATIBILITY
+               ---------------------------------------------------- */
 
-    next();
+            if (
+                branches.length === 0 &&
+                this.gymBranch
+            ) {
+                const legacyBranch =
+                    normalizeBranch(
+                        this.gymBranch
+                    );
+
+                if (legacyBranch) {
+                    branches = [
+                        legacyBranch,
+                    ];
+                }
+            }
+
+            /* ----------------------------------------------------
+               REMOVE DUPLICATES
+               ---------------------------------------------------- */
+
+            branches = [
+                ...new Set(branches),
+            ];
+
+            /* ----------------------------------------------------
+               VALIDATE
+               ---------------------------------------------------- */
+
+            const invalidBranches =
+                branches.filter(
+                    (branch) =>
+                    !VALID_GYM_BRANCHES.includes(
+                        branch
+                    )
+                );
+
+            if (
+                invalidBranches.length > 0
+            ) {
+                this.invalidate(
+                    'gymBranches',
+                    `Invalid gym branch assigned: ${invalidBranches.join(', ')}`
+                );
+
+                return;
+            }
+
+            /* ----------------------------------------------------
+               REQUIRE AT LEAST ONE BRANCH
+               ---------------------------------------------------- */
+
+            if (
+                branches.length === 0
+            ) {
+                this.invalidate(
+                    'gymBranches',
+                    'Receptionist must be assigned to at least one gym branch.'
+                );
+
+                return;
+            }
+
+            /* ----------------------------------------------------
+               SAVE AUTHORITATIVE BRANCHES
+               ---------------------------------------------------- */
+
+            this.gymBranches =
+                branches;
+
+            /* ----------------------------------------------------
+               KEEP LEGACY FIELD IN SYNC
+               ---------------------------------------------------- */
+
+            this.gymBranch =
+                branches.length === 1 ?
+                branches[0] :
+                null;
+        }
+
+
+        /* ========================================================
+           MAIN ADMIN
+           ======================================================== */
+
+        if (
+            MAIN_ADMIN_ROLES.includes(
+                this.role
+            )
+        ) {
+            /*
+             * Main admins have access to all branches,
+             * so they don't need branch assignments.
+             */
+            this.gymBranches = [];
+
+            this.gymBranch = null;
+        }
+    }
+);
+
+
+/* ============================================================
+   DATABASE INDEXES
+   ============================================================ */
+
+adminSchema.index({
+    role: 1,
+    gymBranches: 1,
+});
+
+adminSchema.index({
+    gymBranches: 1,
+    status: 1,
 });
 
 
-module.exports = mongoose.model('Admin', adminSchema);
+/* ============================================================
+   SAFE OBJECT
+   ============================================================ */
+
+adminSchema.methods.toSafeObject =
+    function() {
+        const object =
+            this.toObject();
+
+        delete object.password;
+
+        return object;
+    };
+
+
+/* ============================================================
+   EXPORT
+   ============================================================ */
+
+module.exports =
+    mongoose.model(
+        'Admin',
+        adminSchema
+    );

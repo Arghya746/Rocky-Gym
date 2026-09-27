@@ -3,7 +3,7 @@ const bcrypt = require('bcryptjs');
 const jwt = require('jsonwebtoken');
 
 /* ============================================================
-   ALLOWED VALUES
+   CONSTANTS
    ============================================================ */
 
 const ALLOWED_BRANCHES = [
@@ -151,10 +151,57 @@ const normalizeEmail = (email) => {
    ============================================================ */
 
 const isMainAdminRole = (role) =>
-    MAIN_ADMIN_ROLES.includes(role);
+    MAIN_ADMIN_ROLES.includes(
+        String(role || '').trim().toLowerCase()
+    );
 
 const isReceptionistRole = (role) =>
-    RECEPTIONIST_ROLES.includes(role);
+    RECEPTIONIST_ROLES.includes(
+        String(role || '').trim().toLowerCase()
+    );
+
+
+/* ============================================================
+   RESOLVE ADMIN BRANCHES
+   ------------------------------------------------------------
+   New system:
+       gymBranches: ['Kalyanpur', 'Gopalpur']
+
+   Legacy system:
+       gymBranch: 'Kalyanpur'
+   ============================================================ */
+
+const resolveAdminBranches = (admin) => {
+    if (!admin) {
+        return [];
+    }
+
+    let branches = [];
+
+    /* New multi-branch field */
+    if (Array.isArray(admin.gymBranches)) {
+        branches = normalizeBranches(
+            admin.gymBranches
+        );
+    }
+
+    /* Legacy fallback */
+    if (
+        branches.length === 0 &&
+        admin.gymBranch
+    ) {
+        const legacyBranch =
+            normalizeBranch(
+                admin.gymBranch
+            );
+
+        if (legacyBranch) {
+            branches = [legacyBranch];
+        }
+    }
+
+    return branches;
+};
 
 
 /* ============================================================
@@ -170,11 +217,12 @@ const registerAdmin = async(req, res) => {
             role,
             gymBranch,
             gymBranches,
-        } = req.body;
+        } = req.body || {};
+
 
         /* --------------------------------------------------------
            REQUIRED FIELDS
-           -------------------------------------------------------- */
+        -------------------------------------------------------- */
 
         if (!name || !email || !password) {
             return res.status(400).json({
@@ -182,23 +230,32 @@ const registerAdmin = async(req, res) => {
             });
         }
 
+
         /* --------------------------------------------------------
            ROLE
-           -------------------------------------------------------- */
+        -------------------------------------------------------- */
 
-        const selectedRole = role || 'receptionist';
+        const selectedRole = String(
+                role || 'receptionist'
+            )
+            .trim()
+            .toLowerCase();
 
-        if (!ALLOWED_ROLES.includes(selectedRole)) {
+        if (!ALLOWED_ROLES.includes(
+                selectedRole
+            )) {
             return res.status(400).json({
                 message: 'Invalid role.',
             });
         }
 
+
         /* --------------------------------------------------------
            EMAIL
-           -------------------------------------------------------- */
+        -------------------------------------------------------- */
 
-        const normalizedEmail = normalizeEmail(email);
+        const normalizedEmail =
+            normalizeEmail(email);
 
         if (!normalizedEmail) {
             return res.status(400).json({
@@ -206,59 +263,75 @@ const registerAdmin = async(req, res) => {
             });
         }
 
+
         /* --------------------------------------------------------
            BRANCH RESOLUTION
-           -------------------------------------------------------- */
+        -------------------------------------------------------- */
 
         let selectedBranches = [];
 
-        if (isReceptionistRole(selectedRole)) {
-            /*
-             * Prefer the new multi-branch field.
-             */
+        if (
+            isReceptionistRole(
+                selectedRole
+            )
+        ) {
+            /* New multi-branch field */
             if (Array.isArray(gymBranches)) {
-                selectedBranches = normalizeBranches(gymBranches);
+                selectedBranches =
+                    normalizeBranches(
+                        gymBranches
+                    );
             }
 
-            /*
-             * Backward compatibility with gymBranch.
-             */
+            /* Legacy single branch */
             if (
                 selectedBranches.length === 0 &&
                 gymBranch
             ) {
-                const legacyBranch = normalizeBranch(gymBranch);
+                const legacyBranch =
+                    normalizeBranch(
+                        gymBranch
+                    );
 
                 if (legacyBranch) {
-                    selectedBranches = [legacyBranch];
+                    selectedBranches = [
+                        legacyBranch,
+                    ];
                 }
             }
 
-            /*
-             * Receptionist/staff must have
-             * at least one valid branch.
-             */
-            if (selectedBranches.length === 0) {
+            /* Branch is mandatory */
+            if (
+                selectedBranches.length === 0
+            ) {
                 return res.status(400).json({
                     message: 'At least one valid gym branch is required for a receptionist or staff account.',
                 });
             }
         }
 
-        /*
-         * Main admins have unrestricted branch access.
-         */
-        if (isMainAdminRole(selectedRole)) {
+
+        /* --------------------------------------------------------
+           MAIN ADMIN
+        -------------------------------------------------------- */
+
+        if (
+            isMainAdminRole(
+                selectedRole
+            )
+        ) {
             selectedBranches = [];
         }
 
-        /* --------------------------------------------------------
-           EXISTING ADMIN
-           -------------------------------------------------------- */
 
-        const existingAdmin = await Admin.findOne({
-            email: normalizedEmail,
-        });
+        /* --------------------------------------------------------
+           CHECK EXISTING ADMIN
+        -------------------------------------------------------- */
+
+        const existingAdmin =
+            await Admin.findOne({
+                email: normalizedEmail,
+            });
 
         if (existingAdmin) {
             return res.status(400).json({
@@ -266,63 +339,69 @@ const registerAdmin = async(req, res) => {
             });
         }
 
+
         /* --------------------------------------------------------
            PASSWORD
-           -------------------------------------------------------- */
+        -------------------------------------------------------- */
 
-        const hashedPassword = await bcrypt.hash(
-            String(password),
-            10
-        );
+        const hashedPassword =
+            await bcrypt.hash(
+                String(password),
+                10
+            );
+
 
         /* --------------------------------------------------------
            PERMISSIONS
-           -------------------------------------------------------- */
+        -------------------------------------------------------- */
 
-        const permissions = isReceptionistRole(selectedRole) ?
+        const permissions =
+            isReceptionistRole(
+                selectedRole
+            ) ?
             getDefaultReceptionistPermissions() :
             undefined;
 
+
         /* --------------------------------------------------------
-           LEGACY BRANCH VALUE
-           -------------------------------------------------------- */
+           LEGACY SINGLE BRANCH
+        -------------------------------------------------------- */
 
         const legacyGymBranch =
             selectedBranches.length === 1 ?
             selectedBranches[0] :
             null;
 
+
         /* --------------------------------------------------------
            CREATE ADMIN
-           -------------------------------------------------------- */
+        -------------------------------------------------------- */
 
-        const admin = await Admin.create({
-            name: String(name).trim(),
+        const admin =
+            await Admin.create({
+                name: String(name).trim(),
 
-            email: normalizedEmail,
+                email: normalizedEmail,
 
-            password: hashedPassword,
+                password: hashedPassword,
 
-            role: selectedRole,
+                role: selectedRole,
 
-            /*
-             * Authoritative multi-branch field.
-             */
-            gymBranches: selectedBranches,
+                /* Authoritative field */
+                gymBranches: selectedBranches,
 
-            /*
-             * Legacy compatibility field.
-             */
-            gymBranch: legacyGymBranch,
+                /* Backward compatibility */
+                gymBranch: legacyGymBranch,
 
-            status: 'active',
+                status: 'active',
 
-            permissions,
-        });
+                permissions,
+            });
+
 
         /* --------------------------------------------------------
            RESPONSE
-           -------------------------------------------------------- */
+        -------------------------------------------------------- */
 
         return res.status(201).json({
             message: 'Admin registered successfully.',
@@ -333,9 +412,9 @@ const registerAdmin = async(req, res) => {
                 email: admin.email,
                 role: admin.role,
 
-                gymBranches: admin.gymBranches,
+                gymBranches: admin.gymBranches || [],
 
-                gymBranch: admin.gymBranch,
+                gymBranch: admin.gymBranch || null,
 
                 status: admin.status,
 
@@ -365,11 +444,12 @@ const loginAdmin = async(req, res) => {
         const {
             email,
             password,
-        } = req.body;
+        } = req.body || {};
+
 
         /* --------------------------------------------------------
            REQUIRED FIELDS
-           -------------------------------------------------------- */
+        -------------------------------------------------------- */
 
         if (!email || !password) {
             return res.status(400).json({
@@ -377,11 +457,13 @@ const loginAdmin = async(req, res) => {
             });
         }
 
+
         /* --------------------------------------------------------
            NORMALIZE EMAIL
-           -------------------------------------------------------- */
+        -------------------------------------------------------- */
 
-        const normalizedEmail = normalizeEmail(email);
+        const normalizedEmail =
+            normalizeEmail(email);
 
         if (!normalizedEmail) {
             return res.status(400).json({
@@ -389,25 +471,21 @@ const loginAdmin = async(req, res) => {
             });
         }
 
+
         /* --------------------------------------------------------
            FIND ADMIN
-           -------------------------------------------------------- */
+        -------------------------------------------------------- */
 
-        const admin = await Admin.findOne({
-            email: normalizedEmail,
-        });
-        console.log("========== LOGIN DEBUG ==========");
-        console.log("Email:", normalizedEmail);
-        console.log("DB gymBranches:", admin.gymBranches);
-        console.log("DB gymBranch:", admin.gymBranch);
-        console.log("Role:", admin.role);
+        const admin =
+            await Admin.findOne({
+                email: normalizedEmail,
+            });
 
-        let testBranches = normalizeBranches(
-            admin.gymBranches
-        );
 
-        console.log("After normalize:", testBranches);
-        console.log("================================");
+        /*
+         * IMPORTANT:
+         * Check admin BEFORE accessing any admin fields.
+         */
 
         if (!admin) {
             return res.status(401).json({
@@ -415,19 +493,59 @@ const loginAdmin = async(req, res) => {
             });
         }
 
+
         /* --------------------------------------------------------
-           ACCOUNT STATUS
+           LOGIN DEBUG
            -------------------------------------------------------- */
 
-        if (admin.status !== 'active') {
+        const resolvedBranches =
+            resolveAdminBranches(
+                admin
+            );
+
+        console.log(
+            '[LOGIN DEBUG]',
+            JSON.stringify({
+                email: normalizedEmail,
+
+                found: true,
+
+                role: admin.role || null,
+
+                gymBranches: Array.isArray(
+                        admin.gymBranches
+                    ) ?
+                    admin.gymBranches : [],
+
+                gymBranch: admin.gymBranch ||
+                    null,
+
+                resolvedBranches,
+
+                status: admin.status ||
+                    null,
+            })
+        );
+
+
+        /* --------------------------------------------------------
+           ACCOUNT STATUS
+        -------------------------------------------------------- */
+
+        if (
+            String(admin.status || '')
+            .trim()
+            .toLowerCase() !== 'active'
+        ) {
             return res.status(403).json({
                 message: 'Your account has been deactivated.',
             });
         }
 
+
         /* --------------------------------------------------------
            PASSWORD
-           -------------------------------------------------------- */
+        -------------------------------------------------------- */
 
         const isPasswordCorrect =
             await bcrypt.compare(
@@ -441,85 +559,129 @@ const loginAdmin = async(req, res) => {
             });
         }
 
+
         /* --------------------------------------------------------
-           RESOLVE MULTI-BRANCH ACCESS
-           -------------------------------------------------------- */
+           ROLE
+        -------------------------------------------------------- */
 
-        let gymBranches =
-            normalizeBranches(
-                admin.gymBranches
-            );
+        const normalizedRole =
+            String(
+                admin.role || ''
+            )
+            .trim()
+            .toLowerCase();
 
-        /*
-         * Backward compatibility for old accounts
-         * that only contain gymBranch.
-         */
-        if (
-            gymBranches.length === 0 &&
-            admin.gymBranch
-        ) {
-            const legacyBranch =
-                normalizeBranch(
-                    admin.gymBranch
-                );
-
-            if (legacyBranch) {
-                gymBranches = [
-                    legacyBranch,
-                ];
-            }
+        if (!ALLOWED_ROLES.includes(
+                normalizedRole
+            )) {
+            return res.status(403).json({
+                message: 'Your account has an invalid role configuration.',
+            });
         }
 
-        /* --------------------------------------------------------
-           RECEPTIONIST / STAFF BRANCH VALIDATION
-           -------------------------------------------------------- */
 
-        if (isReceptionistRole(admin.role)) {
-            if (gymBranches.length === 0) {
+        /* --------------------------------------------------------
+           RESOLVE MULTI-BRANCH ACCESS
+        -------------------------------------------------------- */
+
+        let gymBranches =
+            resolveAdminBranches(
+                admin
+            );
+
+
+        /* --------------------------------------------------------
+           RECEPTIONIST / STAFF
+        -------------------------------------------------------- */
+
+        if (
+            isReceptionistRole(
+                normalizedRole
+            )
+        ) {
+            if (
+                gymBranches.length === 0
+            ) {
+                console.error(
+                    '[LOGIN BRANCH ERROR]',
+                    JSON.stringify({
+                        email: normalizedEmail,
+
+                        role: normalizedRole,
+
+                        dbGymBranches: admin.gymBranches,
+
+                        dbGymBranch: admin.gymBranch,
+
+                        resolvedBranches: gymBranches,
+                    })
+                );
+
                 return res.status(403).json({
                     message: 'Your account is not assigned to a valid gym branch. Please contact the administrator.',
                 });
             }
         }
 
-        /* --------------------------------------------------------
-           MAIN ADMIN BRANCH ACCESS
-           -------------------------------------------------------- */
 
-        if (isMainAdminRole(admin.role)) {
+        /* --------------------------------------------------------
+           MAIN ADMIN
+        -------------------------------------------------------- */
+
+        if (
+            isMainAdminRole(
+                normalizedRole
+            )
+        ) {
+            /*
+             * Main admins can access all branches.
+             *
+             * Empty gymBranches means:
+             * unrestricted branch access.
+             */
             gymBranches = [];
         }
 
+
         /* --------------------------------------------------------
            LEGACY SINGLE BRANCH
-           -------------------------------------------------------- */
+        -------------------------------------------------------- */
 
         const gymBranch =
             gymBranches.length === 1 ?
             gymBranches[0] :
             null;
 
-        /* --------------------------------------------------------
-           RECEPTIONIST PERMISSIONS
-           -------------------------------------------------------- */
 
-        let permissions = admin.permissions;
+        /* --------------------------------------------------------
+           PERMISSIONS
+        -------------------------------------------------------- */
+
+        let permissions =
+            admin.permissions;
 
         if (
-            isReceptionistRole(admin.role) &&
-            !permissions
+            isReceptionistRole(
+                normalizedRole
+            ) &&
+            (!permissions ||
+                typeof permissions !==
+                'object'
+            )
         ) {
             permissions =
                 getDefaultReceptionistPermissions();
 
-            admin.permissions = permissions;
+            admin.permissions =
+                permissions;
 
             await admin.save();
         }
 
+
         /* --------------------------------------------------------
            JWT SECRET
-           -------------------------------------------------------- */
+        -------------------------------------------------------- */
 
         if (!process.env.JWT_SECRET) {
             console.error(
@@ -531,38 +693,41 @@ const loginAdmin = async(req, res) => {
             });
         }
 
+
         /* --------------------------------------------------------
            CREATE JWT
-           -------------------------------------------------------- */
+        -------------------------------------------------------- */
 
-        const token = jwt.sign({
-                id: admin._id.toString(),
+        const token =
+            jwt.sign({
+                    id: admin._id.toString(),
 
-                email: admin.email,
+                    email: admin.email,
 
-                role: admin.role,
+                    role: normalizedRole,
 
-                /*
-                 * Authoritative branch access.
-                 */
-                gymBranches,
+                    /*
+                     * Multi-branch access
+                     */
+                    gymBranches,
 
-                /*
-                 * Legacy compatibility.
-                 */
-                gymBranch,
-            },
+                    /*
+                     * Legacy compatibility
+                     */
+                    gymBranch,
+                },
 
-            process.env.JWT_SECRET,
+                process.env.JWT_SECRET,
 
-            {
-                expiresIn: '1d',
-            }
-        );
+                {
+                    expiresIn: '1d',
+                }
+            );
+
 
         /* --------------------------------------------------------
            LOGIN RESPONSE
-           -------------------------------------------------------- */
+        -------------------------------------------------------- */
 
         return res.status(200).json({
             message: 'Login successful.',
@@ -576,10 +741,23 @@ const loginAdmin = async(req, res) => {
 
                 email: admin.email,
 
-                role: admin.role,
+                role: normalizedRole,
 
+                /*
+                 * IMPORTANT:
+                 * Receptionist gets:
+                 *
+                 * ['Kalyanpur', 'Gopalpur']
+                 *
+                 * Main admin gets:
+                 *
+                 * []
+                 */
                 gymBranches,
 
+                /*
+                 * Legacy compatibility
+                 */
                 gymBranch,
 
                 status: admin.status,

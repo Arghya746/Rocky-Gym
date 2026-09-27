@@ -1,11 +1,18 @@
 const mongoose = require('mongoose');
 
-const VALID_BRANCHES = ['Kalyanpur', 'Gopalpur'];
+const VALID_BRANCHES = [
+    'Kalyanpur',
+    'Gopalpur',
+];
+
+/* =========================================================
+   PLAN SCHEMA
+   ========================================================= */
 
 const planSchema = new mongoose.Schema({
-    // =========================================
-    // GYM BRANCH
-    // =========================================
+    /* =====================================================
+       GYM BRANCH
+       ===================================================== */
 
     gymBranch: {
         type: String,
@@ -14,20 +21,26 @@ const planSchema = new mongoose.Schema({
         trim: true,
     },
 
-    // =========================================
-    // PLAN INFORMATION
-    // =========================================
+    /* =====================================================
+       PLAN INFORMATION
+       ===================================================== */
 
     name: {
         type: String,
         required: true,
         trim: true,
+        minlength: 1,
+        maxlength: 100,
     },
 
     durationMonths: {
         type: Number,
         required: true,
         min: 1,
+        validate: {
+            validator: Number.isInteger,
+            message: 'Duration in months must be a whole number.',
+        },
     },
 
     price: {
@@ -40,6 +53,7 @@ const planSchema = new mongoose.Schema({
         type: String,
         trim: true,
         default: '',
+        maxlength: 500,
     },
 
     isActive: {
@@ -50,20 +64,58 @@ const planSchema = new mongoose.Schema({
     timestamps: true,
 });
 
-// =========================================
-// INDEXES
-// =========================================
+/* =========================================================
+   INDEXES
+   ========================================================= */
 
-// Helps branch-based plan queries in AdminDashboard
+/*
+ * Branch + active status
+ *
+ * Used by:
+ * GET /api/plans
+ */
 planSchema.index({
     gymBranch: 1,
     isActive: 1,
 });
 
-// Helps branch + plan-name lookups
+/*
+ * Branch + duration + price
+ *
+ * Helps AdminDashboard sorting/filtering.
+ */
+planSchema.index({
+    gymBranch: 1,
+    durationMonths: 1,
+    price: 1,
+});
+
+/*
+ * Prevent duplicate ACTIVE plan names
+ * within the same branch.
+ *
+ * Example:
+ * Kalyanpur + Monthly + active
+ *
+ * cannot exist twice.
+ *
+ * Inactive plans are allowed to have
+ * the same name.
+ */
 planSchema.index({
     gymBranch: 1,
     name: 1,
+}, {
+    unique: true,
+    partialFilterExpression: {
+        isActive: true,
+    },
+    name: 'unique_active_plan_name_per_branch',
 });
 
-module.exports = mongoose.model('Plan', planSchema);
+/* =========================================================
+   MODEL
+   ========================================================= */
+
+module.exports =
+    mongoose.model('Plan', planSchema);

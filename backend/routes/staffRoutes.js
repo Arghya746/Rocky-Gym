@@ -14,12 +14,15 @@ const {
 
 const router = express.Router();
 
-
 // =====================================
-// STAFF MANAGEMENT
-// MAIN ADMIN ONLY
+// MAIN ADMIN ROLES
 // =====================================
 
+const MAIN_ADMIN_ROLES = [
+    'admin',
+    'main_admin',
+    'super_admin',
+];
 
 // =====================================
 // GET ALL RECEPTIONISTS
@@ -29,10 +32,9 @@ const router = express.Router();
 router.get(
     '/',
     protect,
-    authorize('admin'),
+    authorize(...MAIN_ADMIN_ROLES),
     getStaff
 );
-
 
 // =====================================
 // UPDATE RECEPTIONIST BRANCHES
@@ -42,10 +44,9 @@ router.get(
 router.put(
     '/:id/branches',
     protect,
-    authorize('admin'),
+    authorize(...MAIN_ADMIN_ROLES),
     updateStaffBranches
 );
-
 
 // =====================================
 // UPDATE RECEPTIONIST PERMISSIONS
@@ -55,10 +56,9 @@ router.put(
 router.put(
     '/:id/permissions',
     protect,
-    authorize('admin'),
+    authorize(...MAIN_ADMIN_ROLES),
     updateStaffPermissions
 );
-
 
 // =====================================
 // ACTIVATE / DEACTIVATE RECEPTIONIST
@@ -68,9 +68,8 @@ router.put(
 router.put(
     '/:id/status',
     protect,
-    authorize('admin'),
+    authorize(...MAIN_ADMIN_ROLES),
     updateStaffStatus
 );
-
 
 module.exports = router;

@@ -37,16 +37,31 @@ const getAccessibleBranch = (req) => {
         return null;
     }
 
-    // Main admin can access both branches.
-    if (req.admin.role === 'admin') {
+    const role = String(
+        req.admin.role || ''
+    ).toLowerCase();
+
+    // Main admins can access both branches.
+    if (
+        role === 'admin' ||
+        role === 'main_admin' ||
+        role === 'super_admin'
+    ) {
         return null;
     }
 
-    // Receptionist can access only
-    // their assigned branch.
-    return normalizeBranch(
-        req.admin.gymBranch
-    );
+    // Receptionist/staff can access
+    // only their assigned branch.
+    if (
+        role === 'receptionist' ||
+        role === 'staff'
+    ) {
+        return normalizeBranch(
+            req.admin.gymBranch
+        );
+    }
+
+    return null;
 };
 
 // ===============================
@@ -64,9 +79,19 @@ const getWriteBranch = (
         };
     }
 
-    // Main admin must explicitly
-    // select a valid branch.
-    if (req.admin.role === 'admin') {
+    const role = String(
+        req.admin.role || ''
+    ).toLowerCase();
+
+    // ===============================
+    // MAIN ADMIN
+    // ===============================
+
+    if (
+        role === 'admin' ||
+        role === 'main_admin' ||
+        role === 'super_admin'
+    ) {
         const branch =
             normalizeBranch(
                 requestedBranch
@@ -84,22 +109,34 @@ const getWriteBranch = (
         };
     }
 
-    // Receptionist uses only
-    // their assigned branch.
-    const branch =
-        normalizeBranch(
-            req.admin.gymBranch
-        );
+    // ===============================
+    // RECEPTIONIST / STAFF
+    // ===============================
 
-    if (!branch) {
+    if (
+        role === 'receptionist' ||
+        role === 'staff'
+    ) {
+        const branch =
+            normalizeBranch(
+                req.admin.gymBranch
+            );
+
+        if (!branch) {
+            return {
+                error: 'Your account is not assigned to a valid gym branch.',
+                status: 403,
+            };
+        }
+
         return {
-            error: 'Your account is not assigned to a valid gym branch.',
-            status: 403,
+            branch,
         };
     }
 
     return {
-        branch,
+        error: 'You do not have permission to manage payments.',
+        status: 403,
     };
 };
 
@@ -148,11 +185,11 @@ const addPayment = async(
             );
 
         if (branchResult.error) {
-            return res.status(
-                branchResult.status
-            ).json({
-                message: branchResult.error,
-            });
+            return res
+                .status(branchResult.status)
+                .json({
+                    message: branchResult.error,
+                });
         }
 
         const selectedBranch =
@@ -259,14 +296,20 @@ const getPayments = async(
             });
         }
 
+        const role = String(
+            req.admin.role || ''
+        ).toLowerCase();
+
         const branch =
             getAccessibleBranch(req);
 
-        // Receptionist without branch
+        // Receptionist/staff without branch
         // must not see any payment data.
         if (
-            req.admin.role ===
-            'receptionist' &&
+            (
+                role === 'receptionist' ||
+                role === 'staff'
+            ) &&
             !branch
         ) {
             return res.status(403).json({
@@ -322,12 +365,18 @@ const getPaymentById = async(
             });
         }
 
+        const role = String(
+            req.admin.role || ''
+        ).toLowerCase();
+
         const branch =
             getAccessibleBranch(req);
 
         if (
-            req.admin.role ===
-            'receptionist' &&
+            (
+                role === 'receptionist' ||
+                role === 'staff'
+            ) &&
             !branch
         ) {
             return res.status(403).json({
@@ -387,12 +436,20 @@ const updatePayment = async(
             });
         }
 
+        const role = String(
+            req.admin.role || ''
+        ).toLowerCase();
+
         const branch =
             getAccessibleBranch(req);
 
+        // Receptionist/staff without branch
+        // cannot update payment data.
         if (
-            req.admin.role ===
-            'receptionist' &&
+            (
+                role === 'receptionist' ||
+                role === 'staff'
+            ) &&
             !branch
         ) {
             return res.status(403).json({
@@ -426,20 +483,25 @@ const updatePayment = async(
         };
 
         // ===============================
-        // RECEPTIONIST BRANCH PROTECTION
+        // BRANCH PROTECTION
         // ===============================
 
         if (
-            req.admin.role ===
-            'receptionist'
+            role === 'receptionist' ||
+            role === 'staff'
         ) {
-            // Receptionist cannot change
-            // payment branch.
+            // Receptionist/staff cannot
+            // change payment branch.
             updateData.gymBranch =
                 branch;
-        } else {
+        } else if (
+            role === 'admin' ||
+            role === 'main_admin' ||
+            role === 'super_admin'
+        ) {
             // Main admin can change branch,
             // but only to a valid branch.
+
             const requestedBranch =
                 normalizeBranch(
                     updateData.gymBranch
@@ -466,6 +528,10 @@ const updatePayment = async(
                     message: 'Payment has no valid gym branch.',
                 });
             }
+        } else {
+            return res.status(403).json({
+                message: 'You do not have permission to update payments.',
+            });
         }
 
         // ===============================
@@ -578,12 +644,20 @@ const deletePayment = async(
             });
         }
 
+        const role = String(
+            req.admin.role || ''
+        ).toLowerCase();
+
         const branch =
             getAccessibleBranch(req);
 
+        // Receptionist/staff without branch
+        // cannot delete payment data.
         if (
-            req.admin.role ===
-            'receptionist' &&
+            (
+                role === 'receptionist' ||
+                role === 'staff'
+            ) &&
             !branch
         ) {
             return res.status(403).json({
