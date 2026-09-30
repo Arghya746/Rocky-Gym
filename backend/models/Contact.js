@@ -1,11 +1,23 @@
 const mongoose = require('mongoose');
 
+/* =========================================================
+   CONTACT / ENQUIRY SCHEMA
+   ========================================================= */
+
 const contactSchema = new mongoose.Schema({
+    /* -------------------------------------------------
+       NAME
+    ------------------------------------------------- */
+
     name: {
         type: String,
         required: true,
         trim: true,
     },
+
+    /* -------------------------------------------------
+       PHONE
+    ------------------------------------------------- */
 
     phone: {
         type: String,
@@ -13,15 +25,28 @@ const contactSchema = new mongoose.Schema({
         trim: true,
     },
 
+    /* -------------------------------------------------
+       GYM BRANCH
+    ------------------------------------------------- */
+
     gymBranch: {
         type: String,
-        enum: ['Kalyanpur', 'Gopalpur'],
+        enum: [
+            'Kalyanpur',
+            'Gopalpur',
+        ],
         required: true,
+        trim: true,
     },
+
+    /* -------------------------------------------------
+       FITNESS GOAL
+    ------------------------------------------------- */
 
     goal: {
         type: String,
         required: true,
+
         enum: [
             'Muscle Building',
             'Fat Loss',
@@ -29,6 +54,10 @@ const contactSchema = new mongoose.Schema({
             'General Fitness',
         ],
     },
+
+    /* -------------------------------------------------
+       MESSAGE
+    ------------------------------------------------- */
 
     message: {
         type: String,
@@ -39,4 +68,21 @@ const contactSchema = new mongoose.Schema({
     timestamps: true,
 });
 
-module.exports = mongoose.model('Contact', contactSchema);
+/* =========================================================
+   DATABASE INDEX
+   ========================================================= */
+
+contactSchema.index({
+    gymBranch: 1,
+    createdAt: -1,
+});
+
+/* =========================================================
+   EXPORT
+   ========================================================= */
+
+module.exports =
+    mongoose.model(
+        'Contact',
+        contactSchema
+    );

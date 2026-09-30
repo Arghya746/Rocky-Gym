@@ -1,11 +1,33 @@
 const mongoose = require('mongoose');
 
+/* =========================================================
+   VALID BRANCHES
+   ========================================================= */
+
+const VALID_GYM_BRANCHES = [
+    'Kalyanpur',
+    'Gopalpur',
+];
+
+/* =========================================================
+   TRAINER SCHEMA
+   ========================================================= */
+
 const trainerSchema = new mongoose.Schema({
+    /* =====================================================
+       GYM BRANCH
+    ===================================================== */
+
     gymBranch: {
         type: String,
-        enum: ['Kalyanpur', 'Gopalpur'],
+        enum: VALID_GYM_BRANCHES,
         required: true,
+        trim: true,
     },
+
+    /* =====================================================
+       BASIC INFORMATION
+    ===================================================== */
 
     name: {
         type: String,
@@ -23,7 +45,12 @@ const trainerSchema = new mongoose.Schema({
         type: String,
         trim: true,
         lowercase: true,
+        default: '',
     },
+
+    /* =====================================================
+       PROFESSIONAL INFORMATION
+    ===================================================== */
 
     specialization: {
         type: String,
@@ -39,11 +66,20 @@ const trainerSchema = new mongoose.Schema({
 
     gender: {
         type: String,
-        enum: ['Male', 'Female', 'Other'],
+        enum: [
+            'Male',
+            'Female',
+            'Other',
+        ],
     },
+
+    /* =====================================================
+       PROFILE
+    ===================================================== */
 
     photo: {
         type: String,
+        trim: true,
         default: '',
     },
 
@@ -53,14 +89,41 @@ const trainerSchema = new mongoose.Schema({
         default: '',
     },
 
+    /* =====================================================
+       STATUS
+    ===================================================== */
+
     status: {
         type: String,
-        enum: ['Active', 'Inactive'],
+        enum: [
+            'Active',
+            'Inactive',
+        ],
         default: 'Active',
     },
 }, {
     timestamps: true,
 });
 
-module.exports =
-    mongoose.model('Trainer', trainerSchema);
+/* =========================================================
+   DATABASE INDEXES
+   ========================================================= */
+
+trainerSchema.index({
+    gymBranch: 1,
+    status: 1,
+});
+
+trainerSchema.index({
+    gymBranch: 1,
+    createdAt: -1,
+});
+
+/* =========================================================
+   MODEL
+   ========================================================= */
+
+module.exports = mongoose.model(
+    'Trainer',
+    trainerSchema
+);

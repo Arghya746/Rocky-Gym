@@ -16,23 +16,23 @@ const {
 
 const router = express.Router();
 
-/* =========================================================
-   ATTENDANCE
-   ========================================================= */
+// ============================================================
+// ATTENDANCE
+// ============================================================
 
-/* =========================================================
-   MARK ATTENDANCE
-   POST /api/attendance
-
-   Main Admin:
-   - Must provide valid gymBranch
-
-   Receptionist:
-   - Uses assigned branch
-
-   Permission:
-   - attendance.add
-   ========================================================= */
+// ============================================================
+// MARK ATTENDANCE
+// POST /api/attendance
+//
+// Main Admin:
+// - Must provide/select a valid gymBranch
+//
+// Receptionist / Staff:
+// - Uses an assigned branch
+//
+// Permission:
+// attendance.add
+// ============================================================
 
 router.post(
     '/',
@@ -42,20 +42,19 @@ router.post(
     markAttendance
 );
 
-
-/* =========================================================
-   VIEW ATTENDANCE
-   GET /api/attendance
-
-   Main Admin:
-   - Both branches
-
-   Receptionist:
-   - Assigned branch only
-
-   Permission:
-   - attendance.view
-   ========================================================= */
+// ============================================================
+// GET ATTENDANCE
+// GET /api/attendance
+//
+// Main Admin:
+// - Can access both branches
+//
+// Receptionist / Staff:
+// - Can access assigned branch(es)
+//
+// Permission:
+// attendance.view
+// ============================================================
 
 router.get(
     '/',
@@ -65,11 +64,13 @@ router.get(
     getAttendance
 );
 
-
-/* =========================================================
-   VIEW SINGLE ATTENDANCE RECORD
-   GET /api/attendance/:id
-   ========================================================= */
+// ============================================================
+// GET SINGLE ATTENDANCE
+// GET /api/attendance/:id
+//
+// Permission:
+// attendance.view
+// ============================================================
 
 router.get(
     '/:id',
@@ -79,14 +80,13 @@ router.get(
     getAttendanceById
 );
 
-
-/* =========================================================
-   EDIT ATTENDANCE
-   PUT /api/attendance/:id
-
-   Permission:
-   - attendance.edit
-   ========================================================= */
+// ============================================================
+// UPDATE ATTENDANCE
+// PUT /api/attendance/:id
+//
+// Permission:
+// attendance.edit
+// ============================================================
 
 router.put(
     '/:id',
@@ -96,14 +96,13 @@ router.put(
     updateAttendance
 );
 
-
-/* =========================================================
-   DELETE ATTENDANCE
-   DELETE /api/attendance/:id
-
-   Permission:
-   - attendance.delete
-   ========================================================= */
+// ============================================================
+// DELETE ATTENDANCE
+// DELETE /api/attendance/:id
+//
+// Permission:
+// attendance.delete
+// ============================================================
 
 router.delete(
     '/:id',
@@ -113,9 +112,8 @@ router.delete(
     deleteAttendance
 );
 
-
-/* =========================================================
-   EXPORT ROUTER
-   ========================================================= */
+// ============================================================
+// EXPORT
+// ============================================================
 
 module.exports = router;

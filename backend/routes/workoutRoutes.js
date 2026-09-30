@@ -16,23 +16,23 @@ const {
 
 const router = express.Router();
 
-/* =========================================================
-   WORKOUTS
-   ========================================================= */
+// ============================================================
+// WORKOUTS
+// ============================================================
 
-/* =========================================================
-   VIEW WORKOUTS
-   GET /api/workouts
-
-   Main Admin:
-   - Can access both branches
-
-   Receptionist:
-   - Can access assigned branch only
-
-   Permission:
-   - workouts.view
-   ========================================================= */
+// ============================================================
+// GET ALL WORKOUTS
+// GET /api/workouts
+//
+// Main Admin:
+// - Can access both branches
+//
+// Receptionist / Staff:
+// - Can access assigned branch(es)
+//
+// Permission:
+// workouts.view
+// ============================================================
 
 router.get(
     '/',
@@ -42,20 +42,19 @@ router.get(
     getWorkouts
 );
 
-
-/* =========================================================
-   ADD WORKOUT
-   POST /api/workouts
-
-   Main Admin:
-   - Must provide a valid gymBranch
-
-   Receptionist:
-   - Uses assigned branch
-
-   Permission:
-   - workouts.add
-   ========================================================= */
+// ============================================================
+// ADD WORKOUT
+// POST /api/workouts
+//
+// Main Admin:
+// - Must provide/select a valid gymBranch
+//
+// Receptionist / Staff:
+// - Uses an assigned branch
+//
+// Permission:
+// workouts.add
+// ============================================================
 
 router.post(
     '/',
@@ -65,11 +64,13 @@ router.post(
     addWorkout
 );
 
-
-/* =========================================================
-   VIEW SINGLE WORKOUT
-   GET /api/workouts/:id
-   ========================================================= */
+// ============================================================
+// GET SINGLE WORKOUT
+// GET /api/workouts/:id
+//
+// Permission:
+// workouts.view
+// ============================================================
 
 router.get(
     '/:id',
@@ -79,14 +80,19 @@ router.get(
     getWorkoutById
 );
 
-
-/* =========================================================
-   EDIT WORKOUT
-   PUT /api/workouts/:id
-
-   Permission:
-   - workouts.edit
-   ========================================================= */
+// ============================================================
+// UPDATE WORKOUT
+// PUT /api/workouts/:id
+//
+// Main Admin:
+// - Can update records across valid branches
+//
+// Receptionist / Staff:
+// - Restricted to assigned branch(es)
+//
+// Permission:
+// workouts.edit
+// ============================================================
 
 router.put(
     '/:id',
@@ -96,14 +102,13 @@ router.put(
     updateWorkout
 );
 
-
-/* =========================================================
-   DELETE WORKOUT
-   DELETE /api/workouts/:id
-
-   Permission:
-   - workouts.delete
-   ========================================================= */
+// ============================================================
+// DELETE WORKOUT
+// DELETE /api/workouts/:id
+//
+// Permission:
+// workouts.delete
+// ============================================================
 
 router.delete(
     '/:id',
@@ -113,9 +118,8 @@ router.delete(
     deleteWorkout
 );
 
-
-/* =========================================================
-   EXPORT ROUTER
-   ========================================================= */
+// ============================================================
+// EXPORT
+// ============================================================
 
 module.exports = router;

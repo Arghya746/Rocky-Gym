@@ -16,19 +16,25 @@ const {
 
 const router = express.Router();
 
-/* =========================================================
-   GET ALL MEMBERS
-   GET /api/members
+// ============================================================
+// MEMBERS
+// ============================================================
 
-   Main Admin:
-   - Can access both branches
-
-   Receptionist:
-   - Can access assigned branch only
-
-   Permission:
-   - members.view
-   ========================================================= */
+// ============================================================
+// GET ALL MEMBERS
+// GET /api/members
+//
+// Main Admin:
+// - Can access Kalyanpur
+// - Can access Gopalpur
+// - Can access all branches
+//
+// Receptionist / Staff:
+// - Can access assigned branch(es)
+//
+// Permission:
+// members.view
+// ============================================================
 
 router.get(
     '/',
@@ -38,20 +44,19 @@ router.get(
     getMembers
 );
 
-
-/* =========================================================
-   ADD MEMBER
-   POST /api/members
-
-   Main Admin:
-   - Must provide a valid gymBranch
-
-   Receptionist:
-   - Member is created in their assigned branch
-
-   Permission:
-   - members.add
-   ========================================================= */
+// ============================================================
+// ADD MEMBER
+// POST /api/members
+//
+// Main Admin:
+// - Must select/provide a valid gymBranch
+//
+// Receptionist / Staff:
+// - Uses an assigned branch
+//
+// Permission:
+// members.add
+// ============================================================
 
 router.post(
     '/',
@@ -61,13 +66,13 @@ router.post(
     addMember
 );
 
-
-/* =========================================================
-   GET SINGLE MEMBER
-   GET /api/members/:id
-
-   Branch isolation is enforced.
-   ========================================================= */
+// ============================================================
+// GET SINGLE MEMBER
+// GET /api/members/:id
+//
+// Branch isolation is handled by authentication +
+// controller branch filtering.
+// ============================================================
 
 router.get(
     '/:id',
@@ -77,22 +82,21 @@ router.get(
     getMemberById
 );
 
-
-/* =========================================================
-   UPDATE MEMBER
-   PUT /api/members/:id
-
-   Main Admin:
-   - Can update members from either branch
-   - Can change branch to a valid branch
-
-   Receptionist:
-   - Can update only members from assigned branch
-   - Cannot move member to another branch
-
-   Permission:
-   - members.edit
-   ========================================================= */
+// ============================================================
+// UPDATE MEMBER
+// PUT /api/members/:id
+//
+// Main Admin:
+// - Can update members from either branch
+// - Can move a member between valid branches
+//
+// Receptionist / Staff:
+// - Can update members from assigned branch(es)
+// - Cannot move a member outside their assigned branches
+//
+// Permission:
+// members.edit
+// ============================================================
 
 router.put(
     '/:id',
@@ -102,16 +106,15 @@ router.put(
     updateMember
 );
 
-
-/* =========================================================
-   DELETE MEMBER
-   DELETE /api/members/:id
-
-   Branch isolation is enforced by the controller.
-
-   Permission:
-   - members.delete
-   ========================================================= */
+// ============================================================
+// DELETE MEMBER
+// DELETE /api/members/:id
+//
+// Branch isolation is handled by controller.
+//
+// Permission:
+// members.delete
+// ============================================================
 
 router.delete(
     '/:id',
@@ -121,9 +124,8 @@ router.delete(
     deleteMember
 );
 
-
-/* =========================================================
-   EXPORT ROUTER
-   ========================================================= */
+// ============================================================
+// EXPORT
+// ============================================================
 
 module.exports = router;

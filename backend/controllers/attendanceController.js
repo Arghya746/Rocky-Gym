@@ -1,18 +1,12 @@
 const Attendance = require('../models/Attendance');
 const Member = require('../models/Member');
 
-// =========================================
-// ALLOWED BRANCHES
-// =========================================
-
-const ALLOWED_BRANCHES = [
-    'Kalyanpur',
-    'Gopalpur',
-];
-
-// =========================================
-// ROLES
-// =========================================
+const {
+    VALID_BRANCHES: ALLOWED_BRANCHES,
+    normalizeBranch,
+    getActiveBranch,
+    resolveWriteBranch,
+} = require('../utils/branchAccess');
 
 const MAIN_ADMIN_ROLES = [
     'admin',
@@ -25,70 +19,36 @@ const BRANCH_USER_ROLES = [
     'staff',
 ];
 
-// =========================================
-// NORMALIZE ROLE
-// =========================================
+const getRole = (req) =>
+    String(req.admin.role || '')
+    .trim()
+    .toLowerCase();
 
-const normalizeRole = (value) => {
+const isMainAdmin = (req) =>
+    MAIN_ADMIN_ROLES.includes(getRole(req));
 
-    if (!value) {
-        return '';
-    }
+const isBranchUser = (req) =>
+    BRANCH_USER_ROLES.includes(getRole(req));
 
-    return String(value)
-        .trim()
-        .toLowerCase();
+const getAccessibleBranch = (req) =>
+    getActiveBranch(req);
+
+const isValidObjectId = (value) => {
+    return /^[a-fA-F0-9]{24}$/.test(String(value || ''));
 };
 
-// =========================================
-// NORMALIZE BRANCH
-// =========================================
 
-const normalizeBranch = (value) => {
-
-    if (!value) {
-        return null;
-    }
-
-    const normalized =
-        String(value)
-        .trim()
-        .toLowerCase();
-
-    if (normalized === 'kalyanpur') {
-        return 'Kalyanpur';
-    }
-
-    if (normalized === 'gopalpur') {
-        return 'Gopalpur';
-    }
-
-    return null;
-};
-
-// =========================================
-// NORMALIZE DATE
-// =========================================
-// Converts an incoming date into:
-// YYYY-MM-DD
-//
-// Example:
-// 2026-09-23T08:30:00.000Z
-//        ↓
-// 2026-09-23
-//
-// Uses local calendar components so the
-// attendance day does not unexpectedly
-// shift because of UTC conversion.
-// =========================================
+// ============================================================
+// NORMALIZE ATTENDANCE DATE
+// ============================================================
 
 const normalizeAttendanceDate = (value) => {
-
     if (!value) {
         return null;
     }
 
-    const parsedDate = new Date(value);
+    const parsedDate =
+        new Date(value);
 
     if (
         Number.isNaN(
@@ -114,17 +74,18 @@ const normalizeAttendanceDate = (value) => {
     return `${year}-${month}-${day}`;
 };
 
-// =========================================
-// PARSE DATE
-// =========================================
+
+// ============================================================
+// PARSE VALID DATE
+// ============================================================
 
 const parseValidDate = (value) => {
-
     if (!value) {
         return null;
     }
 
-    const parsedDate = new Date(value);
+    const parsedDate =
+        new Date(value);
 
     if (
         Number.isNaN(
@@ -137,148 +98,25 @@ const parseValidDate = (value) => {
     return parsedDate;
 };
 
-// =========================================
-// CHECK MAIN ADMIN
-// =========================================
 
-const isMainAdmin = (req) => {
-
-    const role =
-        normalizeRole(
-            req.admin.role
-        );
-
-    return MAIN_ADMIN_ROLES.includes(
-        role
-    );
-};
-
-// =========================================
-// CHECK BRANCH USER
-// =========================================
-
-const isBranchUser = (req) => {
-
-    const role =
-        normalizeRole(
-            req.admin.role
-        );
-
-    return BRANCH_USER_ROLES.includes(
-        role
-    );
-};
-
-// =========================================
-// GET ACCESSIBLE BRANCH
-// =========================================
-
-const getAccessibleBranch = (req) => {
-
-    const role =
-        normalizeRole(
-            req.admin.role
-        );
-
-    // Main admin can access all branches.
-    if (
-        MAIN_ADMIN_ROLES.includes(
-            role
-        )
-    ) {
-        return null;
-    }
-
-    // Receptionist/staff only get
-    // their assigned branch.
-    if (
-        BRANCH_USER_ROLES.includes(
-            role
-        )
-    ) {
-
-        return normalizeBranch(
-            req.admin.gymBranch ||
-            req.admin.branchName ||
-            req.admin.branch
-        );
-    }
-
-    return null;
-};
-
-// =========================================
-// GET WRITE BRANCH
-// =========================================
-
-const getWriteBranch = (
-    req,
-    requestedBranch
-) => {
-
-    const role =
-        normalizeRole(
-            req.admin.role
-        );
-
-    // Main admin chooses branch.
-    if (
-        MAIN_ADMIN_ROLES.includes(
-            role
-        )
-    ) {
-
-        return normalizeBranch(
-            requestedBranch
-        );
-    }
-
-    // Branch user always uses
-    // their assigned branch.
-    if (
-        BRANCH_USER_ROLES.includes(
-            role
-        )
-    ) {
-
-        return normalizeBranch(
-            req.admin.gymBranch ||
-            req.admin.branchName ||
-            req.admin.branch
-        );
-    }
-
-    return null;
-};
-
-// =========================================
+// ============================================================
 // VALIDATE ROLE
-// =========================================
+// ============================================================
 
 const validateRole = (req, res) => {
-
-    const role =
-        normalizeRole(
-            req.admin && req.admin.role
-        );
-
-    if (!role) {
-
-        res.status(403).json({
-            message: 'Your account role is not configured.',
+    if (!req.admin) {
+        res.status(401).json({
+            message: 'Not authorized.',
         });
 
         return false;
     }
 
-    if (!MAIN_ADMIN_ROLES.includes(
-            role
-        ) &&
-        !BRANCH_USER_ROLES.includes(
-            role
-        )
-    ) {
+    const role = getRole(req);
 
+    if (!MAIN_ADMIN_ROLES.includes(role) &&
+        !BRANCH_USER_ROLES.includes(role)
+    ) {
         res.status(403).json({
             message: 'You are not authorized to access attendance records.',
         });
@@ -289,21 +127,20 @@ const validateRole = (req, res) => {
     return true;
 };
 
-// =========================================
-// VALIDATE BRANCH USER BRANCH
-// =========================================
 
-const validateBranchUserBranch = (
+// ============================================================
+// VALIDATE BRANCH
+// ============================================================
+
+const validateUserBranch = (
     req,
     res,
     branch
 ) => {
-
     if (
         isBranchUser(req) &&
         !branch
     ) {
-
         res.status(403).json({
             message: 'Your account is not assigned to a valid gym branch.',
         });
@@ -314,33 +151,33 @@ const validateBranchUserBranch = (
     return true;
 };
 
-// =========================================
-// VALIDATE CHECK-IN / CHECK-OUT TIMES
-// =========================================
+
+// ============================================================
+// VALIDATE ATTENDANCE TIMES
+// ============================================================
 
 const validateAttendanceTimes = (
     checkInTime,
     checkOutTime
 ) => {
-
     let parsedCheckIn = null;
     let parsedCheckOut = null;
 
-    // =========================================
+    // --------------------------------------------------------
     // CHECK-IN
-    // =========================================
+    // --------------------------------------------------------
 
-    if (checkInTime !== undefined &&
+    if (
+        checkInTime !== undefined &&
         checkInTime !== null &&
-        checkInTime !== '') {
-
+        checkInTime !== ''
+    ) {
         parsedCheckIn =
             parseValidDate(
                 checkInTime
             );
 
         if (!parsedCheckIn) {
-
             return {
                 valid: false,
                 message: 'Invalid check-in time.',
@@ -348,21 +185,21 @@ const validateAttendanceTimes = (
         }
     }
 
-    // =========================================
+    // --------------------------------------------------------
     // CHECK-OUT
-    // =========================================
+    // --------------------------------------------------------
 
-    if (checkOutTime !== undefined &&
+    if (
+        checkOutTime !== undefined &&
         checkOutTime !== null &&
-        checkOutTime !== '') {
-
+        checkOutTime !== ''
+    ) {
         parsedCheckOut =
             parseValidDate(
                 checkOutTime
             );
 
         if (!parsedCheckOut) {
-
             return {
                 valid: false,
                 message: 'Invalid check-out time.',
@@ -370,16 +207,15 @@ const validateAttendanceTimes = (
         }
     }
 
-    // =========================================
-    // CHECK-IN VS CHECK-OUT
-    // =========================================
+    // --------------------------------------------------------
+    // COMPARE
+    // --------------------------------------------------------
 
     if (
         parsedCheckIn &&
         parsedCheckOut &&
         parsedCheckOut < parsedCheckIn
     ) {
-
         return {
             valid: false,
             message: 'Check-out time cannot be earlier than check-in time.',
@@ -393,21 +229,64 @@ const validateAttendanceTimes = (
     };
 };
 
-// =========================================
+
+// ============================================================
+// GET WRITE BRANCH
+// ============================================================
+
+const getAttendanceWriteBranch = (
+    req,
+    requestedBranch
+) => {
+    const result =
+        resolveWriteBranch(
+            req,
+            requestedBranch
+        );
+
+    if (result.error) {
+        return {
+            error: result.error,
+            status: result.status || 400,
+        };
+    }
+
+    const branch =
+        normalizeBranch(
+            result.branch
+        );
+
+    if (!branch) {
+        return {
+            error: isBranchUser(req) ?
+                'Your account is not assigned to a valid gym branch.' : 'A valid gym branch is required.',
+            status: isBranchUser(req) ?
+                403 : 400,
+        };
+    }
+
+    if (!ALLOWED_BRANCHES.includes(branch)) {
+        return {
+            error: 'Invalid gym branch.',
+            status: 400,
+        };
+    }
+
+    return {
+        branch,
+    };
+};
+
+
+// ============================================================
 // MARK ATTENDANCE
-// =========================================
+// ============================================================
 
 const markAttendance = async(
     req,
     res
 ) => {
-
     try {
-
-        // =========================================
-        // ROLE
-        // =========================================
-
         if (!validateRole(req, res)) {
             return;
         }
@@ -421,28 +300,35 @@ const markAttendance = async(
             gymBranch,
         } = req.body;
 
-        // =========================================
-        // MEMBER VALIDATION
-        // =========================================
+        // --------------------------------------------------------
+        // MEMBER
+        // --------------------------------------------------------
 
         if (!member) {
-
             return res.status(400).json({
                 message: 'Member is required.',
             });
         }
 
-        // =========================================
-        // DATE VALIDATION
-        // =========================================
+        if (!isValidObjectId(member)) {
+            return res.status(400).json({
+                message: 'Invalid member ID.',
+            });
+        }
+
+        // --------------------------------------------------------
+        // DATE
+        // --------------------------------------------------------
+
+        const sourceDate =
+            date || new Date();
 
         const attendanceDay =
             normalizeAttendanceDate(
-                date || new Date()
+                sourceDate
             );
 
         if (!attendanceDay) {
-
             return res.status(400).json({
                 message: 'Invalid attendance date.',
             });
@@ -450,19 +336,18 @@ const markAttendance = async(
 
         const attendanceDate =
             parseValidDate(
-                date || new Date()
+                sourceDate
             );
 
         if (!attendanceDate) {
-
             return res.status(400).json({
                 message: 'Invalid attendance date.',
             });
         }
 
-        // =========================================
-        // TIME VALIDATION
-        // =========================================
+        // --------------------------------------------------------
+        // TIMES
+        // --------------------------------------------------------
 
         const timeValidation =
             validateAttendanceTimes(
@@ -471,48 +356,37 @@ const markAttendance = async(
             );
 
         if (!timeValidation.valid) {
-
             return res.status(400).json({
                 message: timeValidation.message,
             });
         }
 
-        // =========================================
+        // --------------------------------------------------------
         // BRANCH
-        // =========================================
+        // --------------------------------------------------------
 
-        const selectedBranch =
-            getWriteBranch(
+        const branchResult =
+            getAttendanceWriteBranch(
                 req,
                 gymBranch
             );
 
-        if (!selectedBranch) {
-
-            if (isBranchUser(req)) {
-
-                return res.status(403).json({
-                    message: 'Your account is not assigned to a valid gym branch.',
+        if (branchResult.error) {
+            return res
+                .status(
+                    branchResult.status
+                )
+                .json({
+                    message: branchResult.error,
                 });
-            }
-
-            return res.status(400).json({
-                message: 'A valid gym branch is required.',
-            });
         }
 
-        if (!ALLOWED_BRANCHES.includes(
-                selectedBranch
-            )) {
+        const selectedBranch =
+            branchResult.branch;
 
-            return res.status(400).json({
-                message: 'Invalid gym branch.',
-            });
-        }
-
-        // =========================================
-        // VERIFY MEMBER
-        // =========================================
+        // --------------------------------------------------------
+        // MEMBER BRANCH CHECK
+        // --------------------------------------------------------
 
         const memberRecord =
             await Member.findOne({
@@ -521,15 +395,14 @@ const markAttendance = async(
             });
 
         if (!memberRecord) {
-
             return res.status(400).json({
                 message: 'Member not found in the selected gym branch.',
             });
         }
 
-        // =========================================
-        // DUPLICATE CHECK
-        // =========================================
+        // --------------------------------------------------------
+        // DUPLICATE
+        // --------------------------------------------------------
 
         const existingAttendance =
             await Attendance.findOne({
@@ -539,23 +412,19 @@ const markAttendance = async(
             });
 
         if (existingAttendance) {
-
             return res.status(409).json({
-
                 message: 'Attendance has already been marked for this member on this calendar day.',
 
                 attendance: existingAttendance,
-
             });
         }
 
-        // =========================================
-        // CREATE ATTENDANCE
-        // =========================================
+        // --------------------------------------------------------
+        // CREATE
+        // --------------------------------------------------------
 
         const attendance =
             await Attendance.create({
-
                 member,
 
                 gymBranch: selectedBranch,
@@ -569,59 +438,42 @@ const markAttendance = async(
                 checkOutTime: timeValidation.checkOutTime,
 
                 status,
-
             });
 
         return res.status(201).json({
-
             message: 'Attendance marked successfully.',
 
             attendance,
-
         });
 
     } catch (error) {
-
-        // =========================================
-        // DUPLICATE KEY
-        // =========================================
-
-        if (
-            error &&
-            error.code === 11000
-        ) {
-
-            return res.status(409).json({
-
-                message: 'Attendance has already been marked for this member on this calendar day.',
-
-            });
-        }
-
         console.error(
             'Mark Attendance Error:',
             error
         );
 
+        if (error.code === 11000) {
+            return res.status(409).json({
+                message: 'Attendance has already been marked for this member on this calendar day.',
+            });
+        }
+
         return res.status(500).json({
-
             message: 'Server error. Please try again.',
-
         });
     }
 };
 
-// =========================================
+
+// ============================================================
 // GET ALL ATTENDANCE
-// =========================================
+// ============================================================
 
 const getAttendance = async(
     req,
     res
 ) => {
-
     try {
-
         if (!validateRole(req, res)) {
             return;
         }
@@ -629,7 +481,7 @@ const getAttendance = async(
         const branch =
             getAccessibleBranch(req);
 
-        if (!validateBranchUserBranch(
+        if (!validateUserBranch(
                 req,
                 res,
                 branch
@@ -654,47 +506,48 @@ const getAttendance = async(
             });
 
         return res.status(200).json({
-
             message: 'Attendance fetched successfully.',
-
             attendance,
-
         });
 
     } catch (error) {
-
         console.error(
             'Get Attendance Error:',
-            error.message
+            error
         );
 
         return res.status(500).json({
-
             message: 'Server error. Please try again.',
-
         });
     }
 };
 
-// =========================================
+
+// ============================================================
 // GET SINGLE ATTENDANCE
-// =========================================
+// ============================================================
 
 const getAttendanceById = async(
     req,
     res
 ) => {
-
     try {
-
         if (!validateRole(req, res)) {
             return;
+        }
+
+        if (!isValidObjectId(
+                req.params.id
+            )) {
+            return res.status(400).json({
+                message: 'Invalid attendance ID.',
+            });
         }
 
         const branch =
             getAccessibleBranch(req);
 
-        if (!validateBranchUserBranch(
+        if (!validateUserBranch(
                 req,
                 res,
                 branch
@@ -707,67 +560,66 @@ const getAttendanceById = async(
         };
 
         if (branch) {
-
             query.gymBranch =
                 branch;
         }
 
         const attendance =
-            await Attendance.findOne(query)
-            .populate(
+            await Attendance.findOne(
+                query
+            ).populate(
                 'member',
                 'name phone email gymBranch'
             );
 
         if (!attendance) {
-
             return res.status(404).json({
-
                 message: 'Attendance record not found.',
-
             });
         }
 
         return res.status(200).json({
-
             attendance,
-
         });
 
     } catch (error) {
-
         console.error(
             'Get Attendance Error:',
-            error.message
+            error
         );
 
         return res.status(500).json({
-
             message: 'Server error. Please try again.',
-
         });
     }
 };
 
-// =========================================
+
+// ============================================================
 // UPDATE ATTENDANCE
-// =========================================
+// ============================================================
 
 const updateAttendance = async(
     req,
     res
 ) => {
-
     try {
-
         if (!validateRole(req, res)) {
             return;
+        }
+
+        if (!isValidObjectId(
+                req.params.id
+            )) {
+            return res.status(400).json({
+                message: 'Invalid attendance ID.',
+            });
         }
 
         const branch =
             getAccessibleBranch(req);
 
-        if (!validateBranchUserBranch(
+        if (!validateUserBranch(
                 req,
                 res,
                 branch
@@ -775,43 +627,39 @@ const updateAttendance = async(
             return;
         }
 
-        // =========================================
-        // FIND EXISTING RECORD
-        // =========================================
+        // --------------------------------------------------------
+        // FIND EXISTING
+        // --------------------------------------------------------
 
         const query = {
             _id: req.params.id,
         };
 
         if (branch) {
-
             query.gymBranch =
                 branch;
         }
 
         const existingAttendance =
-            await Attendance.findOne(query);
+            await Attendance.findOne(
+                query
+            );
 
         if (!existingAttendance) {
-
             return res.status(404).json({
-
                 message: 'Attendance record not found.',
-
             });
         }
-
-        // =========================================
-        // UPDATE DATA
-        // =========================================
 
         const updateData = {
             ...req.body,
         };
 
-        // =========================================
+        delete updateData._id;
+
+        // --------------------------------------------------------
         // DATE
-        // =========================================
+        // --------------------------------------------------------
 
         const requestedDate =
             updateData.date !== undefined ?
@@ -824,11 +672,8 @@ const updateAttendance = async(
             );
 
         if (!normalizedDay) {
-
             return res.status(400).json({
-
                 message: 'Invalid attendance date.',
-
             });
         }
 
@@ -838,25 +683,24 @@ const updateAttendance = async(
             );
 
         if (!normalizedDate) {
-
             return res.status(400).json({
-
                 message: 'Invalid attendance date.',
-
             });
         }
 
-        // =========================================
+        // --------------------------------------------------------
         // TIMES
-        // =========================================
+        // --------------------------------------------------------
 
         const requestedCheckIn =
-            updateData.checkInTime !== undefined ?
+            updateData.checkInTime !==
+            undefined ?
             updateData.checkInTime :
             existingAttendance.checkInTime;
 
         const requestedCheckOut =
-            updateData.checkOutTime !== undefined ?
+            updateData.checkOutTime !==
+            undefined ?
             updateData.checkOutTime :
             existingAttendance.checkOutTime;
 
@@ -867,90 +711,77 @@ const updateAttendance = async(
             );
 
         if (!timeValidation.valid) {
-
             return res.status(400).json({
-
                 message: timeValidation.message,
-
             });
         }
 
-        // =========================================
+        // --------------------------------------------------------
         // BRANCH
-        // =========================================
+        // --------------------------------------------------------
 
         let updateBranch;
 
-        if (branch) {
-
-            // Branch users cannot change branch.
+        if (isBranchUser(req)) {
             updateBranch =
                 branch;
 
-        } else {
-
+        } else if (isMainAdmin(req)) {
             updateBranch =
                 normalizeBranch(
                     updateData.gymBranch ||
                     existingAttendance.gymBranch
                 );
-
-            if (!updateBranch) {
-
-                return res.status(400).json({
-
-                    message: 'A valid gym branch is required.',
-
-                });
-            }
-        }
-
-        if (!ALLOWED_BRANCHES.includes(
-                updateBranch
-            )) {
-
-            return res.status(400).json({
-
-                message: 'Invalid gym branch.',
-
+        } else {
+            return res.status(403).json({
+                message: 'You do not have permission to update attendance.',
             });
         }
 
-        // =========================================
+        if (!updateBranch ||
+            !ALLOWED_BRANCHES.includes(
+                updateBranch
+            )
+        ) {
+            return res.status(400).json({
+                message: 'A valid gym branch is required.',
+            });
+        }
+
+        // --------------------------------------------------------
         // MEMBER
-        // =========================================
+        // --------------------------------------------------------
 
         const updateMember =
             updateData.member ||
             existingAttendance.member;
 
-        const memberRecord =
-            await Member.findOne({
-
-                _id: updateMember,
-
-                gymBranch: updateBranch,
-
-            });
-
-        if (!memberRecord) {
-
+        if (!isValidObjectId(
+                updateMember
+            )) {
             return res.status(400).json({
-
-                message: 'Member not found in the selected gym branch.',
-
+                message: 'Invalid member ID.',
             });
         }
 
-        // =========================================
-        // DUPLICATE CHECK
-        // =========================================
-        // Exclude the current attendance record.
-        // =========================================
+        const memberRecord =
+            await Member.findOne({
+                _id: updateMember,
+                gymBranch: updateBranch,
+            });
+
+        if (!memberRecord) {
+            return res.status(400).json({
+                message: 'Member not found in the selected gym branch.',
+            });
+        }
+
+        // --------------------------------------------------------
+        // DUPLICATE
+        // --------------------------------------------------------
 
         const duplicateAttendance =
             await Attendance.findOne({
-
                 member: updateMember,
 
                 gymBranch: updateBranch,
@@ -960,23 +791,19 @@ const updateAttendance = async(
                 _id: {
                     $ne: existingAttendance._id,
                 },
-
             });
 
         if (duplicateAttendance) {
-
             return res.status(409).json({
-
                 message: 'Attendance already exists for this member on this calendar day.',
 
                 attendance: duplicateAttendance,
-
             });
         }
 
-        // =========================================
-        // FORCE NORMALIZED VALUES
-        // =========================================
+        // --------------------------------------------------------
+        // FORCE SAFE VALUES
+        // --------------------------------------------------------
 
         updateData.member =
             updateMember;
@@ -996,101 +823,77 @@ const updateAttendance = async(
         updateData.checkOutTime =
             timeValidation.checkOutTime;
 
-        // =========================================
+        // --------------------------------------------------------
         // UPDATE
-        // =========================================
+        // --------------------------------------------------------
 
-        try {
+        const attendance =
+            await Attendance.findByIdAndUpdate(
+                req.params.id,
+                updateData, {
+                    new: true,
+                    runValidators: true,
+                }
+            ).populate(
+                'member',
+                'name phone email gymBranch'
+            );
 
-            const attendance =
-                await Attendance.findByIdAndUpdate(
-
-                    req.params.id,
-
-                    updateData,
-
-                    {
-                        new: true,
-                        runValidators: true,
-                    }
-
-                ).populate(
-
-                    'member',
-
-                    'name phone email gymBranch'
-
-                );
-
-            if (!attendance) {
-
-                return res.status(404).json({
-
-                    message: 'Attendance record not found.',
-
-                });
-            }
-
-            return res.status(200).json({
-
-                message: 'Attendance updated successfully.',
-
-                attendance,
-
+        if (!attendance) {
+            return res.status(404).json({
+                message: 'Attendance record not found.',
             });
-
-        } catch (error) {
-
-            // Unique index race-condition protection.
-            if (
-                error &&
-                error.code === 11000
-            ) {
-
-                return res.status(409).json({
-
-                    message: 'Attendance already exists for this member on this calendar day.',
-
-                });
-            }
-
-            throw error;
         }
 
-    } catch (error) {
+        return res.status(200).json({
+            message: 'Attendance updated successfully.',
+            attendance,
+        });
 
+    } catch (error) {
         console.error(
             'Update Attendance Error:',
             error
         );
 
+        if (error.code === 11000) {
+            return res.status(409).json({
+                message: 'Attendance already exists for this member on this calendar day.',
+            });
+        }
+
         return res.status(500).json({
-
             message: 'Server error. Please try again.',
-
         });
     }
 };
 
-// =========================================
+
+// ============================================================
 // DELETE ATTENDANCE
-// =========================================
+// ============================================================
 
 const deleteAttendance = async(
     req,
     res
 ) => {
-
     try {
-
         if (!validateRole(req, res)) {
             return;
+        }
+
+        if (!isValidObjectId(
+                req.params.id
+            )) {
+            return res.status(400).json({
+                message: 'Invalid attendance ID.',
+            });
         }
 
         const branch =
             getAccessibleBranch(req);
 
-        if (!validateBranchUserBranch(
+        if (!validateUserBranch(
                 req,
                 res,
                 branch
@@ -1103,7 +906,6 @@ const deleteAttendance = async(
         };
 
         if (branch) {
-
             query.gymBranch =
                 branch;
         }
@@ -1114,49 +916,36 @@ const deleteAttendance = async(
             );
 
         if (!attendance) {
-
             return res.status(404).json({
-
                 message: 'Attendance record not found.',
-
             });
         }
 
         return res.status(200).json({
-
             message: 'Attendance deleted successfully.',
-
         });
 
     } catch (error) {
-
         console.error(
             'Delete Attendance Error:',
-            error.message
+            error
         );
 
         return res.status(500).json({
-
             message: 'Server error. Please try again.',
-
         });
     }
 };
 
-// =========================================
-// EXPORT
-// =========================================
+
+// ============================================================
+// EXPORTS
+// ============================================================
 
 module.exports = {
-
     markAttendance,
-
     getAttendance,
-
     getAttendanceById,
-
     updateAttendance,
-
     deleteAttendance,
-
 };

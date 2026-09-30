@@ -5,39 +5,55 @@ const {
     loginAdmin,
 } = require('../controllers/adminController');
 
+const {
+    protect,
+    authorize,
+} = require('../middleware/authMiddleware');
+
 const router = express.Router();
 
-/* ============================================================
-   ADMIN AUTHENTICATION
-   ============================================================ */
+// ============================================================
+// ADMIN LOGIN
+// ============================================================
+// POST /api/admin/login
+//
+// Public endpoint.
+// JWT is not required for login.
+// ============================================================
 
-/*
-   POST /api/admin/login
+router.post(
+    '/login',
+    loginAdmin
+);
 
-   Used by:
-   - Main Admin
-   - Receptionist
-   - Other supported admin/staff accounts
+// ============================================================
+// ADMIN / RECEPTIONIST REGISTRATION
+// ============================================================
+// POST /api/admin/register
+//
+// Only main administrators can create:
+// - Admin accounts
+// - Receptionist accounts
+//
+// Supported main-admin roles:
+// - admin
+// - main_admin
+// - super_admin
+// ============================================================
 
-   Controller:
-   loginAdmin
-*/
-router.post('/login', loginAdmin);
+router.post(
+    '/register',
+    protect,
+    authorize(
+        'admin',
+        'main_admin',
+        'super_admin'
+    ),
+    registerAdmin
+);
 
-
-/*
-   POST /api/admin/register
-
-   Creates a new admin/staff account.
-
-   Controller:
-   registerAdmin
-*/
-router.post('/register', registerAdmin);
-
-
-/* ============================================================
-   EXPORT
-   ============================================================ */
+// ============================================================
+// EXPORT
+// ============================================================
 
 module.exports = router;

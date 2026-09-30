@@ -1,7 +1,6 @@
 const Admin = require('../models/Admin');
 const mongoose = require('mongoose');
 
-
 // =====================================================
 // CONSTANTS
 // =====================================================
@@ -17,6 +16,15 @@ const MAIN_ADMIN_ROLES = [
     'super_admin',
 ];
 
+// =====================================================
+// NORMALIZE ROLE
+// =====================================================
+
+const normalizeRole = (value) => {
+    return String(value || '')
+        .trim()
+        .toLowerCase();
+};
 
 // =====================================================
 // NORMALIZE BRANCH
@@ -43,12 +51,13 @@ const normalizeBranch = (value) => {
     return '';
 };
 
-
 // =====================================================
 // NORMALIZE BRANCH ARRAY
 // =====================================================
 
-const normalizeBranches = (branches) => {
+const normalizeBranches = (
+    branches
+) => {
     if (!Array.isArray(branches)) {
         return [];
     }
@@ -58,46 +67,44 @@ const normalizeBranches = (branches) => {
             branches
             .map(normalizeBranch)
             .filter((branch) =>
-                VALID_BRANCHES.includes(branch)
+                VALID_BRANCHES.includes(
+                    branch
+                )
             )
         )
     );
 };
 
-
 // =====================================================
-// CHECK MAIN ADMIN
+// MAIN ADMIN
 // =====================================================
 
 const isMainAdmin = (req) => {
     return Boolean(
         req.admin &&
         MAIN_ADMIN_ROLES.includes(
-            req.admin.role
+            normalizeRole(
+                req.admin.role
+            )
         )
     );
 };
 
-
 // =====================================================
-// GET ACCESSIBLE BRANCHES
+// ACCESSIBLE BRANCHES
 // =====================================================
 
-const getAccessibleBranches = (req) => {
+const getAccessibleBranches = (
+    req
+) => {
     if (!req.admin) {
         return [];
     }
 
-    /*
-     * Main admin can manage both branches.
-     */
     if (isMainAdmin(req)) {
         return [...VALID_BRANCHES];
     }
 
-    /*
-     * New multi-branch receptionist.
-     */
     const multiBranches =
         normalizeBranches(
             req.admin.gymBranches
@@ -107,9 +114,6 @@ const getAccessibleBranches = (req) => {
         return multiBranches;
     }
 
-    /*
-     * Backward compatibility for old accounts.
-     */
     const legacyBranch =
         normalizeBranch(
             req.admin.gymBranch
@@ -122,74 +126,21 @@ const getAccessibleBranches = (req) => {
     return [];
 };
 
-
 // =====================================================
-// GET ACTIVE BRANCH
-// =====================================================
-//
-// The frontend can send:
-// ?gymBranch=Kalyanpur
-//
-// or:
-//
-// body.gymBranch
-//
-// If no branch is supplied:
-// use the first assigned branch for compatibility.
-//
-
-const getActiveBranch = (req) => {
-    const accessibleBranches =
-        getAccessibleBranches(req);
-
-    if (
-        accessibleBranches.length === 0
-    ) {
-        return '';
-    }
-
-    /*
-     * Main admin can explicitly select a branch.
-     */
-    const requestedBranch =
-        normalizeBranch(
-            req.query.gymBranch ||
-            req.body.gymBranch ||
-            req.headers['x-gym-branch'] ||
-            ''
-        );
-
-    if (requestedBranch) {
-        if (
-            accessibleBranches.includes(
-                requestedBranch
-            )
-        ) {
-            return requestedBranch;
-        }
-
-        /*
-         * Requested branch isn't allowed.
-         */
-        return '';
-    }
-
-    /*
-     * No explicit branch:
-     * first accessible branch.
-     */
-    return accessibleBranches[0];
-};
-
-
-// =====================================================
-// STAFF RESPONSE
+// STAFF SERIALIZER
 // =====================================================
 
-const serializeStaff = (staff) => {
+const serializeStaff = (
+    staff
+) => {
     if (!staff) {
         return null;
     }
+
+    const branches =
+        normalizeBranches(
+            staff.gymBranches
+        );
 
     return {
         _id: staff._id,
@@ -201,13 +152,8 @@ const serializeStaff = (staff) => {
 
         role: staff.role,
 
-        gymBranches: normalizeBranches(
-            staff.gymBranches
-        ),
+        gymBranches: branches,
 
-        /*
-         * Legacy field is returned too.
-         */
         gymBranch: normalizeBranch(
             staff.gymBranch
         ) || null,
@@ -218,10 +164,8 @@ const serializeStaff = (staff) => {
     };
 };
 
-
 // =====================================================
-// GET ALL RECEPTIONISTS
-// =====================================================
+// GET STAFF
 // GET /api/admin/staff
 // =====================================================
 
@@ -230,14 +174,15 @@ const getStaff = async(
     res
 ) => {
     try {
+        if (!req.admin) {
+            return res.status(401).json({
+                message: 'Not authorized.',
+            });
+        }
 
         const accessibleBranches =
             getAccessibleBranches(req);
 
-        /*
-         * A branch user must have at least one
-         * assigned branch.
-         */
         if (!isMainAdmin(req) &&
             accessibleBranches.length === 0
         ) {
@@ -250,16 +195,9 @@ const getStaff = async(
             role: 'receptionist',
         };
 
-        /*
-         * Main admin:
-         * return all receptionists.
-         *
-         * Receptionist:
-         * only return receptionists who share
-         * at least one accessible branch.
-         */
+        // Branch users can only see
+        // receptionists sharing a branch.
         if (!isMainAdmin(req)) {
-
             query.gymBranches = {
                 $in: accessibleBranches,
             };
@@ -281,9 +219,7 @@ const getStaff = async(
                     serializeStaff
                 ),
         });
-
     } catch (error) {
-
         console.error(
             'Get Staff Error:',
             error
@@ -295,20 +231,9 @@ const getStaff = async(
     }
 };
 
-
 // =====================================================
-// UPDATE RECEPTIONIST BRANCHES
-// =====================================================
+// UPDATE STAFF BRANCHES
 // PUT /api/admin/staff/:id/branches
-//
-// Body:
-//
-// {
-//     "gymBranches": [
-//         "Kalyanpur",
-//         "Gopalpur"
-//     ]
-// }
 // =====================================================
 
 const updateStaffBranches = async(
@@ -316,20 +241,19 @@ const updateStaffBranches = async(
     res
 ) => {
     try {
-
-        /*
-         * Only main admin can change branch
-         * assignments.
-         */
         if (!isMainAdmin(req)) {
             return res.status(403).json({
                 message: 'Only the main admin can assign receptionist branches.',
             });
         }
 
-        const { id } = req.params;
+        const {
+            id,
+        } = req.params;
 
-        if (!mongoose.Types.ObjectId.isValid(id)) {
+        if (!mongoose.Types.ObjectId.isValid(
+                id
+            )) {
             return res.status(400).json({
                 message: 'Invalid staff ID.',
             });
@@ -339,34 +263,19 @@ const updateStaffBranches = async(
             gymBranches,
         } = req.body;
 
-        /*
-         * Must be an array.
-         */
         if (!Array.isArray(gymBranches)) {
             return res.status(400).json({
                 message: 'gymBranches must be an array.',
             });
         }
 
-        /*
-         * Normalize and remove duplicates.
-         */
         const normalizedBranches =
             normalizeBranches(
                 gymBranches
             );
 
-        /*
-         * Reject invalid branch names.
-         *
-         * Example:
-         *
-         * ['Kalyanpur', 'Delhi']
-         *
-         * should not silently become
-         *
-         * ['Kalyanpur']
-         */
+        // Reject invalid branches rather than
+        // silently removing them.
         if (
             normalizedBranches.length !==
             gymBranches.length
@@ -376,10 +285,6 @@ const updateStaffBranches = async(
             });
         }
 
-        /*
-         * Receptionist must have at least one
-         * branch.
-         */
         if (
             normalizedBranches.length === 0
         ) {
@@ -400,15 +305,10 @@ const updateStaffBranches = async(
             });
         }
 
-        /*
-         * Save the NEW authoritative field.
-         */
         staff.gymBranches =
             normalizedBranches;
 
-        /*
-         * Clear the old single branch field.
-         */
+        // Keep legacy field empty.
         staff.gymBranch = null;
 
         await staff.save();
@@ -418,9 +318,7 @@ const updateStaffBranches = async(
 
             staff: serializeStaff(staff),
         });
-
     } catch (error) {
-
         console.error(
             'Update Staff Branches Error:',
             error
@@ -432,10 +330,8 @@ const updateStaffBranches = async(
     }
 };
 
-
 // =====================================================
-// UPDATE RECEPTIONIST PERMISSIONS
-// =====================================================
+// UPDATE STAFF PERMISSIONS
 // PUT /api/admin/staff/:id/permissions
 // =====================================================
 
@@ -444,34 +340,35 @@ const updateStaffPermissions = async(
     res
 ) => {
     try {
-
-        const { id } = req.params;
+        if (!isMainAdmin(req)) {
+            return res.status(403).json({
+                message: 'Only the main admin can update staff permissions.',
+            });
+        }
 
         const {
-            permissions,
-        } = req.body;
+            id,
+        } = req.params;
 
-        if (!mongoose.Types.ObjectId.isValid(id)) {
+        if (!mongoose.Types.ObjectId.isValid(
+                id
+            )) {
             return res.status(400).json({
                 message: 'Invalid staff ID.',
             });
         }
 
+        const {
+            permissions,
+        } = req.body;
+
         if (!permissions ||
-            typeof permissions !== 'object' ||
+            typeof permissions !==
+            'object' ||
             Array.isArray(permissions)
         ) {
             return res.status(400).json({
                 message: 'Permissions are required.',
-            });
-        }
-
-        /*
-         * Only main admin can change permissions.
-         */
-        if (!isMainAdmin(req)) {
-            return res.status(403).json({
-                message: 'Only the main admin can update staff permissions.',
             });
         }
 
@@ -491,10 +388,18 @@ const updateStaffPermissions = async(
             staff.permissions ?
             staff.permissions.toObject ?
             staff.permissions.toObject() :
-            staff.permissions : {};
+            staff.permissions :
+            {};
+
+        /*
+         * IMPORTANT:
+         *
+         * There is NO "plans" permission anymore.
+         *
+         * Access products use "accessPasses".
+         */
 
         staff.permissions = {
-
             members: {
                 ...(existingPermissions.members || {}),
                 ...(permissions.members || {}),
@@ -520,14 +425,25 @@ const updateStaffPermissions = async(
                 ...(permissions.enquiries || {}),
             },
 
-            plans: {
-                ...(existingPermissions.plans || {}),
-                ...(permissions.plans || {}),
+            accessPasses: {
+                ...(existingPermissions.accessPasses || {}),
+                ...(permissions.accessPasses || {}),
             },
 
             offers: {
                 ...(existingPermissions.offers || {}),
                 ...(permissions.offers || {}),
+            },
+
+            /*
+             * Staff management is controlled by main admin.
+             * Receptionists should not modify staff accounts.
+             */
+            staff: {
+                view: false,
+                add: false,
+                edit: false,
+                delete: false,
             },
         };
 
@@ -538,9 +454,7 @@ const updateStaffPermissions = async(
 
             staff: serializeStaff(staff),
         });
-
     } catch (error) {
-
         console.error(
             'Update Staff Permissions Error:',
             error
@@ -552,10 +466,8 @@ const updateStaffPermissions = async(
     }
 };
 
-
 // =====================================================
-// UPDATE RECEPTIONIST STATUS
-// =====================================================
+// UPDATE STAFF STATUS
 // PUT /api/admin/staff/:id/status
 // =====================================================
 
@@ -564,7 +476,6 @@ const updateStaffStatus = async(
     res
 ) => {
     try {
-
         if (!isMainAdmin(req)) {
             return res.status(403).json({
                 message: 'Only the main admin can update staff status.',
@@ -579,7 +490,9 @@ const updateStaffStatus = async(
             status,
         } = req.body;
 
-        if (!mongoose.Types.ObjectId.isValid(id)) {
+        if (!mongoose.Types.ObjectId.isValid(
+                id
+            )) {
             return res.status(400).json({
                 message: 'Invalid staff ID.',
             });
@@ -606,7 +519,8 @@ const updateStaffStatus = async(
             });
         }
 
-        staff.status = status;
+        staff.status =
+            status;
 
         await staff.save();
 
@@ -619,9 +533,7 @@ const updateStaffStatus = async(
 
             staff: serializeStaff(staff),
         });
-
     } catch (error) {
-
         console.error(
             'Update Staff Status Error:',
             error
@@ -632,7 +544,6 @@ const updateStaffStatus = async(
         });
     }
 };
-
 
 // =====================================================
 // EXPORTS

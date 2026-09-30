@@ -1,9 +1,13 @@
 const mongoose = require('mongoose');
 
+/* =========================================================
+   ATTENDANCE SCHEMA
+   ========================================================= */
+
 const attendanceSchema = new mongoose.Schema({
-    // =========================================
-    // MEMBER
-    // =========================================
+    /* =====================================================
+       MEMBER
+    ===================================================== */
 
     member: {
         type: mongoose.Schema.Types.ObjectId,
@@ -11,27 +15,34 @@ const attendanceSchema = new mongoose.Schema({
         required: true,
     },
 
-    // =========================================
-    // GYM BRANCH
-    // =========================================
+    /* =====================================================
+       GYM BRANCH
+    ===================================================== */
 
     gymBranch: {
         type: String,
-        enum: ['Kalyanpur', 'Gopalpur'],
+        enum: [
+            'Kalyanpur',
+            'Gopalpur',
+        ],
         required: true,
+        trim: true,
     },
 
-    // =========================================
-    // NORMALIZED CALENDAR DAY
-    // =========================================
-    // Format:
-    // YYYY-MM-DD
-    //
-    // Example:
-    // 2026-09-23
-    //
-    // This is used for daily uniqueness.
-    // =========================================
+    /* =====================================================
+       NORMALIZED CALENDAR DAY
+    =====================================================
+
+       Format:
+
+           YYYY-MM-DD
+
+       Example:
+
+           2026-09-23
+
+       Used for daily uniqueness.
+    ===================================================== */
 
     attendanceDay: {
         type: String,
@@ -40,9 +51,9 @@ const attendanceSchema = new mongoose.Schema({
         match: /^\d{4}-\d{2}-\d{2}$/,
     },
 
-    // =========================================
-    // ATTENDANCE DATE / TIMESTAMP
-    // =========================================
+    /* =====================================================
+       ATTENDANCE DATE / TIMESTAMP
+    ===================================================== */
 
     date: {
         type: Date,
@@ -50,47 +61,54 @@ const attendanceSchema = new mongoose.Schema({
         default: Date.now,
     },
 
-    // =========================================
-    // CHECK-IN TIME
-    // =========================================
+    /* =====================================================
+       CHECK-IN TIME
+    ===================================================== */
 
     checkInTime: {
         type: Date,
         default: null,
     },
 
-    // =========================================
-    // CHECK-OUT TIME
-    // =========================================
+    /* =====================================================
+       CHECK-OUT TIME
+    ===================================================== */
 
     checkOutTime: {
         type: Date,
         default: null,
     },
 
-    // =========================================
-    // STATUS
-    // =========================================
+    /* =====================================================
+       STATUS
+    ===================================================== */
 
     status: {
         type: String,
-        enum: ['Present', 'Absent'],
+        enum: [
+            'Present',
+            'Absent',
+        ],
         default: 'Present',
     },
 }, {
     timestamps: true,
 });
 
-// =========================================
-// DATABASE INDEXES
-// =========================================
+/* =========================================================
+   DATABASE INDEXES
+   ========================================================= */
 
-// Prevent the same member from having
-// multiple attendance records on the
-// same calendar day.
-//
-// Branch is included for additional
-// branch-level data isolation.
+/*
+ * Prevent duplicate attendance records for the same:
+ *
+ * member
+ * +
+ * branch
+ * +
+ * calendar day
+ */
+
 attendanceSchema.index({
     member: 1,
     gymBranch: 1,
@@ -100,19 +118,30 @@ attendanceSchema.index({
     name: 'unique_member_branch_attendance_day',
 });
 
-// Branch attendance listing.
+/* ---------------------------------------------------------
+   BRANCH ATTENDANCE LISTING
+--------------------------------------------------------- */
+
 attendanceSchema.index({
     gymBranch: 1,
     attendanceDay: -1,
 });
 
-// Member attendance history.
+/* ---------------------------------------------------------
+   MEMBER ATTENDANCE HISTORY
+--------------------------------------------------------- */
+
 attendanceSchema.index({
     member: 1,
     attendanceDay: -1,
 });
 
-module.exports = mongoose.model(
-    'Attendance',
-    attendanceSchema
-);
+/* =========================================================
+   EXPORT
+   ========================================================= */
+
+module.exports =
+    mongoose.model(
+        'Attendance',
+        attendanceSchema
+    );

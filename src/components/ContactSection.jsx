@@ -1,7 +1,7 @@
 import { useState } from 'react';
 import API_URL from '../config/api';
 
-export default function ContactSection() {
+export default function ContactSection({ branchConfig }) {
   const [formState, setFormState] = useState({
     name: '',
     phone: '',
@@ -10,6 +10,22 @@ export default function ContactSection() {
   });
 
   const [formMessage, setFormMessage] = useState('');
+  const [isSubmitting, setIsSubmitting] = useState(false);
+
+  /* =========================================================
+     BRANCH
+     ========================================================= */
+
+  const gymBranch =
+    branchConfig?.name === 'Gopalpur'
+      ? 'Gopalpur'
+      : branchConfig?.name === 'Kalyanpur'
+        ? 'Kalyanpur'
+        : '';
+
+  /* =========================================================
+     FORM CHANGE
+     ========================================================= */
 
   const handleChange = (event) => {
     const { name, value } = event.target;
@@ -18,48 +34,158 @@ export default function ContactSection() {
       ...prev,
       [name]: value,
     }));
+
+    // Clear previous message when user starts editing again
+    if (formMessage) {
+      setFormMessage('');
+    }
   };
+
+  /* =========================================================
+     FORM SUBMIT
+     ========================================================= */
 
   const handleSubmit = async (event) => {
     event.preventDefault();
 
-    const { name, phone, goal, message } = formState;
-
-    if (!name.trim() || !phone.trim()) {
-      setFormMessage('Please enter your name and phone number.');
+    if (isSubmitting) {
       return;
     }
 
+    const {
+      name,
+      phone,
+      goal,
+      message,
+    } = formState;
+
+    /* -------------------------------------------------------
+       NAME + PHONE VALIDATION
+    ------------------------------------------------------- */
+
+    if (!name.trim() || !phone.trim()) {
+      setFormMessage(
+        'Please enter your name and phone number.'
+      );
+      return;
+    }
+
+    /* -------------------------------------------------------
+       PHONE VALIDATION
+    ------------------------------------------------------- */
+
     if (!/^[0-9]{10}$/.test(phone.trim())) {
-      setFormMessage('Please enter a valid 10-digit phone number.');
+      setFormMessage(
+        'Please enter a valid 10-digit phone number.'
+      );
+      return;
+    }
+
+    /* -------------------------------------------------------
+       BRANCH VALIDATION
+    ------------------------------------------------------- */
+
+    if (
+      gymBranch !== 'Kalyanpur' &&
+      gymBranch !== 'Gopalpur'
+    ) {
+      console.error(
+        'Contact form branch is missing or invalid:',
+        {
+          branchConfig,
+          gymBranch,
+        }
+      );
+
+      setFormMessage(
+        'Unable to identify the gym branch. Please refresh the page and try again.'
+      );
+
+      return;
+    }
+
+    /* -------------------------------------------------------
+       GOAL VALIDATION
+    ------------------------------------------------------- */
+
+    const allowedGoals = [
+      'Muscle Building',
+      'Fat Loss',
+      'Strength',
+      'General Fitness',
+    ];
+
+    if (!allowedGoals.includes(goal)) {
+      setFormMessage(
+        'Please select a valid fitness goal.'
+      );
       return;
     }
 
     try {
-      setFormMessage('Submitting your enquiry...');
-
-      const response = await fetch(`${API_URL}/api/contacts`, {
-        method: 'POST',
-        headers: {
-          'Content-Type': 'application/json',
-        },
-        body: JSON.stringify({
-          name: name.trim(),
-          phone: phone.trim(),
-          goal,
-          message: message.trim(),
-        }),
-      });
-
-      const data = await response.json();
-
-      if (!response.ok) {
-        throw new Error(data.message || 'Something went wrong.');
-      }
+      setIsSubmitting(true);
 
       setFormMessage(
-        `Thanks ${name.trim()}! Your ${goal.toLowerCase()} enquiry has been submitted successfully.`
+        'Submitting your enquiry...'
       );
+
+      /* -----------------------------------------------------
+         CONTACT API
+      ----------------------------------------------------- */
+
+      const response = await fetch(
+        `${API_URL}/api/contacts`,
+        {
+          method: 'POST',
+
+          headers: {
+            'Content-Type': 'application/json',
+          },
+
+          body: JSON.stringify({
+            gymBranch: gymBranch,
+            name: name.trim(),
+            phone: phone.trim(),
+            goal: goal,
+            message: message.trim(),
+          }),
+        }
+      );
+
+      /* -----------------------------------------------------
+         READ RESPONSE SAFELY
+      ----------------------------------------------------- */
+
+      let data = {};
+
+      try {
+        data = await response.json();
+      } catch {
+        data = {};
+      }
+
+      /* -----------------------------------------------------
+         API ERROR
+      ----------------------------------------------------- */
+
+      if (!response.ok) {
+        throw new Error(
+          data.message ||
+            `Unable to submit your enquiry. Server returned ${response.status}.`
+        );
+      }
+
+      /* -----------------------------------------------------
+         SUCCESS
+      ----------------------------------------------------- */
+
+      setFormMessage(
+        `Thanks ${name.trim()}! Your ${goal.toLowerCase()} enquiry for ${gymBranch} has been submitted successfully.`
+      );
+
+      /* -----------------------------------------------------
+         RESET FORM
+      ----------------------------------------------------- */
 
       setFormState({
         name: '',
@@ -67,28 +193,44 @@ export default function ContactSection() {
         goal: 'Muscle Building',
         message: '',
       });
+
     } catch (error) {
-      console.error('Contact form error:', error);
+      console.error(
+        'Contact form error:',
+        error
+      );
 
       setFormMessage(
-        'Unable to submit your enquiry. Please try again.'
+        error.message ||
+          'Unable to submit your enquiry. Please try again.'
       );
+
+    } finally {
+      setIsSubmitting(false);
     }
   };
 
   return (
-    <section id="contact" className="section contact-section">
+    <section
+      id="contact"
+      className="section contact-section"
+    >
 
-      {/* =========================================
+      {/* =====================================================
           CONTACT INFORMATION + FORM
-      ========================================= */}
+      ===================================================== */}
 
       <div className="container contact-grid">
 
-        {/* LEFT SIDE */}
+        {/* ===================================================
+            LEFT SIDE
+        =================================================== */}
+
         <div className="contact-left">
 
-          <div className="section-tag">START TODAY</div>
+          <div className="section-tag">
+            START TODAY
+          </div>
 
           <h2>
             READY TO
@@ -96,17 +238,25 @@ export default function ContactSection() {
           </h2>
 
           <p>
-            Book a free trial session and experience the Alpha Gym environment.
+            Book a free trial session and experience
+            the Alpha Gym environment.
           </p>
 
           <div className="contact-info">
 
-            {/* LOCATION 1 */}
+            {/* =============================================
+                LOCATION 1
+            ============================================= */}
+
             <div className="contact-info-item">
+
               <span>📍</span>
 
               <div>
-                <small>LOCATION 1 — KALYANPUR</small>
+
+                <small>
+                  LOCATION 1 — KALYANPUR
+                </small>
 
                 <strong>
                   1st Floor, Anudeep Apartment, Plot 43,
@@ -115,15 +265,24 @@ export default function ContactSection() {
                   <br />
                   (Near Kalyanpur Adi Durgapuja Pandal)
                 </strong>
+
               </div>
+
             </div>
 
-            {/* LOCATION 2 */}
+            {/* =============================================
+                LOCATION 2
+            ============================================= */}
+
             <div className="contact-info-item">
+
               <span>📍</span>
 
               <div>
-                <small>LOCATION 2 — CHELIDANGA</small>
+
+                <small>
+                  LOCATION 2 — CHELIDANGA
+                </small>
 
                 <strong>
                   2nd Floor, Rozi Niwas, Mother Teresa Road,
@@ -131,15 +290,24 @@ export default function ContactSection() {
                   <br />
                   (Above Wine Shop, Opposite Pizza Xpress Pizzeria)
                 </strong>
+
               </div>
+
             </div>
 
-            {/* TIMINGS */}
+            {/* =============================================
+                TIMINGS
+            ============================================= */}
+
             <div className="contact-info-item">
+
               <span>🕐</span>
 
               <div>
-                <small>GYM TIMINGS</small>
+
+                <small>
+                  GYM TIMINGS
+                </small>
 
                 <strong>
                   Kalyanpur: 6:00 AM — 12:00 PM
@@ -151,17 +319,27 @@ export default function ContactSection() {
                   <br />
                   4:00 PM — 10:00 PM
                 </strong>
+
               </div>
+
             </div>
 
-            {/* WHATSAPP */}
+            {/* =============================================
+                WHATSAPP
+            ============================================= */}
+
             <div className="contact-info-item">
+
               <span>📞</span>
 
               <div>
-                <small>WHATSAPP</small>
+
+                <small>
+                  WHATSAPP
+                </small>
 
                 <strong>
+
                   <a
                     href="https://wa.me/918927100145"
                     target="_blank"
@@ -179,33 +357,55 @@ export default function ContactSection() {
                   >
                     73877-66912
                   </a>
+
                 </strong>
+
               </div>
+
             </div>
 
-            {/* EMAIL */}
+            {/* =============================================
+                EMAIL
+            ============================================= */}
+
             <div className="contact-info-item">
+
               <span>✉️</span>
 
               <div>
-                <small>EMAIL</small>
+
+                <small>
+                  EMAIL
+                </small>
 
                 <strong>
+
                   <a href="mailto:alphagym.asn@gmail.com">
                     alphagym.asn@gmail.com
                   </a>
+
                 </strong>
+
               </div>
+
             </div>
 
-            {/* INSTAGRAM */}
+            {/* =============================================
+                INSTAGRAM
+            ============================================= */}
+
             <div className="contact-info-item">
+
               <span>📸</span>
 
               <div>
-                <small>INSTAGRAM</small>
+
+                <small>
+                  INSTAGRAM
+                </small>
 
                 <strong>
+
                   <a
                     href="https://www.instagram.com/alpha_gym_asansol/"
                     target="_blank"
@@ -213,27 +413,35 @@ export default function ContactSection() {
                   >
                     @alpha_gym_asansol
                   </a>
+
                 </strong>
+
               </div>
+
             </div>
 
           </div>
+
         </div>
 
 
-        {/* =========================================
+        {/* ===================================================
             RIGHT SIDE — CONTACT FORM
-        ========================================= */}
+        =================================================== */}
 
         <form
           className="contact-form"
           onSubmit={handleSubmit}
         >
 
+          {/* =============================================
+              NAME + PHONE
+          ============================================= */}
+
           <div className="input-row">
 
-            {/* NAME */}
             <div className="input-group">
+
               <label htmlFor="name">
                 YOUR NAME
               </label>
@@ -245,13 +453,15 @@ export default function ContactSection() {
                 placeholder="Enter your name"
                 value={formState.name}
                 onChange={handleChange}
+                autoComplete="name"
                 required
               />
+
             </div>
 
 
-            {/* PHONE */}
             <div className="input-group">
+
               <label htmlFor="phone">
                 PHONE
               </label>
@@ -265,15 +475,21 @@ export default function ContactSection() {
                 placeholder="10 digit number"
                 value={formState.phone}
                 onChange={handleChange}
+                autoComplete="tel"
                 required
               />
+
             </div>
 
           </div>
 
 
-          {/* GOAL */}
+          {/* =============================================
+              GOAL
+          ============================================= */}
+
           <div className="input-group">
+
             <label htmlFor="goal">
               GOAL
             </label>
@@ -284,16 +500,34 @@ export default function ContactSection() {
               value={formState.goal}
               onChange={handleChange}
             >
-              <option>Muscle Building</option>
-              <option>Fat Loss</option>
-              <option>Strength</option>
-              <option>General Fitness</option>
+
+              <option value="Muscle Building">
+                Muscle Building
+              </option>
+
+              <option value="Fat Loss">
+                Fat Loss
+              </option>
+
+              <option value="Strength">
+                Strength
+              </option>
+
+              <option value="General Fitness">
+                General Fitness
+              </option>
+
             </select>
+
           </div>
 
 
-          {/* MESSAGE */}
+          {/* =============================================
+              MESSAGE
+          ============================================= */}
+
           <div className="input-group">
+
             <label htmlFor="message">
               MESSAGE
             </label>
@@ -306,21 +540,37 @@ export default function ContactSection() {
               value={formState.message}
               onChange={handleChange}
             />
+
           </div>
 
 
-          {/* SUBMIT */}
+          {/* =============================================
+              SUBMIT
+          ============================================= */}
+
           <button
             type="submit"
             className="submit-btn"
+            disabled={isSubmitting}
           >
-            BOOK FREE TRIAL
+
+            {isSubmitting
+              ? 'SUBMITTING...'
+              : 'BOOK FREE TRIAL'}
+
           </button>
 
 
-          {/* FORM MESSAGE */}
+          {/* =============================================
+              FORM MESSAGE
+          ============================================= */}
+
           {formMessage && (
-            <div className="form-message">
+            <div
+              className="form-message"
+              role="status"
+              aria-live="polite"
+            >
               {formMessage}
             </div>
           )}
@@ -330,9 +580,9 @@ export default function ContactSection() {
       </div>
 
 
-      {/* =========================================
-          GOOGLE MAPS — BOTTOM OF CONTACT SECTION
-      ========================================= */}
+      {/* =====================================================
+          GOOGLE MAPS
+      ===================================================== */}
 
       <div className="container contact-maps">
 
@@ -355,20 +605,32 @@ export default function ContactSection() {
 
         <div className="maps-grid">
 
-          {/* =====================================
+          {/* ===============================================
               KALYANPUR MAP
-          ===================================== */}
+          =============================================== */}
 
           <div className="map-card">
 
             <div className="map-card-header">
-              <span>01</span>
+
+              <span>
+                01
+              </span>
 
               <div>
-                <small>ALPHA GYM</small>
-                <h4>KALYANPUR</h4>
+
+                <small>
+                  ALPHA GYM
+                </small>
+
+                <h4>
+                  KALYANPUR
+                </h4>
+
               </div>
+
             </div>
+
 
             <iframe
               title="Alpha Gym Kalyanpur Asansol"
@@ -378,29 +640,44 @@ export default function ContactSection() {
               referrerPolicy="no-referrer-when-downgrade"
             />
 
+
             <div className="map-address">
+
               1st Floor, Anudeep Apartment, Plot 43,
               Shakespeare Sarani, Kalyanpur Housing,
               Asansol - 713305
+
             </div>
 
           </div>
 
 
-          {/* =====================================
+          {/* ===============================================
               CHELIDANGA MAP
-          ===================================== */}
+          =============================================== */}
 
           <div className="map-card">
 
             <div className="map-card-header">
-              <span>02</span>
+
+              <span>
+                02
+              </span>
 
               <div>
-                <small>ALPHA GYM</small>
-                <h4>CHELIDANGA</h4>
+
+                <small>
+                  ALPHA GYM
+                </small>
+
+                <h4>
+                  CHELIDANGA
+                </h4>
+
               </div>
+
             </div>
+
 
             <iframe
               title="Alpha Gym Chelidanga Asansol"
@@ -410,9 +687,12 @@ export default function ContactSection() {
               referrerPolicy="no-referrer-when-downgrade"
             />
 
+
             <div className="map-address">
+
               2nd Floor, Rozi Niwas, Mother Teresa Road,
               Chelidanga, Asansol - 713304
+
             </div>
 
           </div>

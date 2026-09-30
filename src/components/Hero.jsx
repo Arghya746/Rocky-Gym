@@ -1,4 +1,4 @@
-import athleteImage from '../assets/alpha-gym-unisex.jpg';
+import athleteImage from '../assets/puja-offer.jpg.jpeg';
 
 export default function Hero({ branchConfig }) {
   const branchName =
@@ -31,7 +31,7 @@ export default function Hero({ branchConfig }) {
 
         {/* =====================================================
             HERO CONTENT
-        ===================================================== */}
+            ===================================================== */}
         <div className="hero-content">
 
           {/* BRANCH TAG */}
@@ -99,7 +99,7 @@ export default function Hero({ branchConfig }) {
 
         {/* =====================================================
             HERO IMAGE
-        ===================================================== */}
+            ===================================================== */}
         <div className="hero-visual">
 
           <div className="hero-circle" />

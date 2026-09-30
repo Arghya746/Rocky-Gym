@@ -1,134 +1,174 @@
+const mongoose = require('mongoose');
+
 const Workout = require('../models/Workout');
 const Member = require('../models/Member');
 
+const {
+    VALID_BRANCHES,
+    normalizeBranch,
+    isMainAdminRequest,
+    getAccessibleBranches,
+    getBranchFilter,
+    resolveWriteBranch,
+} = require('../utils/branchAccess');
 
-// =========================================
-// ALLOWED BRANCHES
-// =========================================
+// ============================================================
+// CONSTANTS
+// ============================================================
 
-const ALLOWED_BRANCHES = [
-    'Kalyanpur',
-    'Gopalpur',
+const VALID_WORKOUT_TYPES = [
+    'Strength',
+    'Cardio',
+    'Weight Loss',
+    'Muscle Building',
+    'Flexibility',
+    'General Fitness',
 ];
 
+const VALID_STATUSES = [
+    'Active',
+    'Completed',
+];
 
-// =========================================
-// NORMALIZE BRANCH
-// =========================================
+// ============================================================
+// AUTH HELPER
+// ============================================================
 
-const normalizeBranch = (value) => {
+const ensureAdmin = (
+    req,
+    res
+) => {
+    if (!req || !req.admin) {
+        res.status(401).json({
+            message: 'Not authorized.',
+        });
 
-    if (!value) {
+        return false;
+    }
+
+    return true;
+};
+
+// ============================================================
+// OBJECT ID HELPER
+// ============================================================
+
+const isValidObjectId = (
+    value
+) => {
+    return mongoose.Types.ObjectId.isValid(
+        String(value || '')
+    );
+};
+
+// ============================================================
+// WORKOUT TYPE
+// ============================================================
+
+const normalizeWorkoutType = (
+    value
+) => {
+    if (
+        value === undefined ||
+        value === null
+    ) {
+        return '';
+    }
+
+    return String(value).trim();
+};
+
+// ============================================================
+// STATUS
+// ============================================================
+
+const normalizeStatus = (
+    value
+) => {
+    if (
+        value === undefined ||
+        value === null ||
+        value === ''
+    ) {
+        return undefined;
+    }
+
+    return String(value).trim();
+};
+
+// ============================================================
+// EXERCISES
+// ============================================================
+
+const normalizeExercises = (
+    exercises
+) => {
+    if (exercises === undefined) {
+        return [];
+    }
+
+    if (!Array.isArray(exercises)) {
         return null;
     }
 
-    const normalized =
-        String(value)
-        .trim()
-        .toLowerCase();
-
-    if (normalized === 'kalyanpur') {
-        return 'Kalyanpur';
-    }
-
-    if (normalized === 'gopalpur') {
-        return 'Gopalpur';
-    }
-
-    return null;
+    return exercises;
 };
 
+// ============================================================
+// SERVER ERROR
+// ============================================================
 
-// =========================================
-// GET ACCESSIBLE BRANCH
-// =========================================
-// Main admin:
-//   null = access to both branches
-//
-// Receptionist:
-//   assigned branch only
-// =========================================
+const sendServerError = (
+    res,
+    label,
+    error
+) => {
+    console.error(
+        `\n[${label}]`
+    );
 
-const getAccessibleBranch = (req) => {
+    console.error(
+        error &&
+        error.stack ?
+        error.stack :
+        error
+    );
 
-    // Main admin can manage both branches
-    if (
-        req.admin &&
-        req.admin.role === 'admin'
-    ) {
+    return res.status(500).json({
+        message: 'Server error. Please try again.',
+    });
+};
+
+// ============================================================
+// GET MEMBER IN BRANCH
+// ============================================================
+
+const findMemberInBranch = async(
+    memberId,
+    gymBranch
+) => {
+    if (!isValidObjectId(memberId)) {
         return null;
     }
 
-    // Receptionist can access only
-    // their assigned branch
-    if (
-        req.admin &&
-        req.admin.role === 'receptionist'
-    ) {
-
-        return normalizeBranch(
-            req.admin.gymBranch
-        );
-    }
-
-    return null;
+    return Member.findOne({
+        _id: memberId,
+        gymBranch,
+    });
 };
 
-
-// =========================================
-// GET WRITE BRANCH
-// =========================================
-// Main admin:
-//   Must provide a valid branch.
-//
-// Receptionist:
-//   Always uses assigned branch.
-//   Cannot override it.
-// =========================================
-
-const getWriteBranch = (req, requestedBranch) => {
-
-    // =========================================
-    // MAIN ADMIN
-    // =========================================
-
-    if (
-        req.admin &&
-        req.admin.role === 'admin'
-    ) {
-
-        return normalizeBranch(
-            requestedBranch
-        );
-    }
-
-
-    // =========================================
-    // RECEPTIONIST
-    // =========================================
-
-    if (
-        req.admin &&
-        req.admin.role === 'receptionist'
-    ) {
-
-        return normalizeBranch(
-            req.admin.gymBranch
-        );
-    }
-
-
-    return null;
-};
-
-
-// =========================================
+// ============================================================
 // ADD WORKOUT
-// =========================================
+// ============================================================
 
-const addWorkout = async(req, res) => {
-
+const addWorkout = async(
+    req,
+    res
+) => {
     try {
+        if (!ensureAdmin(req, res)) {
+            return;
+        }
 
         const {
             member,
@@ -140,133 +180,183 @@ const addWorkout = async(req, res) => {
             status,
             notes,
             gymBranch,
-        } = req.body;
+        } = req.body || {};
 
+        // ----------------------------------------------------
+        // MEMBER
+        // ----------------------------------------------------
 
-        // =========================================
-        // VALIDATION
-        // =========================================
-
-        if (!member ||
-            !workoutName ||
-            !String(workoutName).trim() ||
-            !workoutType
-        ) {
-
+        if (!member) {
             return res.status(400).json({
-
-                message: 'Member, workout name and workout type are required.',
-
+                message: 'Member is required.',
             });
         }
 
+        if (!isValidObjectId(member)) {
+            return res.status(400).json({
+                message: 'Invalid member ID.',
+            });
+        }
 
-        // =========================================
-        // DETERMINE BRANCH
-        // =========================================
+        // ----------------------------------------------------
+        // WORKOUT NAME
+        // ----------------------------------------------------
 
-        const selectedBranch =
-            getWriteBranch(
+        const finalWorkoutName =
+            String(
+                workoutName || ''
+            ).trim();
+
+        if (!finalWorkoutName) {
+            return res.status(400).json({
+                message: 'Workout name is required.',
+            });
+        }
+
+        // ----------------------------------------------------
+        // WORKOUT TYPE
+        // ----------------------------------------------------
+
+        const finalWorkoutType =
+            normalizeWorkoutType(
+                workoutType
+            );
+
+        if (!finalWorkoutType) {
+            return res.status(400).json({
+                message: 'Workout type is required.',
+            });
+        }
+
+        if (!VALID_WORKOUT_TYPES.includes(
+                finalWorkoutType
+            )) {
+            return res.status(400).json({
+                message: 'Invalid workout type.',
+            });
+        }
+
+        // ----------------------------------------------------
+        // STATUS
+        // ----------------------------------------------------
+
+        const finalStatus =
+            normalizeStatus(status);
+
+        if (
+            finalStatus &&
+            !VALID_STATUSES.includes(
+                finalStatus
+            )
+        ) {
+            return res.status(400).json({
+                message: 'Invalid workout status.',
+            });
+        }
+
+        // ----------------------------------------------------
+        // EXERCISES
+        // ----------------------------------------------------
+
+        const finalExercises =
+            normalizeExercises(
+                exercises
+            );
+
+        if (finalExercises === null) {
+            return res.status(400).json({
+                message: 'Exercises must be an array.',
+            });
+        }
+
+        // ----------------------------------------------------
+        // BRANCH
+        // ----------------------------------------------------
+
+        const branchResult =
+            resolveWriteBranch(
                 req,
                 gymBranch
             );
 
-
-        // =========================================
-        // VALIDATE BRANCH
-        // =========================================
-
-        if (!selectedBranch) {
-
-            if (
-                req.admin &&
-                req.admin.role === 'receptionist'
-            ) {
-
-                return res.status(403).json({
-
-                    message: 'Your account is not assigned to a valid gym branch.',
-
+        if (branchResult.error) {
+            return res
+                .status(
+                    branchResult.status || 400
+                )
+                .json({
+                    message: branchResult.error,
                 });
-            }
-
-            return res.status(400).json({
-
-                message: 'A valid gym branch is required.',
-
-            });
         }
 
+        const selectedBranch =
+            normalizeBranch(
+                branchResult.branch
+            );
 
-        if (!ALLOWED_BRANCHES.includes(
+        if (!VALID_BRANCHES.includes(
                 selectedBranch
             )) {
-
             return res.status(400).json({
-
-                message: 'Invalid gym branch.',
-
+                message: 'A valid gym branch is required.',
             });
         }
 
+        // ----------------------------------------------------
+        // MEMBER BRANCH VALIDATION
+        // ----------------------------------------------------
 
-        // =========================================
-        // VERIFY MEMBER BELONGS TO SAME BRANCH
-        // =========================================
+        const memberRecord =
+            await findMemberInBranch(
+                member,
+                selectedBranch
+            );
 
-        const existingMember =
-            await Member.findOne({
-
-                _id: member,
-
-                gymBranch: selectedBranch,
-
-            });
-
-
-        if (!existingMember) {
-
+        if (!memberRecord) {
             return res.status(404).json({
-
                 message: 'Member not found in the selected gym branch.',
-
             });
         }
 
+        // ----------------------------------------------------
+        // CREATE
+        // ----------------------------------------------------
 
-        // =========================================
-        // CREATE WORKOUT
-        // =========================================
+        const workoutData = {
+            gymBranch: selectedBranch,
+
+            member,
+
+            workoutName: finalWorkoutName,
+
+            workoutType: finalWorkoutType,
+
+            exercises: finalExercises,
+
+            notes: notes !== undefined ?
+                String(notes).trim() :
+                '',
+        };
+
+        if (startDate !== undefined) {
+            workoutData.startDate =
+                startDate;
+        }
+
+        if (endDate !== undefined) {
+            workoutData.endDate =
+                endDate;
+        }
+
+        if (finalStatus !== undefined) {
+            workoutData.status =
+                finalStatus;
+        }
 
         const workout =
-            await Workout.create({
-
-                gymBranch: selectedBranch,
-
-                member,
-
-                workoutName: String(workoutName).trim(),
-
-                workoutType,
-
-                exercises: Array.isArray(exercises) ?
-                    exercises :
-                    [],
-
-                startDate,
-
-                endDate,
-
-                status,
-
-                notes,
-
-            });
-
-
-        // =========================================
-        // POPULATE MEMBER
-        // =========================================
+            await Workout.create(
+                workoutData
+            );
 
         const populatedWorkout =
             await Workout.findById(
@@ -276,76 +366,62 @@ const addWorkout = async(req, res) => {
                 'name phone email gymBranch'
             );
 
-
         return res.status(201).json({
-
             message: 'Workout added successfully.',
-
             workout: populatedWorkout,
-
         });
 
     } catch (error) {
-
-        console.error(
-            'Add Workout Error:',
-            error.message
+        return sendServerError(
+            res,
+            'ADD WORKOUT ERROR',
+            error
         );
-
-        return res.status(500).json({
-
-            message: 'Server error. Please try again.',
-
-        });
     }
 };
 
-
-// =========================================
+// ============================================================
 // GET ALL WORKOUTS
-// =========================================
+// ============================================================
 
-const getWorkouts = async(req, res) => {
-
+const getWorkouts = async(
+    req,
+    res
+) => {
     try {
+        if (!ensureAdmin(req, res)) {
+            return;
+        }
 
-        const branch =
-            getAccessibleBranch(req);
+        // ----------------------------------------------------
+        // BRANCH FILTER
+        // ----------------------------------------------------
 
+        const query =
+            getBranchFilter(req);
 
-        // =========================================
-        // VALIDATE RECEPTIONIST BRANCH
-        // =========================================
+        // ----------------------------------------------------
+        // INVALID BRANCH REQUEST
+        // ----------------------------------------------------
 
-        if (
-            req.admin &&
-            req.admin.role === 'receptionist' &&
-            !branch
-        ) {
-
+        if (query === null) {
             return res.status(403).json({
-
-                message: 'Your account is not assigned to a valid gym branch.',
-
+                message: 'You do not have access to the selected gym branch.',
             });
         }
 
+        // ----------------------------------------------------
+        // DEBUG LOG
+        // ----------------------------------------------------
 
-        // =========================================
-        // BUILD QUERY
-        // =========================================
+        console.log(
+            '[GET WORKOUTS] Branch filter:',
+            JSON.stringify(query)
+        );
 
-        const query =
-            branch ?
-            {
-                gymBranch: branch,
-            } :
-            {};
-
-
-        // =========================================
-        // FETCH WORKOUTS
-        // =========================================
+        // ----------------------------------------------------
+        // DATABASE QUERY
+        // ----------------------------------------------------
 
         const workouts =
             await Workout.find(query)
@@ -357,186 +433,115 @@ const getWorkouts = async(req, res) => {
                 createdAt: -1,
             });
 
+        console.log(
+            `[GET WORKOUTS] Found ${workouts.length} workout(s).`
+        );
 
         return res.status(200).json({
-
             message: 'Workouts fetched successfully.',
-
             workouts,
-
         });
 
     } catch (error) {
-
-        console.error(
-            'Get Workouts Error:',
-            error.message
+        return sendServerError(
+            res,
+            'GET WORKOUTS ERROR',
+            error
         );
-
-        return res.status(500).json({
-
-            message: 'Server error. Please try again.',
-
-        });
     }
 };
 
+// ============================================================
+// GET SINGLE WORKOUT
+// ============================================================
 
-// =========================================
-// GET WORKOUT BY ID
-// =========================================
-
-const getWorkoutById = async(req, res) => {
-
+const getWorkoutById = async(
+    req,
+    res
+) => {
     try {
+        if (!ensureAdmin(req, res)) {
+            return;
+        }
 
-        const branch =
-            getAccessibleBranch(req);
+        const {
+            id,
+        } = req.params;
 
-
-        // =========================================
-        // VALIDATE RECEPTIONIST BRANCH
-        // =========================================
-
-        if (
-            req.admin &&
-            req.admin.role === 'receptionist' &&
-            !branch
-        ) {
-
-            return res.status(403).json({
-
-                message: 'Your account is not assigned to a valid gym branch.',
-
+        if (!isValidObjectId(id)) {
+            return res.status(400).json({
+                message: 'Invalid workout ID.',
             });
         }
 
+        // ----------------------------------------------------
+        // BRANCH FILTER
+        // ----------------------------------------------------
 
-        // =========================================
-        // BUILD QUERY
-        // =========================================
+        const query =
+            getBranchFilter(req);
 
-        const query = {
-
-            _id: req.params.id,
-
-        };
-
-
-        // Receptionist:
-        // assigned branch only.
-        if (branch) {
-
-            query.gymBranch =
-                branch;
+        if (query === null) {
+            return res.status(403).json({
+                message: 'You do not have access to the selected gym branch.',
+            });
         }
 
-
-        // =========================================
+        // ----------------------------------------------------
         // FIND WORKOUT
-        // =========================================
+        // ----------------------------------------------------
 
         const workout =
-            await Workout.findOne(query)
+            await Workout.findOne({
+                ...query,
+                _id: id,
+            })
             .populate(
                 'member',
                 'name phone email gymBranch'
             );
 
-
         if (!workout) {
-
             return res.status(404).json({
-
                 message: 'Workout not found.',
-
             });
         }
 
-
         return res.status(200).json({
-
             workout,
-
         });
 
     } catch (error) {
-
-        console.error(
-            'Get Workout Error:',
-            error.message
+        return sendServerError(
+            res,
+            'GET WORKOUT ERROR',
+            error
         );
-
-        return res.status(500).json({
-
-            message: 'Server error. Please try again.',
-
-        });
     }
 };
 
-
-// =========================================
+// ============================================================
 // UPDATE WORKOUT
-// =========================================
+// ============================================================
 
-const updateWorkout = async(req, res) => {
-
+const updateWorkout = async(
+    req,
+    res
+) => {
     try {
+        if (!ensureAdmin(req, res)) {
+            return;
+        }
 
-        const branch =
-            getAccessibleBranch(req);
+        const {
+            id,
+        } = req.params;
 
-
-        // =========================================
-        // VALIDATE RECEPTIONIST BRANCH
-        // =========================================
-
-        if (
-            req.admin &&
-            req.admin.role === 'receptionist' &&
-            !branch
-        ) {
-
-            return res.status(403).json({
-
-                message: 'Your account is not assigned to a valid gym branch.',
-
+        if (!isValidObjectId(id)) {
+            return res.status(400).json({
+                message: 'Invalid workout ID.',
             });
         }
-
-
-        // =========================================
-        // FIND WORKOUT
-        // =========================================
-
-        const query = {
-
-            _id: req.params.id,
-
-        };
-
-
-        if (branch) {
-
-            query.gymBranch =
-                branch;
-        }
-
-
-        const workout =
-            await Workout.findOne(query);
-
-
-        if (!workout) {
-
-            return res.status(404).json({
-
-                message: 'Workout not found.',
-
-            });
-        }
-
 
         const {
             member,
@@ -548,217 +553,292 @@ const updateWorkout = async(req, res) => {
             status,
             notes,
             gymBranch,
-        } = req.body;
+        } = req.body || {};
 
+        // ----------------------------------------------------
+        // CURRENT BRANCH FILTER
+        // ----------------------------------------------------
 
-        // =========================================
-        // DETERMINE FINAL BRANCH
-        // =========================================
+        const currentFilter =
+            getBranchFilter(req);
 
-        let finalBranch;
-
-
-        if (branch) {
-
-            // Receptionist cannot change branch.
-            finalBranch =
-                branch;
-
-        } else {
-
-            // Main admin can keep the existing
-            // branch or explicitly change it.
-            finalBranch =
-                normalizeBranch(
-                    gymBranch ||
-                    workout.gymBranch
-                );
-
-
-            if (!finalBranch) {
-
-                return res.status(400).json({
-
-                    message: 'A valid gym branch is required.',
-
-                });
-            }
-        }
-
-
-        // =========================================
-        // VALIDATE BRANCH
-        // =========================================
-
-        if (!ALLOWED_BRANCHES.includes(
-                finalBranch
-            )) {
-
-            return res.status(400).json({
-
-                message: 'Invalid gym branch.',
-
+        if (currentFilter === null) {
+            return res.status(403).json({
+                message: 'You do not have access to the selected gym branch.',
             });
         }
 
+        // ----------------------------------------------------
+        // FIND EXISTING WORKOUT
+        // ----------------------------------------------------
 
-        // =========================================
-        // VERIFY MEMBER IF CHANGED
-        // =========================================
+        const workout =
+            await Workout.findOne({
+                ...currentFilter,
+                _id: id,
+            });
 
-        if (member !== undefined) {
-
-            if (!member) {
-
-                return res.status(400).json({
-
-                    message: 'Member is required.',
-
-                });
-            }
-
-
-            const existingMember =
-                await Member.findOne({
-
-                    _id: member,
-
-                    gymBranch: finalBranch,
-
-                });
-
-
-            if (!existingMember) {
-
-                return res.status(404).json({
-
-                    message: 'Member not found in the selected gym branch.',
-
-                });
-            }
-
-
-            workout.member =
-                member;
+        if (!workout) {
+            return res.status(404).json({
+                message: 'Workout not found.',
+            });
         }
 
+        // ----------------------------------------------------
+        // FINAL BRANCH
+        // ----------------------------------------------------
 
-        // =========================================
-        // UPDATE WORKOUT NAME
-        // =========================================
+        let finalBranch =
+            normalizeBranch(
+                workout.gymBranch
+            );
+
+        // Main admin may move workout to
+        // another valid branch.
+        if (
+            isMainAdminRequest(req)
+        ) {
+            if (
+                gymBranch !== undefined &&
+                gymBranch !== null &&
+                String(
+                    gymBranch
+                ).trim() !== ''
+            ) {
+                finalBranch =
+                    normalizeBranch(
+                        gymBranch
+                    );
+
+                if (!VALID_BRANCHES.includes(
+                        finalBranch
+                    )) {
+                    return res.status(400).json({
+                        message: 'Invalid gym branch.',
+                    });
+                }
+            }
+        } else {
+            // Branch users can only update
+            // their assigned branch.
+            const accessibleBranches =
+                getAccessibleBranches(
+                    req
+                );
+
+            if (!accessibleBranches.includes(
+                    finalBranch
+                )) {
+                return res.status(403).json({
+                    message: 'You do not have access to this workout.',
+                });
+            }
+
+            // Branch users cannot move a workout
+            // to another branch.
+            if (
+                gymBranch !== undefined &&
+                normalizeBranch(
+                    gymBranch
+                ) &&
+                normalizeBranch(
+                    gymBranch
+                ) !== finalBranch
+            ) {
+                return res.status(403).json({
+                    message: 'You cannot move a workout to another gym branch.',
+                });
+            }
+        }
+
+        // ----------------------------------------------------
+        // FINAL MEMBER
+        // ----------------------------------------------------
+
+        const finalMember =
+            member !== undefined ?
+            member :
+            workout.member;
+
+        if (!finalMember) {
+            return res.status(400).json({
+                message: 'Member is required.',
+            });
+        }
+
+        if (!isValidObjectId(
+                finalMember
+            )) {
+            return res.status(400).json({
+                message: 'Invalid member ID.',
+            });
+        }
+
+        // ----------------------------------------------------
+        // MEMBER MUST BELONG TO BRANCH
+        // ----------------------------------------------------
+
+        const memberRecord =
+            await findMemberInBranch(
+                finalMember,
+                finalBranch
+            );
+
+        if (!memberRecord) {
+            return res.status(400).json({
+                message: 'Member not found in the selected gym branch.',
+            });
+        }
+
+        // ----------------------------------------------------
+        // WORKOUT NAME
+        // ----------------------------------------------------
 
         if (
             workoutName !== undefined
         ) {
+            const value =
+                String(
+                    workoutName
+                ).trim();
 
-            if (!String(workoutName).trim()) {
-
+            if (!value) {
                 return res.status(400).json({
-
                     message: 'Workout name cannot be empty.',
-
                 });
             }
 
             workout.workoutName =
-                String(workoutName).trim();
+                value;
         }
 
-
-        // =========================================
-        // UPDATE WORKOUT TYPE
-        // =========================================
+        // ----------------------------------------------------
+        // WORKOUT TYPE
+        // ----------------------------------------------------
 
         if (
             workoutType !== undefined
         ) {
+            const value =
+                normalizeWorkoutType(
+                    workoutType
+                );
+
+            if (!value) {
+                return res.status(400).json({
+                    message: 'Workout type cannot be empty.',
+                });
+            }
+
+            if (!VALID_WORKOUT_TYPES.includes(
+                    value
+                )) {
+                return res.status(400).json({
+                    message: 'Invalid workout type.',
+                });
+            }
 
             workout.workoutType =
-                workoutType;
+                value;
         }
 
-
-        // =========================================
-        // UPDATE EXERCISES
-        // =========================================
+        // ----------------------------------------------------
+        // EXERCISES
+        // ----------------------------------------------------
 
         if (
             exercises !== undefined
         ) {
+            if (!Array.isArray(
+                    exercises
+                )) {
+                return res.status(400).json({
+                    message: 'Exercises must be an array.',
+                });
+            }
 
             workout.exercises =
-                Array.isArray(exercises) ?
-                exercises :
-                [];
+                exercises;
         }
 
-
-        // =========================================
-        // UPDATE DATES
-        // =========================================
+        // ----------------------------------------------------
+        // DATES
+        // ----------------------------------------------------
 
         if (
             startDate !== undefined
         ) {
-
             workout.startDate =
                 startDate;
         }
 
-
         if (
             endDate !== undefined
         ) {
-
             workout.endDate =
                 endDate;
         }
 
-
-        // =========================================
-        // UPDATE STATUS
-        // =========================================
+        // ----------------------------------------------------
+        // STATUS
+        // ----------------------------------------------------
 
         if (
             status !== undefined
         ) {
+            const finalStatus =
+                normalizeStatus(
+                    status
+                );
+
+            if (!VALID_STATUSES.includes(
+                    finalStatus
+                )) {
+                return res.status(400).json({
+                    message: 'Invalid workout status.',
+                });
+            }
 
             workout.status =
-                status;
+                finalStatus;
         }
 
-
-        // =========================================
-        // UPDATE NOTES
-        // =========================================
+        // ----------------------------------------------------
+        // NOTES
+        // ----------------------------------------------------
 
         if (
             notes !== undefined
         ) {
-
             workout.notes =
-                notes;
+                String(
+                    notes
+                ).trim();
         }
 
+        // ----------------------------------------------------
+        // MEMBER
+        // ----------------------------------------------------
 
-        // =========================================
-        // UPDATE BRANCH
-        // =========================================
+        workout.member =
+            finalMember;
+
+        // ----------------------------------------------------
+        // BRANCH
+        // ----------------------------------------------------
 
         workout.gymBranch =
             finalBranch;
 
-
-        // =========================================
+        // ----------------------------------------------------
         // SAVE
-        // =========================================
+        // ----------------------------------------------------
 
         await workout.save();
 
-
-        // =========================================
-        // POPULATE UPDATED WORKOUT
-        // =========================================
+        // ----------------------------------------------------
+        // POPULATE
+        // ----------------------------------------------------
 
         const updatedWorkout =
             await Workout.findById(
@@ -768,137 +848,93 @@ const updateWorkout = async(req, res) => {
                 'name phone email gymBranch'
             );
 
-
         return res.status(200).json({
-
             message: 'Workout updated successfully.',
-
             workout: updatedWorkout,
-
         });
 
     } catch (error) {
-
-        console.error(
-            'Update Workout Error:',
-            error.message
+        return sendServerError(
+            res,
+            'UPDATE WORKOUT ERROR',
+            error
         );
-
-        return res.status(500).json({
-
-            message: 'Server error. Please try again.',
-
-        });
     }
 };
 
-
-// =========================================
+// ============================================================
 // DELETE WORKOUT
-// =========================================
+// ============================================================
 
-const deleteWorkout = async(req, res) => {
-
+const deleteWorkout = async(
+    req,
+    res
+) => {
     try {
+        if (!ensureAdmin(req, res)) {
+            return;
+        }
 
-        const branch =
-            getAccessibleBranch(req);
+        const {
+            id,
+        } = req.params;
 
-
-        // =========================================
-        // VALIDATE RECEPTIONIST BRANCH
-        // =========================================
-
-        if (
-            req.admin &&
-            req.admin.role === 'receptionist' &&
-            !branch
-        ) {
-
-            return res.status(403).json({
-
-                message: 'Your account is not assigned to a valid gym branch.',
-
+        if (!isValidObjectId(id)) {
+            return res.status(400).json({
+                message: 'Invalid workout ID.',
             });
         }
 
+        // ----------------------------------------------------
+        // BRANCH FILTER
+        // ----------------------------------------------------
 
-        // =========================================
-        // BUILD QUERY
-        // =========================================
+        const query =
+            getBranchFilter(req);
 
-        const query = {
-
-            _id: req.params.id,
-
-        };
-
-
-        // Receptionist can delete only
-        // workouts belonging to assigned branch.
-        if (branch) {
-
-            query.gymBranch =
-                branch;
+        if (query === null) {
+            return res.status(403).json({
+                message: 'You do not have access to the selected gym branch.',
+            });
         }
 
-
-        // =========================================
-        // DELETE WORKOUT
-        // =========================================
+        // ----------------------------------------------------
+        // DELETE
+        // ----------------------------------------------------
 
         const workout =
-            await Workout.findOneAndDelete(
-                query
-            );
-
+            await Workout.findOneAndDelete({
+                ...query,
+                _id: id,
+            });
 
         if (!workout) {
-
             return res.status(404).json({
-
                 message: 'Workout not found.',
-
             });
         }
 
-
         return res.status(200).json({
-
             message: 'Workout deleted successfully.',
-
         });
 
     } catch (error) {
-
-        console.error(
-            'Delete Workout Error:',
-            error.message
+        return sendServerError(
+            res,
+            'DELETE WORKOUT ERROR',
+            error
         );
-
-        return res.status(500).json({
-
-            message: 'Server error. Please try again.',
-
-        });
     }
 };
 
-
-// =========================================
-// EXPORT CONTROLLERS
-// =========================================
+// ============================================================
+// EXPORTS
+// ============================================================
 
 module.exports = {
-
     addWorkout,
-
     getWorkouts,
-
     getWorkoutById,
-
     updateWorkout,
-
     deleteWorkout,
-
 };

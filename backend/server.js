@@ -1,191 +1,339 @@
 const express = require('express');
 const cors = require('cors');
-const crypto = require('crypto');
-const mongoose = require('mongoose');
 
 require('dotenv').config();
 
+/* =========================================================
+   DATABASE
+   ========================================================= */
+
 const connectDB = require('./config/db');
 
-// ===============================
-// ROUTES
-// ===============================
 
-const contactRoutes = require('./routes/contactRoutes');
-const adminRoutes = require('./routes/adminRoutes');
-const memberRoutes = require('./routes/memberRoutes');
-const paymentRoutes = require('./routes/paymentRoutes');
-const attendanceRoutes = require('./routes/attendanceRoutes');
-const workoutRoutes = require('./routes/workoutRoutes');
-const dashboardRoutes = require('./routes/dashboardRoutes');
-const staffRoutes = require('./routes/staffRoutes');
-const planRoutes = require('./routes/planRoutes');
-const offerRoutes = require('./routes/offerRoutes');
-const trainerRoutes = require('./routes/trainerRoutes');
+/* =========================================================
+   ROUTES
+   ========================================================= */
+
+const contactRoutes =
+    require('./routes/contactRoutes');
+
+const adminRoutes =
+    require('./routes/adminRoutes');
+
+const memberRoutes =
+    require('./routes/memberRoutes');
+
+const paymentRoutes =
+    require('./routes/paymentRoutes');
+
+const attendanceRoutes =
+    require('./routes/attendanceRoutes');
+
+const workoutRoutes =
+    require('./routes/workoutRoutes');
+
+const dashboardRoutes =
+    require('./routes/dashboardRoutes');
+
+const staffRoutes =
+    require('./routes/staffRoutes');
+
+const offerRoutes =
+    require('./routes/offerRoutes');
+
+const trainerRoutes =
+    require('./routes/trainerRoutes');
+
+const accessPassRoutes =
+    require('./routes/accessPassRoutes');
 
 
-// ===============================
-// APP INITIALIZATION
-// ===============================
+/* =========================================================
+   APP
+   ========================================================= */
 
-const app = express();
-
-
-// ===============================
-// DATABASE
-// ===============================
-
-connectDB();
+const app =
+    express();
 
 
-// ===============================
-// MIDDLEWARE
-// ===============================
+/* =========================================================
+   BASIC CONFIGURATION
+   ========================================================= */
 
-app.use(cors());
+app.disable(
+    'x-powered-by'
+);
 
-app.use(express.json());
+
+/* =========================================================
+   CORS
+   ========================================================= */
+
+app.use(
+    cors({
+        origin: true,
+        credentials: true,
+    })
+);
 
 
-// ===============================
-// API ROUTES
-// ===============================
+/* =========================================================
+   BODY PARSING
+   ========================================================= */
 
-// Contact / Enquiries
+app.use(
+    express.json()
+);
+
+app.use(
+    express.urlencoded({
+        extended: true,
+    })
+);
+
+
+/* =========================================================
+   HEALTH CHECK
+   ========================================================= */
+
+app.get(
+    '/',
+    (req, res) => {
+
+        return res.json({
+            message: 'Alpha Gym Backend is running!',
+
+            status: 'success',
+        });
+    }
+);
+
+
+/* =========================================================
+   API ROUTES
+   ========================================================= */
+
+
+/* ---------------------------------------------------------
+   CONTACTS / ENQUIRIES
+--------------------------------------------------------- */
+
 app.use(
     '/api/contacts',
     contactRoutes
 );
 
 
-// Admin
+/* ---------------------------------------------------------
+   ADMIN
+--------------------------------------------------------- */
+
 app.use(
     '/api/admin',
     adminRoutes
 );
 
 
-// Members
+/* ---------------------------------------------------------
+   MEMBERS
+--------------------------------------------------------- */
+
 app.use(
     '/api/members',
     memberRoutes
 );
 
 
-// Payments
+/* ---------------------------------------------------------
+   PAYMENTS
+--------------------------------------------------------- */
+
 app.use(
     '/api/payments',
     paymentRoutes
 );
 
 
-// Attendance
+/* ---------------------------------------------------------
+   ATTENDANCE
+--------------------------------------------------------- */
+
 app.use(
     '/api/attendance',
     attendanceRoutes
 );
 
 
-// Workouts
+/* ---------------------------------------------------------
+   WORKOUTS
+--------------------------------------------------------- */
+
 app.use(
     '/api/workouts',
     workoutRoutes
 );
 
 
-// Dashboard
+/* ---------------------------------------------------------
+   DASHBOARD
+--------------------------------------------------------- */
+
 app.use(
     '/api/dashboard',
     dashboardRoutes
 );
 
 
-// Staff Management
+/* ---------------------------------------------------------
+   STAFF MANAGEMENT
+--------------------------------------------------------- */
+
 app.use(
     '/api/admin/staff',
     staffRoutes
 );
 
 
-// Membership Plans
-app.use(
-    '/api/plans',
-    planRoutes
-);
+/* ---------------------------------------------------------
+   PUJA OFFERS
+--------------------------------------------------------- */
 
-
-// Membership Offers
 app.use(
     '/api/offers',
     offerRoutes
 );
 
 
-// Trainers
+/* ---------------------------------------------------------
+   ACCESS PASSES
+   DAILY ACCESS / WEEKLY ACCESS
+--------------------------------------------------------- */
+
+app.use(
+    '/api/access-passes',
+    accessPassRoutes
+);
+
+
+/* ---------------------------------------------------------
+   TRAINERS
+--------------------------------------------------------- */
+
 app.use(
     '/api/trainers',
     trainerRoutes
 );
 
 
-// ===============================
-// TEMPORARY MONGODB DIAGNOSTIC
-// REMOVE AFTER TESTING
-// ===============================
+/* =========================================================
+   404 HANDLER
+   ========================================================= */
 
-app.get('/api/debug/mongo-target', (req, res) => {
-    try {
-        const mongoHost = mongoose.connection.host || '';
-        const mongoDatabase = mongoose.connection.name || '';
+app.use(
+    (req, res) => {
 
-        const fingerprintSource =
-            `${mongoHost}/${mongoDatabase}`;
+        return res
+            .status(404)
+            .json({
+                success: false,
 
-        const fingerprint = crypto
-            .createHash('sha256')
-            .update(fingerprintSource)
-            .digest('hex');
+                message: `API route not found: ${req.method} ${req.originalUrl}`,
+            });
+    }
+);
 
-        return res.json({
-            connected: mongoose.connection.readyState === 1,
-            mongoHost,
-            mongoDatabase,
-            fingerprint,
-        });
-    } catch (error) {
+
+/* =========================================================
+   ERROR HANDLER
+   ========================================================= */
+
+app.use(
+    (error, req, res, next) => {
+
         console.error(
-            'MongoDB diagnostic error:',
+            'SERVER ERROR:',
+            error
+        );
+
+        if (
+            res.headersSent
+        ) {
+
+            return next(error);
+        }
+
+        return res
+            .status(
+                error.status || 500
+            )
+            .json({
+
+                success: false,
+
+                message: error.message ||
+                    'Internal server error.',
+            });
+    }
+);
+
+
+/* =========================================================
+   PORT
+   ========================================================= */
+
+const PORT =
+    Number(
+        process.env.PORT
+    ) || 5000;
+
+
+/* =========================================================
+   START SERVER
+   ========================================================= */
+
+const startServer = async() => {
+
+    try {
+
+        /* -------------------------------------------------
+           DATABASE FIRST
+        ------------------------------------------------- */
+
+        await connectDB();
+
+
+        /* -------------------------------------------------
+           START HTTP SERVER
+        ------------------------------------------------- */
+
+        app.listen(
+            PORT,
+            () => {
+
+                console.log(
+                    `Alpha Gym Backend running on port ${PORT}`
+                );
+
+                console.log(
+                    `API Base URL: http://localhost:${PORT}`
+                );
+            }
+        );
+
+    } catch (error) {
+
+        console.error(
+            'SERVER STARTUP FAILED:',
             error.message
         );
 
-        return res.status(500).json({
-            connected: false,
-            error: 'Unable to read MongoDB connection information.',
-        });
+        process.exit(1);
     }
-});
+};
 
 
-// ===============================
-// HEALTH CHECK
-// ===============================
+/* =========================================================
+   START
+   ========================================================= */
 
-app.get('/', (req, res) => {
-    return res.json({
-        message: 'Alpha Gym Backend is running!',
-        status: 'success',
-    });
-});
-
-
-// ===============================
-// SERVER
-// ===============================
-
-const PORT = process.env.PORT || 5000;
-
-app.listen(PORT, () => {
-    console.log(
-        `Alpha Gym Backend running on port ${PORT}`
-    );
-});
+startServer();

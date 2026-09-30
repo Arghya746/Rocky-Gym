@@ -1,10 +1,10 @@
 const mongoose = require('mongoose');
 const Offer = require('../models/Offer');
-const Plan = require('../models/Plan');
 
-/* =========================================================
-   CONSTANTS
-   ========================================================= */
+
+// =========================================================
+// CONSTANTS
+// =========================================================
 
 const VALID_BRANCHES = [
     'Kalyanpur',
@@ -22,92 +22,309 @@ const BRANCH_USER_ROLES = [
     'staff',
 ];
 
-/* =========================================================
-   ROLE HELPERS
-   ========================================================= */
 
-const normalizeRole = (role) => {
-    if (!role) return '';
+// =========================================================
+// ROLE HELPERS
+// =========================================================
 
-    return String(role)
+const normalizeRole = (value) => {
+    return String(value || '')
         .trim()
         .toLowerCase();
 };
 
-const isMainAdmin = (req) => {
-    const role = normalizeRole(req.admin.role);
-
-    return MAIN_ADMIN_ROLES.includes(role);
-};
-
-const isBranchUser = (req) => {
-    const role = normalizeRole(req.admin.role);
-
-    return BRANCH_USER_ROLES.includes(role);
-};
-
-/* =========================================================
-   BRANCH HELPERS
-   ========================================================= */
-
-const normalizeBranch = (branch) => {
-    if (!branch) return '';
-
-    const normalized = String(branch)
-        .trim()
-        .toLowerCase();
-
-    if (normalized === 'kalyanpur') {
-        return 'Kalyanpur';
-    }
-
-    if (normalized === 'gopalpur') {
-        return 'Gopalpur';
-    }
-
-    return String(branch).trim();
-};
-
-const isValidBranch = (branch) => {
-    return VALID_BRANCHES.includes(
-        normalizeBranch(branch)
+const getRole = (req) => {
+    return normalizeRole(
+        req.admin.role
     );
 };
 
-/**
- * Main admin:
- * -> null = access to both branches
- *
- * Receptionist/staff:
- * -> assigned branch
- *
- * Missing branch:
- * -> ''
- */
-const getAccessibleBranch = (req) => {
-    if (isMainAdmin(req)) {
-        return null;
+const isMainAdmin = (req) => {
+    return MAIN_ADMIN_ROLES.includes(
+        getRole(req)
+    );
+};
+
+const isBranchUser = (req) => {
+    return BRANCH_USER_ROLES.includes(
+        getRole(req)
+    );
+};
+
+
+// =========================================================
+// BRANCH HELPERS
+// =========================================================
+
+const normalizeBranch = (value) => {
+
+    if (!value) {
+        return '';
     }
 
-    if (req.admin.gymBranch) {
-        return normalizeBranch(req.admin.gymBranch);
+    if (typeof value === 'object') {
+        value =
+            value._id ||
+            value.name ||
+            value.branchName ||
+            value.gymBranch ||
+            '';
+    }
+
+    const normalized =
+        String(value)
+        .trim()
+        .toLowerCase();
+
+    if (
+        normalized ===
+        'kalyanpur'
+    ) {
+        return 'Kalyanpur';
+    }
+
+    if (
+        normalized ===
+        'gopalpur'
+    ) {
+        return 'Gopalpur';
     }
 
     return '';
 };
 
-/* =========================================================
-   ACCESS VALIDATION
-   ========================================================= */
 
-const validateOfferAccess = (req, res) => {
-    const role = normalizeRole(req.admin.role);
+// =========================================================
+// GET ADMIN BRANCHES
+// =========================================================
 
-    if (MAIN_ADMIN_ROLES.includes(role)) {
+const getAdminBranches = (req) => {
+
+    if (!req.admin) {
+        return [];
+    }
+
+    const branches = [];
+
+    // New multi-branch field
+    if (
+        Array.isArray(
+            req.admin.gymBranches
+        )
+    ) {
+        req.admin.gymBranches.forEach(
+            (branch) => {
+
+                const normalized =
+                    normalizeBranch(
+                        branch
+                    );
+
+                if (
+                    normalized &&
+                    !branches.includes(
+                        normalized
+                    )
+                ) {
+                    branches.push(
+                        normalized
+                    );
+                }
+            }
+        );
+    }
+
+    // Legacy field
+    const legacyBranch =
+        normalizeBranch(
+            req.admin.gymBranch ||
+            req.admin.branchName ||
+            req.admin.branch
+        );
+
+    if (
+        legacyBranch &&
+        !branches.includes(
+            legacyBranch
+        )
+    ) {
+        branches.push(
+            legacyBranch
+        );
+    }
+
+    return branches.filter(
+        (branch) =>
+        VALID_BRANCHES.includes(
+            branch
+        )
+    );
+};
+
+
+// =========================================================
+// VALID BRANCH
+// =========================================================
+
+const isValidBranch = (
+    branch
+) => {
+    return VALID_BRANCHES.includes(
+        normalizeBranch(branch)
+    );
+};
+
+
+// =========================================================
+// RESOLVE BRANCH
+// =========================================================
+
+const resolveBranch = (
+    req,
+    requestedBranch, {
+        required = true,
+    } = {}
+) => {
+
+    // -----------------------------------------
+    // MAIN ADMIN
+    // -----------------------------------------
+
+    if (isMainAdmin(req)) {
+
+        const branch =
+            normalizeBranch(
+                requestedBranch
+            );
+
+        if (!branch &&
+            required
+        ) {
+            return {
+                valid: false,
+                status: 400,
+                message: 'Please select Kalyanpur or Gopalpur.',
+            };
+        }
+
+        if (
+            branch &&
+            !isValidBranch(
+                branch
+            )
+        ) {
+            return {
+                valid: false,
+                status: 400,
+                message: 'Invalid gym branch.',
+            };
+        }
+
+        return {
+            valid: true,
+            branch: branch || null,
+        };
+    }
+
+
+    // -----------------------------------------
+    // RECEPTIONIST / STAFF
+    // -----------------------------------------
+
+    const branches =
+        getAdminBranches(req);
+
+    if (
+        branches.length === 0
+    ) {
+        return {
+            valid: false,
+            status: 403,
+            message: 'Your account is not assigned to a valid gym branch.',
+        };
+    }
+
+    const requested =
+        normalizeBranch(
+            requestedBranch
+        );
+
+    if (requested) {
+
+        if (!branches.includes(
+                requested
+            )) {
+            return {
+                valid: false,
+                status: 403,
+                message: 'You do not have access to the selected gym branch.',
+            };
+        }
+
+        return {
+            valid: true,
+            branch: requested,
+        };
+    }
+
+    // One assigned branch
+    if (
+        branches.length === 1
+    ) {
+        return {
+            valid: true,
+            branch: branches[0],
+        };
+    }
+
+    if (required) {
+        return {
+            valid: false,
+            status: 400,
+            message: 'Please select the active gym branch.',
+        };
+    }
+
+    return {
+        valid: true,
+        branch: null,
+        branches,
+    };
+};
+
+
+// =========================================================
+// OFFER ACCESS
+// =========================================================
+
+const validateOfferAccess = (
+    req,
+    res
+) => {
+
+    if (!req.admin) {
+        res.status(401).json({
+            success: false,
+            message: 'Not authorized. Please login again.',
+        });
+
+        return false;
+    }
+
+    const role =
+        getRole(req);
+
+    if (
+        MAIN_ADMIN_ROLES.includes(
+            role
+        )
+    ) {
         return true;
     }
 
-    if (!BRANCH_USER_ROLES.includes(role)) {
+    if (!BRANCH_USER_ROLES.includes(
+            role
+        )) {
         res.status(403).json({
             success: false,
             message: 'You are not authorized to access offers.',
@@ -116,21 +333,15 @@ const validateOfferAccess = (req, res) => {
         return false;
     }
 
-    const branch = getAccessibleBranch(req);
+    const branches =
+        getAdminBranches(req);
 
-    if (!branch) {
+    if (
+        branches.length === 0
+    ) {
         res.status(403).json({
             success: false,
-            message: 'Your account is not assigned to a gym branch. Please contact the main administrator.',
-        });
-
-        return false;
-    }
-
-    if (!isValidBranch(branch)) {
-        res.status(403).json({
-            success: false,
-            message: 'Invalid or unsupported gym branch.',
+            message: 'Your account is not assigned to a valid gym branch.',
         });
 
         return false;
@@ -139,25 +350,29 @@ const validateOfferAccess = (req, res) => {
     return true;
 };
 
-/* =========================================================
-   VALUE HELPERS
-   ========================================================= */
 
-const escapeRegex = (value) => {
-    return String(value).replace(
-        /[.*+?^${}()|[\]\\]/g,
-        '\\$&'
+// =========================================================
+// OBJECT ID
+// =========================================================
+
+const isValidObjectId = (
+    id
+) => {
+    return mongoose.Types.ObjectId.isValid(
+        id
     );
 };
 
-const isValidObjectId = (id) => {
-    return mongoose.Types.ObjectId.isValid(id);
-};
+
+// =========================================================
+// BOOLEAN
+// =========================================================
 
 const parseBoolean = (
     value,
-    defaultValue = undefined
+    defaultValue
 ) => {
+
     if (
         value === undefined ||
         value === null ||
@@ -166,19 +381,30 @@ const parseBoolean = (
         return defaultValue;
     }
 
-    if (typeof value === 'boolean') {
+    if (
+        typeof value ===
+        'boolean'
+    ) {
         return value;
     }
 
-    if (typeof value === 'string') {
+    if (
+        typeof value ===
+        'string'
+    ) {
+
         const normalized =
             value.trim().toLowerCase();
 
-        if (normalized === 'true') {
+        if (
+            normalized === 'true'
+        ) {
             return true;
         }
 
-        if (normalized === 'false') {
+        if (
+            normalized === 'false'
+        ) {
             return false;
         }
     }
@@ -186,68 +412,222 @@ const parseBoolean = (
     return defaultValue;
 };
 
-const parseDate = (value) => {
-    const date = new Date(value);
 
-    if (Number.isNaN(date.getTime())) {
+// =========================================================
+// DATE
+// =========================================================
+
+const parseDate = (
+    value
+) => {
+
+    if (!value) {
+        return null;
+    }
+
+    const date =
+        new Date(value);
+
+    if (
+        Number.isNaN(
+            date.getTime()
+        )
+    ) {
         return null;
     }
 
     return date;
 };
 
-const normalizeBenefits = (benefits) => {
-    if (!Array.isArray(benefits)) {
+
+// =========================================================
+// PRICE
+// =========================================================
+
+const parsePrice = (
+    value
+) => {
+
+    if (
+        value === undefined ||
+        value === null ||
+        value === ''
+    ) {
+        return null;
+    }
+
+    const price =
+        Number(value);
+
+    if (!Number.isFinite(price) ||
+        price < 0
+    ) {
+        return null;
+    }
+
+    return price;
+};
+
+
+// =========================================================
+// DURATION
+// =========================================================
+
+const parseDuration = (
+    value
+) => {
+
+    if (
+        value === undefined ||
+        value === null ||
+        value === ''
+    ) {
+        return null;
+    }
+
+    const duration =
+        Number(value);
+
+    if (!Number.isInteger(
+            duration
+        ) ||
+        duration < 1
+    ) {
+        return null;
+    }
+
+    return duration;
+};
+
+
+// =========================================================
+// BENEFITS
+// =========================================================
+
+const normalizeBenefits = (
+    benefits
+) => {
+
+    if (!Array.isArray(
+            benefits
+        )) {
         return [];
     }
 
     return [
         ...new Set(
             benefits
-            .map((benefit) =>
-                String(benefit).trim()
+            .map(
+                (benefit) =>
+                String(
+                    benefit
+                ).trim()
             )
             .filter(Boolean)
         ),
     ];
 };
 
-/* =========================================================
-   GET CURRENT ACTIVE OFFERS
-   GET /api/offers
-   ========================================================= */
 
-const getOffers = async(req, res) => {
+// =========================================================
+// DESCRIPTION
+// =========================================================
+
+const normalizeDescription = (
+    description
+) => {
+
+    if (
+        description === undefined ||
+        description === null
+    ) {
+        return '';
+    }
+
+    return String(
+        description
+    ).trim();
+};
+
+
+// =========================================================
+// NAME
+// =========================================================
+
+const normalizeOfferName = (
+    name
+) => {
+
+    return String(
+        name || ''
+    ).trim();
+};
+
+
+// =========================================================
+// GET ACTIVE OFFERS
+// GET /api/offers
+// =========================================================
+
+const getOffers = async(
+    req,
+    res
+) => {
+
     try {
-        if (!validateOfferAccess(req, res)) {
+
+        if (!validateOfferAccess(
+                req,
+                res
+            )) {
             return;
         }
 
-        const branch = getAccessibleBranch(req);
-        const today = new Date();
+        const requestedBranch =
+            req.query.branch;
+
+        const branchResult =
+            resolveBranch(
+                req,
+                requestedBranch, {
+                    required:
+                        !isMainAdmin(req),
+                }
+            );
+
+        if (!branchResult.valid) {
+            return res.status(
+                branchResult.status || 400
+            ).json({
+                success: false,
+                message: branchResult.message,
+            });
+        }
 
         const query = {
             isActive: true,
-            startDate: {
-                $lte: today,
-            },
-            endDate: {
-                $gte: today,
-            },
         };
 
-        if (!isMainAdmin(req)) {
-            query.gymBranch = branch;
+        if (
+            branchResult.branch
+        ) {
+            query.gymBranch =
+                branchResult.branch;
+
+        } else if (
+            branchResult.branches
+        ) {
+            query.gymBranch = {
+                $in: branchResult.branches,
+            };
         }
 
-        const offers = await Offer.find(query)
-            .populate(
-                'plan',
-                'name durationMonths price gymBranch isActive'
-            )
+        const offers =
+            await Offer.find(query)
             .sort({
-                endDate: 1,
-                name: 1,
+                gymBranch: 1,
+                startDate: 1,
+                createdAt: -1,
             });
 
         return res.status(200).json({
@@ -255,7 +635,9 @@ const getOffers = async(req, res) => {
             count: offers.length,
             offers,
         });
+
     } catch (error) {
+
         console.error(
             'Get Offers Error:',
             error
@@ -268,30 +650,64 @@ const getOffers = async(req, res) => {
     }
 };
 
-/* =========================================================
-   GET ALL OFFERS
-   GET /api/offers/all
-   ========================================================= */
 
-const getAllOffers = async(req, res) => {
+// =========================================================
+// GET ALL OFFERS
+// GET /api/offers/all
+// =========================================================
+
+const getAllOffers = async(
+    req,
+    res
+) => {
+
     try {
-        if (!validateOfferAccess(req, res)) {
+
+        if (!validateOfferAccess(
+                req,
+                res
+            )) {
             return;
         }
 
-        const branch = getAccessibleBranch(req);
+        const requestedBranch =
+            req.query.branch;
+
+        const branchResult =
+            resolveBranch(
+                req,
+                requestedBranch, {
+                    required: false,
+                }
+            );
+
+        if (!branchResult.valid) {
+            return res.status(
+                branchResult.status || 400
+            ).json({
+                success: false,
+                message: branchResult.message,
+            });
+        }
 
         const query = {};
 
-        if (!isMainAdmin(req)) {
-            query.gymBranch = branch;
+        if (
+            branchResult.branch
+        ) {
+            query.gymBranch =
+                branchResult.branch;
+
+        } else if (
+            branchResult.branches
+        ) {
+            query.gymBranch = {
+                $in: branchResult.branches,
+            };
         }
 
-        const offers = await Offer.find(query)
-            .populate(
-                'plan',
-                'name durationMonths price gymBranch isActive'
-            )
+        const offers =
+            await Offer.find(query)
             .sort({
                 gymBranch: 1,
                 isActive: -1,
@@ -304,7 +720,9 @@ const getAllOffers = async(req, res) => {
             count: offers.length,
             offers,
         });
+
     } catch (error) {
+
         console.error(
             'Get All Offers Error:',
             error
@@ -317,71 +735,64 @@ const getAllOffers = async(req, res) => {
     }
 };
 
-/* =========================================================
-   GET OFFERS BY PLAN
-   GET /api/offers/plan/:planId
-   ========================================================= */
 
-const getOffersByPlan = async(req, res) => {
+// =========================================================
+// PUBLIC OFFERS
+// GET /api/offers/public
+// =========================================================
+
+const getPublicOffers = async(
+    req,
+    res
+) => {
+
     try {
-        if (!validateOfferAccess(req, res)) {
-            return;
-        }
 
-        const {
-            planId,
-        } = req.params;
+        const requestedBranch =
+            normalizeBranch(
+                req.query.branch
+            );
 
-        if (!isValidObjectId(planId)) {
+        if (
+            requestedBranch &&
+            !isValidBranch(
+                requestedBranch
+            )
+        ) {
             return res.status(400).json({
                 success: false,
-                message: 'Invalid membership plan ID.',
+                message: 'Invalid gym branch.',
             });
         }
 
-        const branch = getAccessibleBranch(req);
-        const today = new Date();
-
-        const planQuery = {
-            _id: planId,
-        };
-
-        if (!isMainAdmin(req)) {
-            planQuery.gymBranch = branch;
-        }
-
-        const existingPlan =
-            await Plan.findOne(planQuery);
-
-        if (!existingPlan) {
-            return res.status(404).json({
-                success: false,
-                message: 'Membership plan not found.',
-            });
-        }
+        const today =
+            new Date();
 
         const query = {
-            plan: existingPlan._id,
             isActive: true,
+
             startDate: {
                 $lte: today,
             },
+
             endDate: {
                 $gte: today,
             },
         };
 
-        if (!isMainAdmin(req)) {
-            query.gymBranch = branch;
+        if (
+            requestedBranch
+        ) {
+            query.gymBranch =
+                requestedBranch;
         }
 
-        const offers = await Offer.find(query)
-            .populate(
-                'plan',
-                'name durationMonths price gymBranch isActive'
-            )
+        const offers =
+            await Offer.find(query)
             .sort({
-                endDate: 1,
+                gymBranch: 1,
+                startDate: 1,
+                createdAt: -1,
             });
 
         return res.status(200).json({
@@ -389,27 +800,38 @@ const getOffersByPlan = async(req, res) => {
             count: offers.length,
             offers,
         });
+
     } catch (error) {
+
         console.error(
-            'Get Offers By Plan Error:',
+            'Get Public Offers Error:',
             error
         );
 
         return res.status(500).json({
             success: false,
-            message: 'Failed to fetch offers for this plan.',
+            message: 'Failed to fetch public offers.',
         });
     }
 };
 
-/* =========================================================
-   GET SINGLE OFFER
-   GET /api/offers/:id
-   ========================================================= */
 
-const getOfferById = async(req, res) => {
+// =========================================================
+// GET SINGLE OFFER
+// GET /api/offers/:id
+// =========================================================
+
+const getOfferById = async(
+    req,
+    res
+) => {
+
     try {
-        if (!validateOfferAccess(req, res)) {
+
+        if (!validateOfferAccess(
+                req,
+                res
+            )) {
             return;
         }
 
@@ -424,20 +846,48 @@ const getOfferById = async(req, res) => {
             });
         }
 
-        const branch = getAccessibleBranch(req);
+        const requestedBranch =
+            req.query.branch;
+
+        const branchResult =
+            resolveBranch(
+                req,
+                requestedBranch, {
+                    required:
+                        !isMainAdmin(req),
+                }
+            );
+
+        if (!branchResult.valid) {
+            return res.status(
+                branchResult.status || 400
+            ).json({
+                success: false,
+                message: branchResult.message,
+            });
+        }
 
         const query = {
             _id: id,
         };
 
-        if (!isMainAdmin(req)) {
-            query.gymBranch = branch;
+        if (
+            branchResult.branch
+        ) {
+            query.gymBranch =
+                branchResult.branch;
+
+        } else if (
+            branchResult.branches
+        ) {
+            query.gymBranch = {
+                $in: branchResult.branches,
+            };
         }
 
-        const offer = await Offer.findOne(query)
-            .populate(
-                'plan',
-                'name durationMonths price gymBranch isActive'
+        const offer =
+            await Offer.findOne(
+                query
             );
 
         if (!offer) {
@@ -451,7 +901,9 @@ const getOfferById = async(req, res) => {
             success: true,
             offer,
         });
+
     } catch (error) {
+
         console.error(
             'Get Offer Error:',
             error
@@ -464,168 +916,143 @@ const getOfferById = async(req, res) => {
     }
 };
 
-/* =========================================================
-   CREATE OFFER
-   POST /api/offers
-   ========================================================= */
 
-const createOffer = async(req, res) => {
+// =========================================================
+// CREATE PUJA OFFER
+// POST /api/offers
+// =========================================================
+
+const createOffer = async(
+    req,
+    res
+) => {
+
     try {
-        if (!validateOfferAccess(req, res)) {
+
+        if (!validateOfferAccess(
+                req,
+                res
+            )) {
             return;
         }
 
         const {
             name,
-            plan,
+            durationMonths,
             offerPrice,
             startDate,
             endDate,
             description,
             benefits,
             gymBranch,
+            image,
+            isActive,
         } = req.body;
 
-        const mainAdmin = isMainAdmin(req);
-        const accessibleBranch =
-            getAccessibleBranch(req);
 
-        /* --------------------------------------------------
-           REQUIRED FIELDS
-        -------------------------------------------------- */
+        // -----------------------------------------
+        // NAME
+        // -----------------------------------------
 
-        if (!name ||
-            !String(name).trim()
-        ) {
+        const normalizedName =
+            normalizeOfferName(
+                name
+            );
+
+        if (!normalizedName) {
             return res.status(400).json({
                 success: false,
-                message: 'Offer name is required.',
-            });
-        }
-
-        if (!plan) {
-            return res.status(400).json({
-                success: false,
-                message: 'Membership plan is required.',
+                message: 'Puja offer name is required.',
             });
         }
 
         if (
-            offerPrice === undefined ||
-            offerPrice === null ||
-            offerPrice === ''
+            normalizedName.length >
+            150
         ) {
             return res.status(400).json({
                 success: false,
-                message: 'Offer price is required.',
+                message: 'Offer name is too long.',
             });
         }
 
-        if (!startDate) {
+
+        // -----------------------------------------
+        // BRANCH
+        // -----------------------------------------
+
+        const branchResult =
+            resolveBranch(
+                req,
+                gymBranch, {
+                    required: true,
+                }
+            );
+
+        if (!branchResult.valid) {
+            return res.status(
+                branchResult.status || 400
+            ).json({
+                success: false,
+                message: branchResult.message,
+            });
+        }
+
+        const selectedBranch =
+            branchResult.branch;
+
+
+        // -----------------------------------------
+        // DURATION
+        // -----------------------------------------
+
+        const parsedDuration =
+            parseDuration(
+                durationMonths
+            );
+
+        if (
+            parsedDuration === null
+        ) {
             return res.status(400).json({
                 success: false,
-                message: 'Offer start date is required.',
+                message: 'Duration must be a valid whole number of months greater than 0.',
             });
         }
 
-        if (!endDate) {
-            return res.status(400).json({
-                success: false,
-                message: 'Offer end date is required.',
-            });
-        }
 
-        /* --------------------------------------------------
-           VALIDATE PLAN ID
-        -------------------------------------------------- */
-
-        if (!isValidObjectId(plan)) {
-            return res.status(400).json({
-                success: false,
-                message: 'Invalid membership plan ID.',
-            });
-        }
-
-        /* --------------------------------------------------
-           DETERMINE BRANCH
-        -------------------------------------------------- */
-
-        let selectedBranch;
-
-        if (mainAdmin) {
-            selectedBranch =
-                gymBranch !== undefined &&
-                gymBranch !== null ?
-                normalizeBranch(gymBranch) :
-                '';
-        } else {
-            selectedBranch =
-                accessibleBranch;
-        }
-
-        if (!selectedBranch) {
-            return res.status(400).json({
-                success: false,
-                message: 'Gym branch is required. Please select Kalyanpur or Gopalpur.',
-            });
-        }
-
-        if (!isValidBranch(selectedBranch)) {
-            return res.status(400).json({
-                success: false,
-                message: 'Invalid gym branch. Allowed branches are Kalyanpur and Gopalpur.',
-            });
-        }
-
-        /* --------------------------------------------------
-           FIND PLAN
-        -------------------------------------------------- */
-
-        const existingPlan =
-            await Plan.findOne({
-                _id: plan,
-                gymBranch: selectedBranch,
-            });
-
-        if (!existingPlan) {
-            return res.status(404).json({
-                success: false,
-                message: `Membership plan not found for ${selectedBranch}.`,
-            });
-        }
-
-        if (!existingPlan.isActive) {
-            return res.status(400).json({
-                success: false,
-                message: 'Cannot create an offer using an inactive membership plan.',
-            });
-        }
-
-        /* --------------------------------------------------
-           PRICE
-        -------------------------------------------------- */
+        // -----------------------------------------
+        // PRICE
+        // -----------------------------------------
 
         const parsedPrice =
-            Number(offerPrice);
+            parsePrice(
+                offerPrice
+            );
 
-        if (!Number.isFinite(parsedPrice) ||
-            parsedPrice < 0
+        if (
+            parsedPrice === null
         ) {
             return res.status(400).json({
                 success: false,
-                message: 'Offer price must be a valid number greater than or equal to 0.',
+                message: 'Offer price must be a valid number.',
             });
         }
 
-        /* --------------------------------------------------
-           DATES
-        -------------------------------------------------- */
+
+        // -----------------------------------------
+        // DATES
+        // -----------------------------------------
 
         const parsedStartDate =
-            parseDate(startDate);
+            parseDate(
+                startDate
+            );
 
         const parsedEndDate =
-            parseDate(endDate);
+            parseDate(
+                endDate
+            );
 
         if (!parsedStartDate) {
             return res.status(400).json({
@@ -647,105 +1074,124 @@ const createOffer = async(req, res) => {
         ) {
             return res.status(400).json({
                 success: false,
-                message: 'Offer end date cannot be before start date.',
+                message: 'End date cannot be before start date.',
             });
         }
 
-        /* --------------------------------------------------
-           NORMALIZE VALUES
-        -------------------------------------------------- */
 
-        const normalizedName =
-            String(name).trim();
-
-        const normalizedDescription =
-            description !== undefined &&
-            description !== null ?
-            String(description).trim() :
-            '';
-
-        const normalizedBenefits =
-            normalizeBenefits(benefits);
-
-        /* --------------------------------------------------
-           DUPLICATE ACTIVE OFFER
-        -------------------------------------------------- */
+        // -----------------------------------------
+        // DUPLICATE ACTIVE OFFER
+        // -----------------------------------------
 
         const existingOffer =
             await Offer.findOne({
                 gymBranch: selectedBranch,
-                name: {
-                    $regex: `^${escapeRegex(normalizedName)}$`,
-                    $options: 'i',
-                },
+
+                name: normalizedName,
+
                 isActive: true,
             });
 
         if (existingOffer) {
             return res.status(409).json({
                 success: false,
-                message: `${normalizedName} offer already exists for ${selectedBranch}.`,
+                message: `An active Puja offer named "${normalizedName}" already exists for ${selectedBranch}.`,
             });
         }
 
-        /* --------------------------------------------------
-           CREATE
-        -------------------------------------------------- */
+
+        // -----------------------------------------
+        // CREATE
+        // -----------------------------------------
 
         const offer =
             await Offer.create({
-                gymBranch: selectedBranch,
-                name: normalizedName,
-                plan: existingPlan._id,
-                offerPrice: parsedPrice,
-                startDate: parsedStartDate,
-                endDate: parsedEndDate,
-                description: normalizedDescription,
-                benefits: normalizedBenefits,
-                isActive: true,
-            });
 
-        const populatedOffer =
-            await Offer.findById(
-                offer._id
-            ).populate(
-                'plan',
-                'name durationMonths price gymBranch isActive'
-            );
+                gymBranch: selectedBranch,
+
+                name: normalizedName,
+
+                durationMonths: parsedDuration,
+
+                offerPrice: parsedPrice,
+
+                startDate: parsedStartDate,
+
+                endDate: parsedEndDate,
+
+                description: normalizeDescription(
+                    description
+                ),
+
+                benefits: normalizeBenefits(
+                    benefits
+                ),
+
+                image: image ?
+                    String(image).trim() : '',
+
+                isActive: parseBoolean(
+                    isActive,
+                    true
+                ),
+            });
 
         return res.status(201).json({
             success: true,
-            message: 'Offer created successfully.',
-            offer: populatedOffer,
+            message: 'Puja offer created successfully.',
+            offer,
         });
+
     } catch (error) {
+
         console.error(
             'Create Offer Error:',
             error
         );
 
-        if (error.code === 11000) {
+        if (
+            error.code === 11000
+        ) {
             return res.status(409).json({
                 success: false,
-                message: 'An active offer with the same name already exists for this branch.',
+                message: 'An active offer of this type already exists for this branch.',
+            });
+        }
+
+        if (
+            error.name ===
+            'ValidationError'
+        ) {
+            return res.status(400).json({
+                success: false,
+                message: 'Invalid Puja offer data.',
             });
         }
 
         return res.status(500).json({
             success: false,
-            message: 'Failed to create offer.',
+            message: 'Failed to create Puja offer.',
         });
     }
 };
 
-/* =========================================================
-   UPDATE OFFER
-   PUT /api/offers/:id
-   ========================================================= */
 
-const updateOffer = async(req, res) => {
+// =========================================================
+// UPDATE PUJA OFFER
+// PUT /api/offers/:id
+// =========================================================
+
+const updateOffer = async(
+    req,
+    res
+) => {
+
     try {
-        if (!validateOfferAccess(req, res)) {
+
+        if (!validateOfferAccess(
+                req,
+                res
+            )) {
             return;
         }
 
@@ -760,26 +1206,55 @@ const updateOffer = async(req, res) => {
             });
         }
 
-        const mainAdmin =
-            isMainAdmin(req);
 
-        const branch =
-            getAccessibleBranch(req);
+        // -----------------------------------------
+        // FIND OFFER WITH ACCESS CONTROL
+        // -----------------------------------------
 
-        /* --------------------------------------------------
-           FIND OFFER
-        -------------------------------------------------- */
+        const requestedBranch =
+            req.body.gymBranch ||
+            req.query.branch;
+
+        const branchResult =
+            resolveBranch(
+                req,
+                requestedBranch, {
+                    required:
+                        !isMainAdmin(req),
+                }
+            );
+
+        if (!branchResult.valid) {
+            return res.status(
+                branchResult.status || 400
+            ).json({
+                success: false,
+                message: branchResult.message,
+            });
+        }
 
         const query = {
             _id: id,
         };
 
-        if (!mainAdmin) {
-            query.gymBranch = branch;
+        if (
+            branchResult.branch
+        ) {
+            query.gymBranch =
+                branchResult.branch;
+
+        } else if (
+            branchResult.branches
+        ) {
+            query.gymBranch = {
+                $in: branchResult.branches,
+            };
         }
 
         const offer =
-            await Offer.findOne(query);
+            await Offer.findOne(
+                query
+            );
 
         if (!offer) {
             return res.status(404).json({
@@ -788,9 +1263,10 @@ const updateOffer = async(req, res) => {
             });
         }
 
+
         const {
             name,
-            plan,
+            durationMonths,
             offerPrice,
             startDate,
             endDate,
@@ -798,130 +1274,105 @@ const updateOffer = async(req, res) => {
             benefits,
             isActive,
             gymBranch,
+            image,
         } = req.body;
 
-        /* --------------------------------------------------
-           FINAL BRANCH
-        -------------------------------------------------- */
 
-        let finalBranch;
-
-        if (mainAdmin) {
-            finalBranch =
-                gymBranch !== undefined &&
-                gymBranch !== null &&
-                String(gymBranch).trim() !== '' ?
-                normalizeBranch(gymBranch) :
-                normalizeBranch(
-                    offer.gymBranch
-                );
-        } else {
-            finalBranch = branch;
-        }
-
-        if (!isValidBranch(finalBranch)) {
-            return res.status(400).json({
-                success: false,
-                message: 'Invalid gym branch. Allowed branches are Kalyanpur and Gopalpur.',
-            });
-        }
-
-        /* --------------------------------------------------
-           FINAL ACTIVE STATUS
-        -------------------------------------------------- */
-
-        const parsedActive =
-            isActive !== undefined ?
-            parseBoolean(
-                isActive,
-                offer.isActive
-            ) :
-            offer.isActive;
-
-        if (
-            typeof parsedActive !==
-            'boolean'
-        ) {
-            return res.status(400).json({
-                success: false,
-                message: 'isActive must be true or false.',
-            });
-        }
-
-        /* --------------------------------------------------
-           FINAL PLAN
-        -------------------------------------------------- */
-
-        let finalPlan;
-
-        if (plan !== undefined) {
-            if (!isValidObjectId(plan)) {
-                return res.status(400).json({
-                    success: false,
-                    message: 'Invalid membership plan ID.',
-                });
-            }
-
-            finalPlan =
-                await Plan.findOne({
-                    _id: plan,
-                    gymBranch: finalBranch,
-                });
-
-            if (!finalPlan) {
-                return res.status(404).json({
-                    success: false,
-                    message: `Membership plan not found for ${finalBranch}.`,
-                });
-            }
-        } else {
-            finalPlan =
-                await Plan.findOne({
-                    _id: offer.plan,
-                    gymBranch: finalBranch,
-                });
-
-            if (!finalPlan) {
-                return res.status(400).json({
-                    success: false,
-                    message: 'The membership plan does not belong to the selected gym branch.',
-                });
-            }
-        }
-
-        /* --------------------------------------------------
-           ACTIVE OFFER REQUIRES ACTIVE PLAN
-        -------------------------------------------------- */
-
-        if (
-            parsedActive &&
-            !finalPlan.isActive
-        ) {
-            return res.status(400).json({
-                success: false,
-                message: 'An active offer must be linked to an active membership plan.',
-            });
-        }
-
-        /* --------------------------------------------------
-           FINAL NAME
-        -------------------------------------------------- */
+        // -----------------------------------------
+        // NAME
+        // -----------------------------------------
 
         const finalName =
             name !== undefined ?
-            String(name).trim() :
-            String(offer.name).trim();
+            normalizeOfferName(
+                name
+            ) :
+            offer.name;
 
         if (!finalName) {
             return res.status(400).json({
                 success: false,
-                message: 'Offer name cannot be empty.',
+                message: 'Puja offer name is required.',
             });
         }
 
-        /* --------------------------------------------------
-           FINAL PRICE
-        -------------------------------------------------- */
+
+        // -----------------------------------------
+        // BRANCH
+        // -----------------------------------------
+
+        let finalBranch =
+            offer.gymBranch;
+
+        if (
+            isMainAdmin(req) &&
+            gymBranch !== undefined
+        ) {
+            finalBranch =
+                normalizeBranch(
+                    gymBranch
+                );
+        }
+
+        if (!isValidBranch(
+                finalBranch
+            )) {
+            return res.status(400).json({
+                success: false,
+                message: 'Invalid gym branch.',
+            });
+        }
+
+        // Branch user cannot move
+        // an offer to another branch.
+
+        if (
+            isBranchUser(req)
+        ) {
+            const assignedBranches =
+                getAdminBranches(req);
+
+            if (!assignedBranches.includes(
+                    finalBranch
+                )) {
+                return res.status(403).json({
+                    success: false,
+                    message: 'You do not have access to this gym branch.',
+                });
+            }
+        }
+
+
+        // -----------------------------------------
+        // DURATION
+        // -----------------------------------------
+
+        let finalDuration =
+            offer.durationMonths;
+
+        if (
+            durationMonths !==
+            undefined
+        ) {
+            finalDuration =
+                parseDuration(
+                    durationMonths
+                );
+
+            if (
+                finalDuration === null
+            ) {
+                return res.status(400).json({
+                    success: false,
+                    message: 'Duration must be a valid whole number of months greater than 0.',
+                });
+            }
+        }
+
+
+        // -----------------------------------------
+        // PRICE
+        // -----------------------------------------
 
         let finalPrice =
             offer.offerPrice;
@@ -930,23 +1381,24 @@ const updateOffer = async(req, res) => {
             offerPrice !== undefined
         ) {
             finalPrice =
-                Number(offerPrice);
+                parsePrice(
+                    offerPrice
+                );
 
-            if (!Number.isFinite(
-                    finalPrice
-                ) ||
-                finalPrice < 0
+            if (
+                finalPrice === null
             ) {
                 return res.status(400).json({
                     success: false,
-                    message: 'Offer price must be a valid number greater than or equal to 0.',
+                    message: 'Offer price must be a valid number.',
                 });
             }
         }
 
-        /* --------------------------------------------------
-           FINAL DATES
-        -------------------------------------------------- */
+
+        // -----------------------------------------
+        // DATES
+        // -----------------------------------------
 
         let finalStartDate =
             offer.startDate;
@@ -958,7 +1410,9 @@ const updateOffer = async(req, res) => {
             startDate !== undefined
         ) {
             finalStartDate =
-                parseDate(startDate);
+                parseDate(
+                    startDate
+                );
 
             if (!finalStartDate) {
                 return res.status(400).json({
@@ -972,7 +1426,9 @@ const updateOffer = async(req, res) => {
             endDate !== undefined
         ) {
             finalEndDate =
-                parseDate(endDate);
+                parseDate(
+                    endDate
+                );
 
             if (!finalEndDate) {
                 return res.status(400).json({
@@ -988,39 +1444,53 @@ const updateOffer = async(req, res) => {
         ) {
             return res.status(400).json({
                 success: false,
-                message: 'Offer end date cannot be before start date.',
+                message: 'End date cannot be before start date.',
             });
         }
 
-        /* --------------------------------------------------
-           DUPLICATE ACTIVE OFFER
-        -------------------------------------------------- */
 
-        if (parsedActive) {
+        // -----------------------------------------
+        // ACTIVE
+        // -----------------------------------------
+
+        const finalActive =
+            parseBoolean(
+                isActive,
+                offer.isActive
+            );
+
+
+        // -----------------------------------------
+        // DUPLICATE ACTIVE OFFER
+        // -----------------------------------------
+
+        if (finalActive) {
+
             const duplicateOffer =
                 await Offer.findOne({
                     _id: {
                         $ne: offer._id,
                     },
+
                     gymBranch: finalBranch,
-                    name: {
-                        $regex: `^${escapeRegex(finalName)}$`,
-                        $options: 'i',
-                    },
+
+                    name: finalName,
+
                     isActive: true,
                 });
 
             if (duplicateOffer) {
                 return res.status(409).json({
                     success: false,
-                    message: `${finalName} offer already exists for ${finalBranch}.`,
+                    message: `An active Puja offer named "${finalName}" already exists for ${finalBranch}.`,
                 });
             }
         }
 
-        /* --------------------------------------------------
-           UPDATE
-        -------------------------------------------------- */
+
+        // -----------------------------------------
+        // SAVE
+        // -----------------------------------------
 
         offer.gymBranch =
             finalBranch;
@@ -1028,8 +1498,8 @@ const updateOffer = async(req, res) => {
         offer.name =
             finalName;
 
-        offer.plan =
-            finalPlan._id;
+        offer.durationMonths =
+            finalDuration;
 
         offer.offerPrice =
             finalPrice;
@@ -1040,19 +1510,23 @@ const updateOffer = async(req, res) => {
         offer.endDate =
             finalEndDate;
 
+        offer.isActive =
+            finalActive;
+
+
         if (
-            description !== undefined
+            description !==
+            undefined
         ) {
             offer.description =
-                description !== null ?
-                String(
+                normalizeDescription(
                     description
-                ).trim() :
-                '';
+                );
         }
 
         if (
-            benefits !== undefined
+            benefits !==
+            undefined
         ) {
             offer.benefits =
                 normalizeBenefits(
@@ -1060,52 +1534,75 @@ const updateOffer = async(req, res) => {
                 );
         }
 
-        offer.isActive =
-            parsedActive;
+        if (
+            image !==
+            undefined
+        ) {
+            offer.image =
+                String(
+                    image || ''
+                ).trim();
+        }
 
         await offer.save();
 
-        const updatedOffer =
-            await Offer.findById(
-                offer._id
-            ).populate(
-                'plan',
-                'name durationMonths price gymBranch isActive'
-            );
 
         return res.status(200).json({
             success: true,
-            message: 'Offer updated successfully.',
-            offer: updatedOffer,
+            message: 'Puja offer updated successfully.',
+            offer,
         });
+
     } catch (error) {
+
         console.error(
             'Update Offer Error:',
             error
         );
 
-        if (error.code === 11000) {
+        if (
+            error.code === 11000
+        ) {
             return res.status(409).json({
                 success: false,
                 message: 'An active offer with the same name already exists for this branch.',
             });
         }
 
+        if (
+            error.name ===
+            'ValidationError'
+        ) {
+            return res.status(400).json({
+                success: false,
+                message: 'Invalid Puja offer data.',
+            });
+        }
+
         return res.status(500).json({
             success: false,
-            message: 'Failed to update offer.',
+            message: 'Failed to update Puja offer.',
         });
     }
 };
 
-/* =========================================================
-   DELETE / DEACTIVATE OFFER
-   DELETE /api/offers/:id
-   ========================================================= */
 
-const deleteOffer = async(req, res) => {
+// =========================================================
+// DELETE / DEACTIVATE OFFER
+// DELETE /api/offers/:id
+// =========================================================
+
+const deleteOffer = async(
+    req,
+    res
+) => {
+
     try {
-        if (!validateOfferAccess(req, res)) {
+
+        if (!validateOfferAccess(
+                req,
+                res
+            )) {
             return;
         }
 
@@ -1120,22 +1617,59 @@ const deleteOffer = async(req, res) => {
             });
         }
 
-        const mainAdmin =
-            isMainAdmin(req);
 
-        const branch =
-            getAccessibleBranch(req);
+        // -----------------------------------------
+        // BRANCH ACCESS
+        // -----------------------------------------
+
+        const requestedBranch =
+            req.query.branch;
+
+        const branchResult =
+            resolveBranch(
+                req,
+                requestedBranch, {
+                    required:
+                        !isMainAdmin(req),
+                }
+            );
+
+        if (!branchResult.valid) {
+            return res.status(
+                branchResult.status || 400
+            ).json({
+                success: false,
+                message: branchResult.message,
+            });
+        }
 
         const query = {
             _id: id,
         };
 
-        if (!mainAdmin) {
-            query.gymBranch = branch;
+        if (
+            branchResult.branch
+        ) {
+            query.gymBranch =
+                branchResult.branch;
+
+        } else if (
+            branchResult.branches
+        ) {
+            query.gymBranch = {
+                $in: branchResult.branches,
+            };
         }
 
+
+        // -----------------------------------------
+        // FIND
+        // -----------------------------------------
+
         const offer =
-            await Offer.findOne(query);
+            await Offer.findOne(
+                query
+            );
 
         if (!offer) {
             return res.status(404).json({
@@ -1144,16 +1678,25 @@ const deleteOffer = async(req, res) => {
             });
         }
 
-        offer.isActive = false;
+
+        // -----------------------------------------
+        // DEACTIVATE
+        // -----------------------------------------
+
+        offer.isActive =
+            false;
 
         await offer.save();
 
+
         return res.status(200).json({
             success: true,
-            message: 'Offer deactivated successfully.',
+            message: 'Puja offer deactivated successfully.',
             offer,
         });
+
     } catch (error) {
+
         console.error(
             'Delete Offer Error:',
             error
@@ -1161,19 +1704,20 @@ const deleteOffer = async(req, res) => {
 
         return res.status(500).json({
             success: false,
-            message: 'Failed to deactivate offer.',
+            message: 'Failed to deactivate Puja offer.',
         });
     }
 };
 
-/* =========================================================
-   EXPORTS
-   ========================================================= */
+
+// =========================================================
+// EXPORTS
+// =========================================================
 
 module.exports = {
     getOffers,
     getAllOffers,
-    getOffersByPlan,
+    getPublicOffers,
     getOfferById,
     createOffer,
     updateOffer,

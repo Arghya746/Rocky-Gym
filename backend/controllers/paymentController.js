@@ -1,105 +1,277 @@
 const Payment = require('../models/Payment');
 const Member = require('../models/Member');
 
+// ============================================================
+// CONSTANTS
+// ============================================================
+
 const ALLOWED_BRANCHES = [
     'Kalyanpur',
     'Gopalpur',
 ];
 
-// ===============================
-// NORMALIZE BRANCH
-// ===============================
+const MAIN_ADMIN_ROLES = [
+    'admin',
+    'main_admin',
+    'super_admin',
+];
+
+const BRANCH_USER_ROLES = [
+    'receptionist',
+    'staff',
+];
+
+// ============================================================
+// ROLE HELPERS
+// ============================================================
+
+const normalizeRole = (value) => {
+    return String(value || '')
+        .trim()
+        .toLowerCase();
+};
+
+const getRole = (req) => {
+    if (!req || !req.admin) {
+        return '';
+    }
+
+    return normalizeRole(
+        req.admin.role
+    );
+};
+
+const isMainAdmin = (req) => {
+    return MAIN_ADMIN_ROLES.includes(
+        getRole(req)
+    );
+};
+
+const isBranchUser = (req) => {
+    return BRANCH_USER_ROLES.includes(
+        getRole(req)
+    );
+};
+
+// ============================================================
+// BRANCH HELPERS
+// ============================================================
 
 const normalizeBranch = (value) => {
-    if (!value) return null;
+    if (
+        value === undefined ||
+        value === null ||
+        value === ''
+    ) {
+        return '';
+    }
 
-    const normalized = String(value)
+    const raw = String(value)
         .trim()
         .toLowerCase();
 
-    if (normalized === 'kalyanpur') {
+    if (raw === 'kalyanpur') {
         return 'Kalyanpur';
     }
 
-    if (normalized === 'gopalpur') {
+    if (raw === 'gopalpur') {
         return 'Gopalpur';
     }
 
-    return null;
+    return '';
 };
 
-// ===============================
-// GET ACCESSIBLE BRANCH
-// ===============================
-
-const getAccessibleBranch = (req) => {
-    if (!req.admin) {
-        return null;
+const normalizeBranches = (branches) => {
+    if (!Array.isArray(branches)) {
+        return [];
     }
 
-    const role = String(
-        req.admin.role || ''
-    ).toLowerCase();
+    return Array.from(
+        new Set(
+            branches
+            .map(normalizeBranch)
+            .filter((branch) =>
+                ALLOWED_BRANCHES.includes(
+                    branch
+                )
+            )
+        )
+    );
+};
 
-    // Main admins can access both branches.
-    if (
-        role === 'admin' ||
-        role === 'main_admin' ||
-        role === 'super_admin'
-    ) {
-        return null;
+const getAccessibleBranches = (req) => {
+    if (!req || !req.admin) {
+        return [];
     }
 
-    // Receptionist/staff can access
-    // only their assigned branch.
+    // Main admin can access both branches.
+    if (isMainAdmin(req)) {
+        return [
+            ...ALLOWED_BRANCHES,
+        ];
+    }
+
+    // New multi-branch field.
+    const assignedBranches =
+        normalizeBranches(
+            req.admin.gymBranches
+        );
+
     if (
-        role === 'receptionist' ||
-        role === 'staff'
+        assignedBranches.length > 0
     ) {
-        return normalizeBranch(
+        return assignedBranches;
+    }
+
+    // Legacy single branch.
+    const legacyBranch =
+        normalizeBranch(
             req.admin.gymBranch
+        );
+
+    if (legacyBranch) {
+        return [
+            legacyBranch,
+        ];
+    }
+
+    return [];
+};
+
+/*
+ * IMPORTANT:
+ * GET requests may not have req.body.
+ *
+ * Therefore every request source is checked
+ * safely before accessing its properties.
+ */
+const getRequestedBranch = (
+    req,
+    explicitBranch
+) => {
+    if (!req) {
+        return normalizeBranch(
+            explicitBranch
         );
     }
 
-    return null;
+    const headerBranch =
+        req.headers &&
+        req.headers['x-gym-branch'];
+
+    const queryGymBranch =
+        req.query &&
+        req.query.gymBranch;
+
+    const queryBranch =
+        req.query &&
+        req.query.branch;
+
+    const bodyGymBranch =
+        req.body &&
+        req.body.gymBranch;
+
+    return normalizeBranch(
+        explicitBranch ||
+        queryGymBranch ||
+        queryBranch ||
+        bodyGymBranch ||
+        headerBranch ||
+        ''
+    );
 };
 
-// ===============================
-// GET WRITE BRANCH
-// ===============================
+// ============================================================
+// READ BRANCH FILTER
+// ============================================================
 
-const getWriteBranch = (
-    req,
-    requestedBranch
-) => {
-    if (!req.admin) {
+const getBranchFilter = (req) => {
+    const accessibleBranches =
+        getAccessibleBranches(req);
+
+    if (
+        accessibleBranches.length === 0
+    ) {
         return {
-            error: 'Not authorized.',
-            status: 401,
+            gymBranch: {
+                $in: [],
+            },
         };
     }
 
-    const role = String(
-        req.admin.role || ''
-    ).toLowerCase();
+    const requestedBranch =
+        getRequestedBranch(req);
 
-    // ===============================
-    // MAIN ADMIN
-    // ===============================
+    if (requestedBranch) {
+        if (!accessibleBranches.includes(
+                requestedBranch
+            )) {
+            return null;
+        }
+
+        return {
+            gymBranch: requestedBranch,
+        };
+    }
+
+    // Main admin without a selected branch.
+    // Return both branches.
+    if (isMainAdmin(req)) {
+        return {
+            gymBranch: {
+                $in: ALLOWED_BRANCHES,
+            },
+        };
+    }
+
+    // Branch user without a selected branch.
+    // They can see all branches assigned to them.
+    return {
+        gymBranch: {
+            $in: accessibleBranches,
+        },
+    };
+};
+
+// ============================================================
+// WRITE BRANCH
+// ============================================================
+
+const resolveWriteBranch = (
+    req,
+    requestedBranch
+) => {
+    const accessibleBranches =
+        getAccessibleBranches(req);
 
     if (
-        role === 'admin' ||
-        role === 'main_admin' ||
-        role === 'super_admin'
+        accessibleBranches.length === 0
     ) {
-        const branch =
-            normalizeBranch(
-                requestedBranch
-            );
+        return {
+            error: 'Your account is not assigned to a valid gym branch.',
+            status: 403,
+        };
+    }
 
+    const branch =
+        normalizeBranch(
+            requestedBranch
+        );
+
+    // Main admin must explicitly select a branch.
+    if (isMainAdmin(req)) {
         if (!branch) {
             return {
                 error: 'Select Kalyanpur or Gopalpur before creating a payment.',
+                status: 400,
+            };
+        }
+
+        if (!ALLOWED_BRANCHES.includes(
+                branch
+            )) {
+            return {
+                error: 'Invalid gym branch.',
                 status: 400,
             };
         }
@@ -109,22 +281,13 @@ const getWriteBranch = (
         };
     }
 
-    // ===============================
-    // RECEPTIONIST / STAFF
-    // ===============================
-
-    if (
-        role === 'receptionist' ||
-        role === 'staff'
-    ) {
-        const branch =
-            normalizeBranch(
-                req.admin.gymBranch
-            );
-
-        if (!branch) {
+    // Branch user explicitly selected a branch.
+    if (branch) {
+        if (!accessibleBranches.includes(
+                branch
+            )) {
             return {
-                error: 'Your account is not assigned to a valid gym branch.',
+                error: 'You do not have access to the selected gym branch.',
                 status: 403,
             };
         }
@@ -134,21 +297,65 @@ const getWriteBranch = (
         };
     }
 
+    // Single assigned branch.
+    if (
+        accessibleBranches.length === 1
+    ) {
+        return {
+            branch: accessibleBranches[0],
+        };
+    }
+
+    // Multiple assigned branches require selection.
     return {
-        error: 'You do not have permission to manage payments.',
-        status: 403,
+        error: 'Select a gym branch before creating a payment.',
+        status: 400,
     };
 };
 
-// ===============================
+// ============================================================
+// OBJECT ID
+// ============================================================
+
+const isValidObjectId = (value) => {
+    return /^[a-fA-F0-9]{24}$/.test(
+        String(value || '')
+    );
+};
+
+// ============================================================
+// SERVER ERROR
+// ============================================================
+
+const sendServerError = (
+    res,
+    error
+) => {
+    console.error(
+        '[PAYMENT ERROR]',
+        error
+    );
+
+    return res.status(500).json({
+        message: 'Server error. Please try again.',
+    });
+};
+
+// ============================================================
 // ADD PAYMENT
-// ===============================
+// ============================================================
 
 const addPayment = async(
     req,
     res
 ) => {
     try {
+        if (!req.admin) {
+            return res.status(401).json({
+                message: 'Not authorized.',
+            });
+        }
+
         const {
             member,
             invoiceNumber,
@@ -158,15 +365,12 @@ const addPayment = async(
             status,
             notes,
             gymBranch,
-        } = req.body;
-
-        // ===============================
-        // VALIDATION
-        // ===============================
+        } = req.body || {};
 
         if (!member ||
             !invoiceNumber ||
             amount === undefined ||
+            amount === null ||
             !paymentMethod
         ) {
             return res.status(400).json({
@@ -174,43 +378,42 @@ const addPayment = async(
             });
         }
 
-        // ===============================
-        // DETERMINE BRANCH
-        // ===============================
+        if (!isValidObjectId(member)) {
+            return res.status(400).json({
+                message: 'Invalid member ID.',
+            });
+        }
 
         const branchResult =
-            getWriteBranch(
+            resolveWriteBranch(
                 req,
                 gymBranch
             );
 
         if (branchResult.error) {
             return res
-                .status(branchResult.status)
+                .status(
+                    branchResult.status || 400
+                )
                 .json({
                     message: branchResult.error,
                 });
         }
 
         const selectedBranch =
-            branchResult.branch;
-
-        // ===============================
-        // VALIDATE BRANCH
-        // ===============================
+            normalizeBranch(
+                branchResult.branch
+            );
 
         if (!ALLOWED_BRANCHES.includes(
                 selectedBranch
             )) {
             return res.status(400).json({
-                message: 'Invalid gym branch.',
+                message: 'A valid gym branch is required.',
             });
         }
 
-        // ===============================
-        // VERIFY MEMBER BRANCH
-        // ===============================
-
+        // Make sure member belongs to same branch.
         const memberRecord =
             await Member.findOne({
                 _id: member,
@@ -223,12 +426,16 @@ const addPayment = async(
             });
         }
 
-        // ===============================
-        // CHECK INVOICE NUMBER
-        // ===============================
-
         const normalizedInvoiceNumber =
-            String(invoiceNumber).trim();
+            String(
+                invoiceNumber
+            ).trim();
+
+        if (!normalizedInvoiceNumber) {
+            return res.status(400).json({
+                message: 'Invoice number is required.',
+            });
+        }
 
         const existingPayment =
             await Payment.findOne({
@@ -240,10 +447,6 @@ const addPayment = async(
                 message: 'Invoice number already exists.',
             });
         }
-
-        // ===============================
-        // CREATE PAYMENT
-        // ===============================
 
         const payment =
             await Payment.create({
@@ -264,26 +467,37 @@ const addPayment = async(
                 notes,
             });
 
+        const populatedPayment =
+            await Payment.findById(
+                payment._id
+            ).populate(
+                'member',
+                'name phone email gymBranch'
+            );
+
         return res.status(201).json({
             message: 'Payment added successfully.',
-
-            payment,
+            payment: populatedPayment,
         });
     } catch (error) {
-        console.error(
-            'Add Payment Error:',
+        if (
+            error.code === 11000
+        ) {
+            return res.status(400).json({
+                message: 'Invoice number already exists.',
+            });
+        }
+
+        return sendServerError(
+            res,
             error
         );
-
-        return res.status(500).json({
-            message: 'Server error. Please try again.',
-        });
     }
 };
 
-// ===============================
+// ============================================================
 // GET ALL PAYMENTS
-// ===============================
+// ============================================================
 
 const getPayments = async(
     req,
@@ -296,38 +510,20 @@ const getPayments = async(
             });
         }
 
-        const role = String(
-            req.admin.role || ''
-        ).toLowerCase();
+        const query =
+            getBranchFilter(req);
 
-        const branch =
-            getAccessibleBranch(req);
-
-        // Receptionist/staff without branch
-        // must not see any payment data.
-        if (
-            (
-                role === 'receptionist' ||
-                role === 'staff'
-            ) &&
-            !branch
-        ) {
+        if (query === null) {
             return res.status(403).json({
-                message: 'Your account is not assigned to a valid gym branch.',
+                message: 'You do not have access to the selected gym branch.',
             });
         }
-
-        const query = branch ?
-            {
-                gymBranch: branch,
-            } :
-            {};
 
         const payments =
             await Payment.find(query)
             .populate(
                 'member',
-                'name phone email membershipPlan gymBranch'
+                'name phone email gymBranch'
             )
             .sort({
                 createdAt: -1,
@@ -335,24 +531,19 @@ const getPayments = async(
 
         return res.status(200).json({
             message: 'Payments fetched successfully.',
-
             payments,
         });
     } catch (error) {
-        console.error(
-            'Get Payments Error:',
+        return sendServerError(
+            res,
             error
         );
-
-        return res.status(500).json({
-            message: 'Server error. Please try again.',
-        });
     }
 };
 
-// ===============================
+// ============================================================
 // GET SINGLE PAYMENT
-// ===============================
+// ============================================================
 
 const getPaymentById = async(
     req,
@@ -365,39 +556,32 @@ const getPaymentById = async(
             });
         }
 
-        const role = String(
-            req.admin.role || ''
-        ).toLowerCase();
-
-        const branch =
-            getAccessibleBranch(req);
-
-        if (
-            (
-                role === 'receptionist' ||
-                role === 'staff'
-            ) &&
-            !branch
-        ) {
-            return res.status(403).json({
-                message: 'Your account is not assigned to a valid gym branch.',
+        if (!isValidObjectId(
+                req.params.id
+            )) {
+            return res.status(400).json({
+                message: 'Invalid payment ID.',
             });
         }
 
-        const query = {
-            _id: req.params.id,
-        };
+        const query =
+            getBranchFilter(req);
 
-        if (branch) {
-            query.gymBranch = branch;
+        if (query === null) {
+            return res.status(403).json({
+                message: 'You do not have access to the selected gym branch.',
+            });
         }
+
+        query._id =
+            req.params.id;
 
         const payment =
             await Payment.findOne(
                 query
             ).populate(
                 'member',
-                'name phone email membershipPlan gymBranch'
+                'name phone email gymBranch'
             );
 
         if (!payment) {
@@ -410,20 +594,16 @@ const getPaymentById = async(
             payment,
         });
     } catch (error) {
-        console.error(
-            'Get Payment Error:',
+        return sendServerError(
+            res,
             error
         );
-
-        return res.status(500).json({
-            message: 'Server error. Please try again.',
-        });
     }
 };
 
-// ===============================
+// ============================================================
 // UPDATE PAYMENT
-// ===============================
+// ============================================================
 
 const updatePayment = async(
     req,
@@ -436,41 +616,28 @@ const updatePayment = async(
             });
         }
 
-        const role = String(
-            req.admin.role || ''
-        ).toLowerCase();
-
-        const branch =
-            getAccessibleBranch(req);
-
-        // Receptionist/staff without branch
-        // cannot update payment data.
-        if (
-            (
-                role === 'receptionist' ||
-                role === 'staff'
-            ) &&
-            !branch
-        ) {
-            return res.status(403).json({
-                message: 'Your account is not assigned to a valid gym branch.',
+        if (!isValidObjectId(
+                req.params.id
+            )) {
+            return res.status(400).json({
+                message: 'Invalid payment ID.',
             });
         }
 
-        // ===============================
-        // FIND PAYMENT
-        // ===============================
+        const currentFilter =
+            getBranchFilter(req);
 
-        const query = {
-            _id: req.params.id,
-        };
-
-        if (branch) {
-            query.gymBranch = branch;
+        if (currentFilter === null) {
+            return res.status(403).json({
+                message: 'You do not have access to the selected gym branch.',
+            });
         }
 
         const existingPayment =
-            await Payment.findOne(query);
+            await Payment.findOne({
+                ...currentFilter,
+                _id: req.params.id,
+            });
 
         if (!existingPayment) {
             return res.status(404).json({
@@ -478,83 +645,89 @@ const updatePayment = async(
             });
         }
 
-        const updateData = {
-            ...req.body,
-        };
+        const {
+            member,
+            invoiceNumber,
+            amount,
+            paymentMethod,
+            paymentDate,
+            status,
+            notes,
+            gymBranch,
+        } = req.body || {};
 
-        // ===============================
-        // BRANCH PROTECTION
-        // ===============================
+        // ----------------------------------------------------
+        // FINAL BRANCH
+        // ----------------------------------------------------
 
-        if (
-            role === 'receptionist' ||
-            role === 'staff'
-        ) {
-            // Receptionist/staff cannot
-            // change payment branch.
-            updateData.gymBranch =
-                branch;
-        } else if (
-            role === 'admin' ||
-            role === 'main_admin' ||
-            role === 'super_admin'
-        ) {
-            // Main admin can change branch,
-            // but only to a valid branch.
+        let finalBranch =
+            normalizeBranch(
+                existingPayment.gymBranch
+            );
 
-            const requestedBranch =
-                normalizeBranch(
-                    updateData.gymBranch
-                );
-
+        if (isMainAdmin(req)) {
             if (
-                updateData.gymBranch !==
-                undefined &&
-                !requestedBranch
+                gymBranch !== undefined
             ) {
-                return res.status(400).json({
-                    message: 'Invalid gym branch.',
-                });
-            }
+                finalBranch =
+                    normalizeBranch(
+                        gymBranch
+                    );
 
-            updateData.gymBranch =
-                requestedBranch ||
-                normalizeBranch(
-                    existingPayment.gymBranch
-                );
-
-            if (!updateData.gymBranch) {
-                return res.status(400).json({
-                    message: 'Payment has no valid gym branch.',
-                });
+                if (!ALLOWED_BRANCHES.includes(
+                        finalBranch
+                    )) {
+                    return res.status(400).json({
+                        message: 'Invalid gym branch.',
+                    });
+                }
             }
         } else {
-            return res.status(403).json({
-                message: 'You do not have permission to update payments.',
-            });
+            const assignedBranches =
+                getAccessibleBranches(
+                    req
+                );
+
+            if (!assignedBranches.includes(
+                    finalBranch
+                )) {
+                return res.status(403).json({
+                    message: 'You do not have access to this payment branch.',
+                });
+            }
+
+            // Branch users can never move payment.
+            finalBranch =
+                assignedBranches.length === 1 ?
+                assignedBranches[0] :
+                normalizeBranch(
+                    gymBranch
+                ) || finalBranch;
+
+            if (!assignedBranches.includes(
+                    finalBranch
+                )) {
+                return res.status(403).json({
+                    message: 'You do not have access to the selected gym branch.',
+                });
+            }
         }
 
-        // ===============================
-        // VALIDATE FINAL BRANCH
-        // ===============================
+        // ----------------------------------------------------
+        // MEMBER
+        // ----------------------------------------------------
 
-        if (!ALLOWED_BRANCHES.includes(
-                updateData.gymBranch
-            )) {
-            return res.status(400).json({
-                message: 'Invalid gym branch.',
-            });
-        }
+        if (member !== undefined) {
+            if (!isValidObjectId(member)) {
+                return res.status(400).json({
+                    message: 'Invalid member ID.',
+                });
+            }
 
-        // ===============================
-        // VERIFY MEMBER BRANCH
-        // ===============================
-
-        if (updateData.member) {
             const memberRecord =
                 await Member.findOne({
-                    _id: updateData.member,
-                    gymBranch: updateData.gymBranch,
+                    _id: member,
+                    gymBranch: finalBranch,
                 });
 
             if (!memberRecord) {
@@ -564,74 +737,120 @@ const updatePayment = async(
             }
         }
 
-        // ===============================
-        // INVOICE VALIDATION
-        // ===============================
+        // ----------------------------------------------------
+        // INVOICE
+        // ----------------------------------------------------
+
+        let finalInvoice =
+            existingPayment.invoiceNumber;
 
         if (
-            updateData.invoiceNumber !==
-            undefined
+            invoiceNumber !== undefined
         ) {
-            const normalizedInvoiceNumber =
+            finalInvoice =
                 String(
-                    updateData.invoiceNumber
+                    invoiceNumber
                 ).trim();
 
-            const duplicateInvoice =
+            if (!finalInvoice) {
+                return res.status(400).json({
+                    message: 'Invoice number is required.',
+                });
+            }
+
+            const duplicate =
                 await Payment.findOne({
-                    invoiceNumber: normalizedInvoiceNumber,
+                    invoiceNumber: finalInvoice,
 
                     _id: {
                         $ne: req.params.id,
                     },
                 });
 
-            if (duplicateInvoice) {
+            if (duplicate) {
                 return res.status(400).json({
                     message: 'Invoice number already exists.',
                 });
             }
-
-            updateData.invoiceNumber =
-                normalizedInvoiceNumber;
         }
 
-        // ===============================
-        // UPDATE PAYMENT
-        // ===============================
+        // ----------------------------------------------------
+        // UPDATE ONLY ALLOWED FIELDS
+        // ----------------------------------------------------
+
+        existingPayment.gymBranch =
+            finalBranch;
+
+        if (member !== undefined) {
+            existingPayment.member =
+                member;
+        }
+
+        existingPayment.invoiceNumber =
+            finalInvoice;
+
+        if (amount !== undefined) {
+            existingPayment.amount =
+                amount;
+        }
+
+        if (
+            paymentMethod !== undefined
+        ) {
+            existingPayment.paymentMethod =
+                paymentMethod;
+        }
+
+        if (
+            paymentDate !== undefined
+        ) {
+            existingPayment.paymentDate =
+                paymentDate;
+        }
+
+        if (status !== undefined) {
+            existingPayment.status =
+                status;
+        }
+
+        if (notes !== undefined) {
+            existingPayment.notes =
+                notes;
+        }
+
+        await existingPayment.save();
 
         const payment =
-            await Payment.findByIdAndUpdate(
-                req.params.id,
-                updateData, {
-                    new: true,
-                    runValidators: true,
-                }
+            await Payment.findById(
+                existingPayment._id
             ).populate(
                 'member',
-                'name phone email membershipPlan gymBranch'
+                'name phone email gymBranch'
             );
 
         return res.status(200).json({
             message: 'Payment updated successfully.',
-
             payment,
         });
     } catch (error) {
-        console.error(
-            'Update Payment Error:',
+        if (
+            error.code === 11000
+        ) {
+            return res.status(400).json({
+                message: 'Invoice number already exists.',
+            });
+        }
+
+        return sendServerError(
+            res,
             error
         );
-
-        return res.status(500).json({
-            message: 'Server error. Please try again.',
-        });
     }
 };
 
-// ===============================
+// ============================================================
 // DELETE PAYMENT
-// ===============================
+// ============================================================
 
 const deletePayment = async(
     req,
@@ -644,34 +863,25 @@ const deletePayment = async(
             });
         }
 
-        const role = String(
-            req.admin.role || ''
-        ).toLowerCase();
-
-        const branch =
-            getAccessibleBranch(req);
-
-        // Receptionist/staff without branch
-        // cannot delete payment data.
-        if (
-            (
-                role === 'receptionist' ||
-                role === 'staff'
-            ) &&
-            !branch
-        ) {
-            return res.status(403).json({
-                message: 'Your account is not assigned to a valid gym branch.',
+        if (!isValidObjectId(
+                req.params.id
+            )) {
+            return res.status(400).json({
+                message: 'Invalid payment ID.',
             });
         }
 
-        const query = {
-            _id: req.params.id,
-        };
+        const query =
+            getBranchFilter(req);
 
-        if (branch) {
-            query.gymBranch = branch;
+        if (query === null) {
+            return res.status(403).json({
+                message: 'You do not have access to the selected gym branch.',
+            });
         }
+
+        query._id =
+            req.params.id;
 
         const payment =
             await Payment.findOneAndDelete(
@@ -688,20 +898,16 @@ const deletePayment = async(
             message: 'Payment deleted successfully.',
         });
     } catch (error) {
-        console.error(
-            'Delete Payment Error:',
+        return sendServerError(
+            res,
             error
         );
-
-        return res.status(500).json({
-            message: 'Server error. Please try again.',
-        });
     }
 };
 
-// ===============================
+// ============================================================
 // EXPORTS
-// ===============================
+// ============================================================
 
 module.exports = {
     addPayment,

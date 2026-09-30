@@ -1,14 +1,14 @@
 const express = require('express');
 
 const {
-    getPublicOffers,
-    getOffers,
-    getAllOffers,
-    getOfferById,
-    createOffer,
-    updateOffer,
-    deleteOffer,
-} = require('../controllers/offerController');
+    getPublicAccessPasses,
+    getAccessPasses,
+    getAllAccessPasses,
+    getAccessPassById,
+    createAccessPass,
+    updateAccessPass,
+    deleteAccessPass,
+} = require('../controllers/accessPassController');
 
 const {
     protect,
@@ -19,64 +19,61 @@ const {
 const router = express.Router();
 
 // ============================================================
-// PUBLIC OFFERS
+// PUBLIC ACCESS PASSES
 // ============================================================
-// GET /api/offers/public
+// GET /api/access-passes/public
 //
 // Public endpoint.
 // No JWT required.
 //
-// Used by the public gym website.
+// Shows Daily Access / Weekly Access products.
 // ============================================================
 
 router.get(
     '/public',
-    getPublicOffers
+    getPublicAccessPasses
 );
 
 // ============================================================
-// PROTECTED OFFERS
+// GET ACTIVE ACCESS PASSES
 // ============================================================
-// GET /api/offers
-//
-// Shows active/relevant offers according to the controller's
-// branch filtering.
+// GET /api/access-passes
 //
 // Permission:
-// offers.view
+// accessPasses.view
 // ============================================================
 
 router.get(
     '/',
     protect,
     authorizeBranch,
-    requirePermission('offers.view'),
-    getOffers
+    requirePermission('accessPasses.view'),
+    getAccessPasses
 );
 
 // ============================================================
-// ALL OFFERS
+// GET ALL ACCESS PASSES
 // ============================================================
-// GET /api/offers/all
+// GET /api/access-passes/all
 //
-// Used when admin needs active + inactive offers.
+// Includes inactive records where supported by controller.
 //
 // Permission:
-// offers.view
+// accessPasses.view
 // ============================================================
 
 router.get(
     '/all',
     protect,
     authorizeBranch,
-    requirePermission('offers.view'),
-    getAllOffers
+    requirePermission('accessPasses.view'),
+    getAllAccessPasses
 );
 
 // ============================================================
-// SINGLE OFFER
+// GET SINGLE ACCESS PASS
 // ============================================================
-// GET /api/offers/:id
+// GET /api/access-passes/:id
 //
 // IMPORTANT:
 // This stays after /public and /all.
@@ -86,61 +83,63 @@ router.get(
     '/:id',
     protect,
     authorizeBranch,
-    requirePermission('offers.view'),
-    getOfferById
+    requirePermission('accessPasses.view'),
+    getAccessPassById
 );
 
 // ============================================================
-// CREATE PUJA OFFER
+// CREATE ACCESS PASS
 // ============================================================
-// POST /api/offers
+// POST /api/access-passes
 //
 // Permission:
-// offers.add
+// accessPasses.add
 //
-// No membership plans are involved.
+// Products:
+// - Daily Access
+// - Weekly Access
 // ============================================================
 
 router.post(
     '/',
     protect,
     authorizeBranch,
-    requirePermission('offers.add'),
-    createOffer
+    requirePermission('accessPasses.add'),
+    createAccessPass
 );
 
 // ============================================================
-// UPDATE PUJA OFFER
+// UPDATE ACCESS PASS
 // ============================================================
-// PUT /api/offers/:id
+// PUT /api/access-passes/:id
 //
 // Permission:
-// offers.edit
+// accessPasses.edit
 // ============================================================
 
 router.put(
     '/:id',
     protect,
     authorizeBranch,
-    requirePermission('offers.edit'),
-    updateOffer
+    requirePermission('accessPasses.edit'),
+    updateAccessPass
 );
 
 // ============================================================
-// DELETE / DEACTIVATE OFFER
+// DELETE / DEACTIVATE ACCESS PASS
 // ============================================================
-// DELETE /api/offers/:id
+// DELETE /api/access-passes/:id
 //
 // Permission:
-// offers.delete
+// accessPasses.delete
 // ============================================================
 
 router.delete(
     '/:id',
     protect,
     authorizeBranch,
-    requirePermission('offers.delete'),
-    deleteOffer
+    requirePermission('accessPasses.delete'),
+    deleteAccessPass
 );
 
 // ============================================================

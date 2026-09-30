@@ -20,7 +20,6 @@ const RECEPTIONIST_ROLES = [
     'staff',
 ];
 
-
 /* ============================================================
    DEFAULT RECEPTIONIST PERMISSIONS
    ============================================================ */
@@ -59,21 +58,42 @@ const DEFAULT_RECEPTIONIST_PERMISSIONS = {
         delete: false,
     },
 
-    plans: {
-        view: true,
-        add: false,
-        edit: false,
-        delete: false,
-    },
-
     offers: {
         view: true,
         add: false,
         edit: false,
         delete: false,
     },
-};
 
+    accessPasses: {
+        view: true,
+        add: false,
+        edit: false,
+        delete: false,
+    },
+
+    /* ========================================================
+       TRAINERS
+    ======================================================== */
+
+    trainers: {
+        view: true,
+        add: false,
+        edit: false,
+        delete: false,
+    },
+
+    /* ========================================================
+       STAFF MANAGEMENT
+    ======================================================== */
+
+    staff: {
+        view: false,
+        add: false,
+        edit: false,
+        delete: false,
+    },
+};
 
 /* ============================================================
    ADMIN SCHEMA
@@ -82,7 +102,7 @@ const DEFAULT_RECEPTIONIST_PERMISSIONS = {
 const adminSchema = new mongoose.Schema({
         /* --------------------------------------------------------
            BASIC INFORMATION
-           -------------------------------------------------------- */
+        -------------------------------------------------------- */
 
         name: {
             type: String,
@@ -103,10 +123,9 @@ const adminSchema = new mongoose.Schema({
             required: true,
         },
 
-
         /* --------------------------------------------------------
            ROLE
-           -------------------------------------------------------- */
+        -------------------------------------------------------- */
 
         role: {
             type: String,
@@ -122,26 +141,27 @@ const adminSchema = new mongoose.Schema({
             default: 'receptionist',
         },
 
-
         /* ========================================================
            MULTI-BRANCH ACCESS
-           ========================================================
+        ========================================================
 
-           AUTHORITATIVE FIELD.
+           AUTHORITATIVE FIELD:
 
-           Receptionist:
+               gymBranches
 
-               gymBranches: [
-                   'Kalyanpur',
-                   'Gopalpur'
-               ]
+           Receptionist / staff:
+
+               ['Kalyanpur']
+
+           or:
+
+               ['Kalyanpur', 'Gopalpur']
 
            Main admin:
 
-               gymBranches: []
+               []
 
-           A receptionist may therefore access multiple branches,
-           while the dashboard chooses one active branch.
+           Main admins automatically have access to all branches.
         ======================================================== */
 
         gymBranches: {
@@ -169,22 +189,8 @@ const adminSchema = new mongoose.Schema({
             },
         },
 
-
         /* ========================================================
            LEGACY SINGLE-BRANCH FIELD
-           ========================================================
-
-           Kept temporarily for backward compatibility.
-
-           One branch:
-
-               gymBranches: ['Kalyanpur']
-               gymBranch: 'Kalyanpur'
-
-           Multiple branches:
-
-               gymBranches: ['Kalyanpur', 'Gopalpur']
-               gymBranch: null
         ======================================================== */
 
         gymBranch: {
@@ -199,10 +205,9 @@ const adminSchema = new mongoose.Schema({
             default: null,
         },
 
-
         /* --------------------------------------------------------
            ACCOUNT STATUS
-           -------------------------------------------------------- */
+        -------------------------------------------------------- */
 
         status: {
             type: String,
@@ -215,17 +220,14 @@ const adminSchema = new mongoose.Schema({
             default: 'active',
         },
 
-
-        /* --------------------------------------------------------
+        /* ========================================================
            PERMISSIONS
-           -------------------------------------------------------- */
+        ======================================================== */
 
         permissions: {
             type: mongoose.Schema.Types.Mixed,
 
             default: () => ({
-                ...DEFAULT_RECEPTIONIST_PERMISSIONS,
-
                 members: {
                     ...DEFAULT_RECEPTIONIST_PERMISSIONS.members,
                 },
@@ -246,12 +248,20 @@ const adminSchema = new mongoose.Schema({
                     ...DEFAULT_RECEPTIONIST_PERMISSIONS.enquiries,
                 },
 
-                plans: {
-                    ...DEFAULT_RECEPTIONIST_PERMISSIONS.plans,
-                },
-
                 offers: {
                     ...DEFAULT_RECEPTIONIST_PERMISSIONS.offers,
+                },
+
+                accessPasses: {
+                    ...DEFAULT_RECEPTIONIST_PERMISSIONS.accessPasses,
+                },
+
+                trainers: {
+                    ...DEFAULT_RECEPTIONIST_PERMISSIONS.trainers,
+                },
+
+                staff: {
+                    ...DEFAULT_RECEPTIONIST_PERMISSIONS.staff,
                 },
             }),
         },
@@ -261,7 +271,6 @@ const adminSchema = new mongoose.Schema({
         timestamps: true,
     }
 );
-
 
 /* ============================================================
    BRANCH NORMALIZATION HELPER
@@ -287,25 +296,16 @@ const normalizeBranch = (value) => {
     return null;
 };
 
-
 /* ============================================================
    BRANCH VALIDATION / NORMALIZATION
-   ============================================================
-
-   IMPORTANT:
-   Do NOT add next() here.
-
-   Your installed Mongoose version executes this validation
-   middleware without a callback.
-============================================================ */
+   ============================================================ */
 
 adminSchema.pre(
     'validate',
     function() {
-
         /* ========================================================
            RECEPTIONIST / STAFF
-           ======================================================== */
+        ======================================================== */
 
         if (
             RECEPTIONIST_ROLES.includes(
@@ -323,7 +323,7 @@ adminSchema.pre(
 
             /* ----------------------------------------------------
                LEGACY COMPATIBILITY
-               ---------------------------------------------------- */
+            ---------------------------------------------------- */
 
             if (
                 branches.length === 0 &&
@@ -343,15 +343,15 @@ adminSchema.pre(
 
             /* ----------------------------------------------------
                REMOVE DUPLICATES
-               ---------------------------------------------------- */
+            ---------------------------------------------------- */
 
             branches = [
                 ...new Set(branches),
             ];
 
             /* ----------------------------------------------------
-               VALIDATE
-               ---------------------------------------------------- */
+               VALIDATE BRANCHES
+            ---------------------------------------------------- */
 
             const invalidBranches =
                 branches.filter(
@@ -374,14 +374,14 @@ adminSchema.pre(
 
             /* ----------------------------------------------------
                REQUIRE AT LEAST ONE BRANCH
-               ---------------------------------------------------- */
+            ---------------------------------------------------- */
 
             if (
                 branches.length === 0
             ) {
                 this.invalidate(
                     'gymBranches',
-                    'Receptionist must be assigned to at least one gym branch.'
+                    'Receptionist/staff must be assigned to at least one gym branch.'
                 );
 
                 return;
@@ -389,14 +389,14 @@ adminSchema.pre(
 
             /* ----------------------------------------------------
                SAVE AUTHORITATIVE BRANCHES
-               ---------------------------------------------------- */
+            ---------------------------------------------------- */
 
             this.gymBranches =
                 branches;
 
             /* ----------------------------------------------------
                KEEP LEGACY FIELD IN SYNC
-               ---------------------------------------------------- */
+            ---------------------------------------------------- */
 
             this.gymBranch =
                 branches.length === 1 ?
@@ -404,27 +404,21 @@ adminSchema.pre(
                 null;
         }
 
-
         /* ========================================================
            MAIN ADMIN
-           ======================================================== */
+        ======================================================== */
 
         if (
             MAIN_ADMIN_ROLES.includes(
                 this.role
             )
         ) {
-            /*
-             * Main admins have access to all branches,
-             * so they don't need branch assignments.
-             */
             this.gymBranches = [];
 
             this.gymBranch = null;
         }
     }
 );
-
 
 /* ============================================================
    DATABASE INDEXES
@@ -440,7 +434,6 @@ adminSchema.index({
     status: 1,
 });
 
-
 /* ============================================================
    SAFE OBJECT
    ============================================================ */
@@ -454,7 +447,6 @@ adminSchema.methods.toSafeObject =
 
         return object;
     };
-
 
 /* ============================================================
    EXPORT

@@ -1,38 +1,40 @@
 const Trainer = require('../models/Trainer');
 
+const {
+    normalizeBranch,
+    getAccessibleBranches,
+    getRequestedBranch,
+    getBranchFilter,
+    resolveWriteBranch,
+    isMainAdminRequest,
+} = require('../utils/branchAccess');
 
-// =====================================
-// GET ACCESSIBLE BRANCH
-// =====================================
+// ============================================================
+// AUTH HELPER
+// ============================================================
 
-const getAccessibleBranch = (req) => {
-    // Main admin can access both branches
-    if (
-        req.admin &&
-        req.admin.role === 'admin'
-    ) {
-        return null;
+const ensureAdmin = (req, res) => {
+    if (!req.admin) {
+        res.status(401).json({
+            message: 'Not authorized.',
+        });
+
+        return false;
     }
 
-    // Receptionist can access assigned branch
-    if (
-        req.admin &&
-        req.admin.gymBranch
-    ) {
-        return req.admin.gymBranch;
-    }
-
-    // Fallback for old accounts
-    return 'Kalyanpur';
+    return true;
 };
 
-
-// =====================================
+// ============================================================
 // CREATE TRAINER
-// =====================================
+// ============================================================
 
 const createTrainer = async(req, res) => {
     try {
+        if (!ensureAdmin(req, res)) {
+            return;
+        }
+
         const {
             name,
             phone,
@@ -46,145 +48,172 @@ const createTrainer = async(req, res) => {
             gymBranch,
         } = req.body;
 
+        // ----------------------------------------------------
+        // VALIDATION
+        // ----------------------------------------------------
+
         if (!name ||
+            !String(name).trim() ||
             !phone ||
-            !specialization
+            !String(phone).trim() ||
+            !specialization ||
+            !String(specialization).trim()
         ) {
             return res.status(400).json({
                 message: 'Name, phone and specialization are required.',
             });
         }
 
-        let selectedBranch;
+        // ----------------------------------------------------
+        // BRANCH
+        // ----------------------------------------------------
 
-        // Main admin can choose branch
-        if (
-            req.admin &&
-            req.admin.role === 'admin'
-        ) {
-            selectedBranch =
-                gymBranch || 'Kalyanpur';
-        } else {
-            // Receptionist is restricted
-            // to assigned branch
-            selectedBranch =
-                (
-                    req.admin &&
-                    req.admin.gymBranch
-                ) ?
-                req.admin.gymBranch :
-                'Kalyanpur';
+        const branchResult = resolveWriteBranch(
+            req,
+            gymBranch
+        );
+
+        if (branchResult.error) {
+            return res.status(
+                branchResult.status || 400
+            ).json({
+                message: branchResult.error,
+            });
         }
 
-        const allowedBranches = [
-            'Kalyanpur',
-            'Gopalpur',
-        ];
+        const selectedBranch = normalizeBranch(
+            branchResult.branch
+        );
 
-        if (!allowedBranches.includes(
-                selectedBranch
-            )) {
+        if (!selectedBranch) {
             return res.status(400).json({
                 message: 'Invalid gym branch.',
             });
         }
 
-        const trainer =
-            await Trainer.create({
-                gymBranch: selectedBranch,
-                name: name.trim(),
-                phone: phone.trim(),
-                email: email ?
-                    email.trim().toLowerCase() :
-                    '',
-                specialization: specialization.trim(),
-                experience: experience !== undefined ?
-                    experience :
-                    0,
-                gender,
-                photo: photo || '',
-                bio: bio ?
-                    bio.trim() :
-                    '',
-                status: status || 'Active',
-            });
+        // ----------------------------------------------------
+        // CREATE
+        // ----------------------------------------------------
 
-        res.status(201).json({
+        const trainer = await Trainer.create({
+            gymBranch: selectedBranch,
+
+            name: String(name).trim(),
+
+            phone: String(phone).trim(),
+
+            email: email ?
+                String(email).trim().toLowerCase() :
+                '',
+
+            specialization: String(specialization).trim(),
+
+            experience: experience !== undefined &&
+                experience !== null &&
+                experience !== '' ?
+                Number(experience) :
+                0,
+
+            gender: gender || '',
+
+            photo: photo || '',
+
+            bio: bio ?
+                String(bio).trim() :
+                '',
+
+            status: status || 'Active',
+        });
+
+        return res.status(201).json({
             message: 'Trainer created successfully.',
             trainer,
         });
-
     } catch (error) {
         console.error(
             'Create Trainer Error:',
-            error.message
+            error
         );
 
-        res.status(500).json({
+        return res.status(500).json({
             message: 'Server error. Please try again.',
         });
     }
 };
 
-
-// =====================================
-// GET ALL TRAINERS
-// =====================================
+// ============================================================
+// GET TRAINERS
+// ============================================================
 
 const getTrainers = async(req, res) => {
     try {
-        const branch =
-            getAccessibleBranch(req);
-
-        const query = {};
-
-        if (branch) {
-            query.gymBranch = branch;
+        if (!ensureAdmin(req, res)) {
+            return;
         }
 
-        const trainers =
-            await Trainer.find(query)
+        let query;
+
+        try {
+            query = getBranchFilter(req);
+        } catch (branchError) {
+            return res.status(
+                branchError.status || 403
+            ).json({
+                message: branchError.message ||
+                    'You do not have access to the selected gym branch.',
+            });
+        }
+
+        const trainers = await Trainer.find(query)
             .sort({
                 createdAt: -1,
             });
 
-        res.status(200).json({
+        return res.status(200).json({
             message: 'Trainers fetched successfully.',
             trainers,
         });
-
     } catch (error) {
         console.error(
             'Get Trainers Error:',
-            error.message
+            error
         );
 
-        res.status(500).json({
+        return res.status(500).json({
             message: 'Server error. Please try again.',
         });
     }
 };
 
-
-// =====================================
-// GET SINGLE TRAINER
-// =====================================
+// ============================================================
+// GET TRAINER BY ID
+// ============================================================
 
 const getTrainerById = async(req, res) => {
     try {
-        const branch =
-            getAccessibleBranch(req);
+        if (!ensureAdmin(req, res)) {
+            return;
+        }
 
-        const query = {
-            _id: req.params.id,
-        };
+        let branchFilter;
 
-        if (branch) {
-            query.gymBranch = branch;
+        try {
+            branchFilter =
+                getBranchFilter(req);
+        } catch (branchError) {
+            return res.status(
+                branchError.status || 403
+            ).json({
+                message: branchError.message ||
+                    'You do not have access to the selected gym branch.',
+            });
         }
 
         const trainer =
-            await Trainer.findOne(query);
+            await Trainer.findOne({
+                ...branchFilter,
+                _id: req.params.id,
+            });
 
         if (!trainer) {
             return res.status(404).json({
@@ -192,42 +221,54 @@ const getTrainerById = async(req, res) => {
             });
         }
 
-        res.status(200).json({
+        return res.status(200).json({
             trainer,
         });
-
     } catch (error) {
         console.error(
             'Get Trainer Error:',
-            error.message
+            error
         );
 
-        res.status(500).json({
+        return res.status(500).json({
             message: 'Server error. Please try again.',
         });
     }
 };
 
-
-// =====================================
+// ============================================================
 // UPDATE TRAINER
-// =====================================
+// ============================================================
 
 const updateTrainer = async(req, res) => {
     try {
-        const branch =
-            getAccessibleBranch(req);
-
-        const query = {
-            _id: req.params.id,
-        };
-
-        if (branch) {
-            query.gymBranch = branch;
+        if (!ensureAdmin(req, res)) {
+            return;
         }
 
+        let currentFilter;
+
+        try {
+            currentFilter =
+                getBranchFilter(req);
+        } catch (branchError) {
+            return res.status(
+                branchError.status || 403
+            ).json({
+                message: branchError.message ||
+                    'You do not have access to the selected gym branch.',
+            });
+        }
+
+        // ----------------------------------------------------
+        // FIND EXISTING TRAINER
+        // ----------------------------------------------------
+
         const trainer =
-            await Trainer.findOne(query);
+            await Trainer.findOne({
+                ...currentFilter,
+                _id: req.params.id,
+            });
 
         if (!trainer) {
             return res.status(404).json({
@@ -248,126 +289,219 @@ const updateTrainer = async(req, res) => {
             gymBranch,
         } = req.body;
 
-        let finalBranch;
+        // ----------------------------------------------------
+        // BRANCH UPDATE
+        // ----------------------------------------------------
 
-        // Receptionist cannot change branch
-        if (branch) {
-            finalBranch = branch;
+        let finalBranch =
+            normalizeBranch(
+                trainer.gymBranch
+            );
+
+        if (isMainAdminRequest(req)) {
+            /*
+             * Main admins can move a trainer
+             * between Kalyanpur and Gopalpur.
+             */
+
+            if (gymBranch !== undefined) {
+                const normalized =
+                    normalizeBranch(
+                        gymBranch
+                    );
+
+                if (!normalized) {
+                    return res.status(400).json({
+                        message: 'Invalid gym branch.',
+                    });
+                }
+
+                finalBranch = normalized;
+            }
         } else {
-            finalBranch =
-                gymBranch ||
-                trainer.gymBranch ||
-                'Kalyanpur';
-        }
+            /*
+             * Receptionists/staff cannot move
+             * trainers to another branch.
+             */
 
-        const allowedBranches = [
-            'Kalyanpur',
-            'Gopalpur',
-        ];
+            const accessibleBranches =
+                getAccessibleBranches(req);
 
-        if (!allowedBranches.includes(
+            if (!accessibleBranches.includes(
+                    finalBranch
+                )) {
+                return res.status(403).json({
+                    message: 'You do not have access to this trainer.',
+                });
+            }
+
+            if (
+                gymBranch !== undefined &&
+                normalizeBranch(gymBranch) !==
                 finalBranch
-            )) {
-            return res.status(400).json({
-                message: 'Invalid gym branch.',
-            });
+            ) {
+                return res.status(403).json({
+                    message: 'You cannot move a trainer to another gym branch.',
+                });
+            }
         }
+
+        // ----------------------------------------------------
+        // NAME
+        // ----------------------------------------------------
 
         if (name !== undefined) {
-            trainer.name =
-                name.trim();
+            const value =
+                String(name).trim();
+
+            if (!value) {
+                return res.status(400).json({
+                    message: 'Trainer name cannot be empty.',
+                });
+            }
+
+            trainer.name = value;
         }
+
+        // ----------------------------------------------------
+        // PHONE
+        // ----------------------------------------------------
 
         if (phone !== undefined) {
-            trainer.phone =
-                phone.trim();
+            const value =
+                String(phone).trim();
+
+            if (!value) {
+                return res.status(400).json({
+                    message: 'Trainer phone cannot be empty.',
+                });
+            }
+
+            trainer.phone = value;
         }
 
+        // ----------------------------------------------------
+        // EMAIL
+        // ----------------------------------------------------
+
         if (email !== undefined) {
-            trainer.email =
-                email ?
-                email.trim().toLowerCase() :
+            trainer.email = email ?
+                String(email)
+                .trim()
+                .toLowerCase() :
                 '';
         }
+
+        // ----------------------------------------------------
+        // SPECIALIZATION
+        // ----------------------------------------------------
 
         if (
             specialization !== undefined
         ) {
+            const value =
+                String(
+                    specialization
+                ).trim();
+
+            if (!value) {
+                return res.status(400).json({
+                    message: 'Trainer specialization cannot be empty.',
+                });
+            }
+
             trainer.specialization =
-                specialization.trim();
+                value;
         }
+
+        // ----------------------------------------------------
+        // EXPERIENCE
+        // ----------------------------------------------------
 
         if (experience !== undefined) {
             trainer.experience =
-                experience;
+                experience === '' ||
+                experience === null ?
+                0 :
+                Number(experience);
         }
 
+        // ----------------------------------------------------
+        // OTHER FIELDS
+        // ----------------------------------------------------
+
         if (gender !== undefined) {
-            trainer.gender =
-                gender;
+            trainer.gender = gender;
         }
 
         if (photo !== undefined) {
-            trainer.photo =
-                photo;
+            trainer.photo = photo;
         }
 
         if (bio !== undefined) {
-            trainer.bio =
-                bio ?
-                bio.trim() :
+            trainer.bio = bio ?
+                String(bio).trim() :
                 '';
         }
 
         if (status !== undefined) {
-            trainer.status =
-                status;
+            trainer.status = status;
         }
+
+        // ----------------------------------------------------
+        // FINAL BRANCH
+        // ----------------------------------------------------
 
         trainer.gymBranch =
             finalBranch;
 
         await trainer.save();
 
-        res.status(200).json({
+        return res.status(200).json({
             message: 'Trainer updated successfully.',
             trainer,
         });
-
     } catch (error) {
         console.error(
             'Update Trainer Error:',
-            error.message
+            error
         );
 
-        res.status(500).json({
+        return res.status(500).json({
             message: 'Server error. Please try again.',
         });
     }
 };
 
-
-// =====================================
+// ============================================================
 // DELETE TRAINER
-// =====================================
+// ============================================================
 
 const deleteTrainer = async(req, res) => {
     try {
-        const branch =
-            getAccessibleBranch(req);
+        if (!ensureAdmin(req, res)) {
+            return;
+        }
 
-        const query = {
-            _id: req.params.id,
-        };
+        let branchFilter;
 
-        if (branch) {
-            query.gymBranch = branch;
+        try {
+            branchFilter =
+                getBranchFilter(req);
+        } catch (branchError) {
+            return res.status(
+                branchError.status || 403
+            ).json({
+                message: branchError.message ||
+                    'You do not have access to the selected gym branch.',
+            });
         }
 
         const trainer =
-            await Trainer.findOneAndDelete(
-                query
-            );
+            await Trainer.findOneAndDelete({
+                ...branchFilter,
+                _id: req.params.id,
+            });
 
         if (!trainer) {
             return res.status(404).json({
@@ -375,22 +509,24 @@ const deleteTrainer = async(req, res) => {
             });
         }
 
-        res.status(200).json({
+        return res.status(200).json({
             message: 'Trainer deleted successfully.',
         });
-
     } catch (error) {
         console.error(
             'Delete Trainer Error:',
-            error.message
+            error
         );
 
-        res.status(500).json({
+        return res.status(500).json({
             message: 'Server error. Please try again.',
         });
     }
 };
 
+// ============================================================
+// EXPORTS
+// ============================================================
 
 module.exports = {
     createTrainer,

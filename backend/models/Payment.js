@@ -1,20 +1,33 @@
 const mongoose = require('mongoose');
 
-const paymentSchema = new mongoose.Schema({
+/* =========================================================
+   VALID BRANCHES
+   ========================================================= */
 
-    // =========================================
-    // GYM BRANCH
-    // =========================================
+const VALID_GYM_BRANCHES = [
+    'Kalyanpur',
+    'Gopalpur',
+];
+
+/* =========================================================
+   PAYMENT SCHEMA
+   ========================================================= */
+
+const paymentSchema = new mongoose.Schema({
+    /* =====================================================
+       GYM BRANCH
+    ===================================================== */
 
     gymBranch: {
         type: String,
-        enum: ['Kalyanpur', 'Gopalpur'],
+        enum: VALID_GYM_BRANCHES,
         required: true,
+        trim: true,
     },
 
-    // =========================================
-    // MEMBER
-    // =========================================
+    /* =====================================================
+       MEMBER
+    ===================================================== */
 
     member: {
         type: mongoose.Schema.Types.ObjectId,
@@ -22,9 +35,9 @@ const paymentSchema = new mongoose.Schema({
         required: true,
     },
 
-    // =========================================
-    // PAYMENT INFORMATION
-    // =========================================
+    /* =====================================================
+       INVOICE NUMBER
+    ===================================================== */
 
     invoiceNumber: {
         type: String,
@@ -33,11 +46,19 @@ const paymentSchema = new mongoose.Schema({
         trim: true,
     },
 
+    /* =====================================================
+       PAYMENT AMOUNT
+    ===================================================== */
+
     amount: {
         type: Number,
         required: true,
         min: 0,
     },
+
+    /* =====================================================
+       PAYMENT METHOD
+    ===================================================== */
 
     paymentMethod: {
         type: String,
@@ -50,10 +71,18 @@ const paymentSchema = new mongoose.Schema({
         required: true,
     },
 
+    /* =====================================================
+       PAYMENT DATE
+    ===================================================== */
+
     paymentDate: {
         type: Date,
         default: Date.now,
     },
+
+    /* =====================================================
+       PAYMENT STATUS
+    ===================================================== */
 
     status: {
         type: String,
@@ -65,30 +94,56 @@ const paymentSchema = new mongoose.Schema({
         default: 'Paid',
     },
 
+    /* =====================================================
+       NOTES
+    ===================================================== */
+
     notes: {
         type: String,
         trim: true,
+        default: '',
     },
-
 }, {
     timestamps: true,
 });
 
-// =========================================
-// INDEXES
-// =========================================
+/* =========================================================
+   DATABASE INDEXES
+   ========================================================= */
 
-paymentSchema.index({
-    gymBranch: 1,
-});
+/* ---------------------------------------------------------
+   Branch payment listing
+--------------------------------------------------------- */
 
 paymentSchema.index({
     gymBranch: 1,
     paymentDate: -1,
 });
 
-module.exports =
-    mongoose.model(
-        'Payment',
-        paymentSchema
-    );
+/* ---------------------------------------------------------
+   Branch + member payment history
+--------------------------------------------------------- */
+
+paymentSchema.index({
+    gymBranch: 1,
+    member: 1,
+    paymentDate: -1,
+});
+
+/* ---------------------------------------------------------
+   Branch + payment status
+--------------------------------------------------------- */
+
+paymentSchema.index({
+    gymBranch: 1,
+    status: 1,
+});
+
+/* =========================================================
+   MODEL
+   ========================================================= */
+
+module.exports = mongoose.model(
+    'Payment',
+    paymentSchema
+);

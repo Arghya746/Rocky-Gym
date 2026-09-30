@@ -4,7 +4,7 @@ const jwt = require('jsonwebtoken');
 
 /* ============================================================
    CONSTANTS
-   ============================================================ */
+============================================================ */
 
 const ALLOWED_BRANCHES = [
     'Kalyanpur',
@@ -30,10 +30,9 @@ const RECEPTIONIST_ROLES = [
     'staff',
 ];
 
-
 /* ============================================================
    DEFAULT RECEPTIONIST PERMISSIONS
-   ============================================================ */
+============================================================ */
 
 const getDefaultReceptionistPermissions = () => ({
     members: {
@@ -66,11 +65,6 @@ const getDefaultReceptionistPermissions = () => ({
 
     enquiries: {
         view: true,
-        delete: false,
-    },
-
-    plans: {
-        view: true,
         add: false,
         edit: false,
         delete: false,
@@ -82,60 +76,184 @@ const getDefaultReceptionistPermissions = () => ({
         edit: false,
         delete: false,
     },
+
+    accessPasses: {
+        view: true,
+        add: false,
+        edit: false,
+        delete: false,
+    },
+
+    staff: {
+        view: false,
+        add: false,
+        edit: false,
+        delete: false,
+    },
 });
 
+/* ============================================================
+   CLEAN PERMISSIONS
+============================================================ */
+
+const cleanPermissions = (
+    permissions
+) => {
+
+    const defaults =
+        getDefaultReceptionistPermissions();
+
+    const source =
+        permissions &&
+        typeof permissions === 'object' ?
+        permissions :
+        {};
+
+    /*
+     * Deliberately create a fresh object.
+     *
+     * Old "plans" permission is removed.
+     */
+
+    return {
+
+        members: {
+            ...defaults.members,
+            ...(source.members || {}),
+        },
+
+        payments: {
+            ...defaults.payments,
+            ...(source.payments || {}),
+        },
+
+        attendance: {
+            ...defaults.attendance,
+            ...(source.attendance || {}),
+        },
+
+        workouts: {
+            ...defaults.workouts,
+            ...(source.workouts || {}),
+        },
+
+        enquiries: {
+            ...defaults.enquiries,
+            ...(source.enquiries || {}),
+        },
+
+        offers: {
+            ...defaults.offers,
+            ...(source.offers || {}),
+        },
+
+        accessPasses: {
+            ...defaults.accessPasses,
+            ...(source.accessPasses || {}),
+        },
+
+        staff: {
+            ...defaults.staff,
+            ...(source.staff || {}),
+        },
+    };
+};
 
 /* ============================================================
    NORMALIZE BRANCH
-   ============================================================ */
+============================================================ */
 
-const normalizeBranch = (value) => {
-    if (!value) {
+const normalizeBranch = (
+    value
+) => {
+
+    if (
+        value === undefined ||
+        value === null ||
+        value === ''
+    ) {
+
         return null;
     }
 
-    const normalized = String(value)
+    /*
+     * Support branch objects defensively.
+     */
+
+    let rawValue =
+        value;
+
+    if (
+        typeof value === 'object'
+    ) {
+
+        rawValue =
+            value.name ||
+            value.branchName ||
+            value.gymBranch ||
+            value._id ||
+            '';
+    }
+
+    const normalized =
+        String(rawValue)
         .trim()
         .toLowerCase();
 
-    if (normalized === 'kalyanpur') {
+    if (
+        normalized === 'kalyanpur'
+    ) {
+
         return 'Kalyanpur';
     }
 
-    if (normalized === 'gopalpur') {
+    if (
+        normalized === 'gopalpur'
+    ) {
+
         return 'Gopalpur';
     }
 
     return null;
 };
 
-
 /* ============================================================
    NORMALIZE BRANCH ARRAY
-   ============================================================ */
+============================================================ */
 
-const normalizeBranches = (branches) => {
+const normalizeBranches = (
+    branches
+) => {
+
     if (!Array.isArray(branches)) {
+
         return [];
     }
 
     return [
         ...new Set(
             branches
-            .map(normalizeBranch)
+            .map(
+                normalizeBranch
+            )
             .filter(Boolean)
         ),
-    ].filter((branch) =>
-        ALLOWED_BRANCHES.includes(branch)
+    ].filter(
+        (branch) =>
+        ALLOWED_BRANCHES.includes(
+            branch
+        )
     );
 };
 
-
 /* ============================================================
    NORMALIZE EMAIL
-   ============================================================ */
+============================================================ */
 
-const normalizeEmail = (email) => {
+const normalizeEmail = (
+    email
+) => {
+
     if (!email) {
         return '';
     }
@@ -145,71 +263,98 @@ const normalizeEmail = (email) => {
         .toLowerCase();
 };
 
-
 /* ============================================================
    ROLE HELPERS
-   ============================================================ */
+============================================================ */
 
-const isMainAdminRole = (role) =>
-    MAIN_ADMIN_ROLES.includes(
-        String(role || '').trim().toLowerCase()
+const isMainAdminRole = (
+    role
+) => {
+
+    return MAIN_ADMIN_ROLES.includes(
+        String(role || '')
+        .trim()
+        .toLowerCase()
     );
+};
 
-const isReceptionistRole = (role) =>
-    RECEPTIONIST_ROLES.includes(
-        String(role || '').trim().toLowerCase()
+const isReceptionistRole = (
+    role
+) => {
+
+    return RECEPTIONIST_ROLES.includes(
+        String(role || '')
+        .trim()
+        .toLowerCase()
     );
-
+};
 
 /* ============================================================
    RESOLVE ADMIN BRANCHES
-   ------------------------------------------------------------
-   New system:
-       gymBranches: ['Kalyanpur', 'Gopalpur']
+============================================================ */
 
-   Legacy system:
-       gymBranch: 'Kalyanpur'
-   ============================================================ */
+const resolveAdminBranches = (
+    admin
+) => {
 
-const resolveAdminBranches = (admin) => {
     if (!admin) {
         return [];
     }
 
     let branches = [];
 
-    /* New multi-branch field */
-    if (Array.isArray(admin.gymBranches)) {
-        branches = normalizeBranches(
+    /*
+     * Modern multi-branch field.
+     */
+
+    if (
+        Array.isArray(
             admin.gymBranches
-        );
+        )
+    ) {
+
+        branches =
+            normalizeBranches(
+                admin.gymBranches
+            );
     }
 
-    /* Legacy fallback */
+    /*
+     * Legacy fallback.
+     */
+
     if (
         branches.length === 0 &&
         admin.gymBranch
     ) {
+
         const legacyBranch =
             normalizeBranch(
                 admin.gymBranch
             );
 
         if (legacyBranch) {
-            branches = [legacyBranch];
+
+            branches = [
+                legacyBranch,
+            ];
         }
     }
 
     return branches;
 };
 
-
 /* ============================================================
    REGISTER ADMIN
-   ============================================================ */
+============================================================ */
 
-const registerAdmin = async(req, res) => {
+const registerAdmin = async(
+    req,
+    res
+) => {
+
     try {
+
         const {
             name,
             email,
@@ -219,24 +364,59 @@ const registerAdmin = async(req, res) => {
             gymBranches,
         } = req.body || {};
 
-
         /* --------------------------------------------------------
            REQUIRED FIELDS
         -------------------------------------------------------- */
 
-        if (!name || !email || !password) {
+        const normalizedName =
+            String(
+                name || ''
+            ).trim();
+
+        const normalizedEmail =
+            normalizeEmail(email);
+
+        const normalizedPassword =
+            String(
+                password || ''
+            );
+
+        if (!normalizedName ||
+            !normalizedEmail ||
+            !normalizedPassword
+        ) {
+
             return res.status(400).json({
                 message: 'Name, email and password are required.',
             });
         }
 
+        if (
+            normalizedName.length < 2
+        ) {
+
+            return res.status(400).json({
+                message: 'Name must contain at least 2 characters.',
+            });
+        }
+
+        if (
+            normalizedPassword.length < 6
+        ) {
+
+            return res.status(400).json({
+                message: 'Password must contain at least 6 characters.',
+            });
+        }
 
         /* --------------------------------------------------------
            ROLE
         -------------------------------------------------------- */
 
-        const selectedRole = String(
-                role || 'receptionist'
+        const selectedRole =
+            String(
+                role ||
+                'receptionist'
             )
             .trim()
             .toLowerCase();
@@ -244,25 +424,11 @@ const registerAdmin = async(req, res) => {
         if (!ALLOWED_ROLES.includes(
                 selectedRole
             )) {
+
             return res.status(400).json({
                 message: 'Invalid role.',
             });
         }
-
-
-        /* --------------------------------------------------------
-           EMAIL
-        -------------------------------------------------------- */
-
-        const normalizedEmail =
-            normalizeEmail(email);
-
-        if (!normalizedEmail) {
-            return res.status(400).json({
-                message: 'Valid email is required.',
-            });
-        }
-
 
         /* --------------------------------------------------------
            BRANCH RESOLUTION
@@ -275,41 +441,46 @@ const registerAdmin = async(req, res) => {
                 selectedRole
             )
         ) {
-            /* New multi-branch field */
-            if (Array.isArray(gymBranches)) {
+
+            if (
+                Array.isArray(
+                    gymBranches
+                )
+            ) {
+
                 selectedBranches =
                     normalizeBranches(
                         gymBranches
                     );
             }
 
-            /* Legacy single branch */
             if (
                 selectedBranches.length === 0 &&
                 gymBranch
             ) {
+
                 const legacyBranch =
                     normalizeBranch(
                         gymBranch
                     );
 
                 if (legacyBranch) {
+
                     selectedBranches = [
                         legacyBranch,
                     ];
                 }
             }
 
-            /* Branch is mandatory */
             if (
                 selectedBranches.length === 0
             ) {
+
                 return res.status(400).json({
                     message: 'At least one valid gym branch is required for a receptionist or staff account.',
                 });
             }
         }
-
 
         /* --------------------------------------------------------
            MAIN ADMIN
@@ -320,9 +491,13 @@ const registerAdmin = async(req, res) => {
                 selectedRole
             )
         ) {
+
+            /*
+             * Main admins are not tied to one branch.
+             */
+
             selectedBranches = [];
         }
-
 
         /* --------------------------------------------------------
            CHECK EXISTING ADMIN
@@ -334,11 +509,11 @@ const registerAdmin = async(req, res) => {
             });
 
         if (existingAdmin) {
+
             return res.status(400).json({
                 message: 'Admin already exists.',
             });
         }
-
 
         /* --------------------------------------------------------
            PASSWORD
@@ -346,10 +521,9 @@ const registerAdmin = async(req, res) => {
 
         const hashedPassword =
             await bcrypt.hash(
-                String(password),
+                normalizedPassword,
                 10
             );
-
 
         /* --------------------------------------------------------
            PERMISSIONS
@@ -362,7 +536,6 @@ const registerAdmin = async(req, res) => {
             getDefaultReceptionistPermissions() :
             undefined;
 
-
         /* --------------------------------------------------------
            LEGACY SINGLE BRANCH
         -------------------------------------------------------- */
@@ -372,14 +545,14 @@ const registerAdmin = async(req, res) => {
             selectedBranches[0] :
             null;
 
-
         /* --------------------------------------------------------
            CREATE ADMIN
         -------------------------------------------------------- */
 
         const admin =
             await Admin.create({
-                name: String(name).trim(),
+
+                name: normalizedName,
 
                 email: normalizedEmail,
 
@@ -387,10 +560,8 @@ const registerAdmin = async(req, res) => {
 
                 role: selectedRole,
 
-                /* Authoritative field */
                 gymBranches: selectedBranches,
 
-                /* Backward compatibility */
                 gymBranch: legacyGymBranch,
 
                 status: 'active',
@@ -398,18 +569,22 @@ const registerAdmin = async(req, res) => {
                 permissions,
             });
 
-
         /* --------------------------------------------------------
            RESPONSE
         -------------------------------------------------------- */
 
         return res.status(201).json({
+
             message: 'Admin registered successfully.',
 
             admin: {
+
                 id: admin._id,
+
                 name: admin.name,
+
                 email: admin.email,
+
                 role: admin.role,
 
                 gymBranches: admin.gymBranches || [],
@@ -423,6 +598,7 @@ const registerAdmin = async(req, res) => {
         });
 
     } catch (error) {
+
         console.error(
             'Admin Register Error:',
             error
@@ -434,43 +610,44 @@ const registerAdmin = async(req, res) => {
     }
 };
 
-
 /* ============================================================
    LOGIN ADMIN
-   ============================================================ */
+============================================================ */
 
-const loginAdmin = async(req, res) => {
+const loginAdmin = async(
+    req,
+    res
+) => {
+
     try {
+
         const {
             email,
             password,
         } = req.body || {};
 
-
         /* --------------------------------------------------------
            REQUIRED FIELDS
         -------------------------------------------------------- */
 
-        if (!email || !password) {
+        if (!email ||
+            !password
+        ) {
+
             return res.status(400).json({
                 message: 'Email and password are required.',
             });
         }
 
-
-        /* --------------------------------------------------------
-           NORMALIZE EMAIL
-        -------------------------------------------------------- */
-
         const normalizedEmail =
             normalizeEmail(email);
 
         if (!normalizedEmail) {
+
             return res.status(400).json({
                 message: 'Valid email is required.',
             });
         }
-
 
         /* --------------------------------------------------------
            FIND ADMIN
@@ -481,67 +658,32 @@ const loginAdmin = async(req, res) => {
                 email: normalizedEmail,
             });
 
-
-        /*
-         * IMPORTANT:
-         * Check admin BEFORE accessing any admin fields.
-         */
-
         if (!admin) {
+
             return res.status(401).json({
                 message: 'Invalid email or password.',
             });
         }
 
-
-        /* --------------------------------------------------------
-           LOGIN DEBUG
-           -------------------------------------------------------- */
-
-        const resolvedBranches =
-            resolveAdminBranches(
-                admin
-            );
-
-        console.log(
-            '[LOGIN DEBUG]',
-            JSON.stringify({
-                email: normalizedEmail,
-
-                found: true,
-
-                role: admin.role || null,
-
-                gymBranches: Array.isArray(
-                        admin.gymBranches
-                    ) ?
-                    admin.gymBranches : [],
-
-                gymBranch: admin.gymBranch ||
-                    null,
-
-                resolvedBranches,
-
-                status: admin.status ||
-                    null,
-            })
-        );
-
-
         /* --------------------------------------------------------
            ACCOUNT STATUS
         -------------------------------------------------------- */
 
-        if (
-            String(admin.status || '')
+        const accountStatus =
+            String(
+                admin.status || ''
+            )
             .trim()
-            .toLowerCase() !== 'active'
+            .toLowerCase();
+
+        if (
+            accountStatus !== 'active'
         ) {
+
             return res.status(403).json({
                 message: 'Your account has been deactivated.',
             });
         }
-
 
         /* --------------------------------------------------------
            PASSWORD
@@ -554,11 +696,11 @@ const loginAdmin = async(req, res) => {
             );
 
         if (!isPasswordCorrect) {
+
             return res.status(401).json({
                 message: 'Invalid email or password.',
             });
         }
-
 
         /* --------------------------------------------------------
            ROLE
@@ -574,14 +716,14 @@ const loginAdmin = async(req, res) => {
         if (!ALLOWED_ROLES.includes(
                 normalizedRole
             )) {
+
             return res.status(403).json({
                 message: 'Your account has an invalid role configuration.',
             });
         }
 
-
         /* --------------------------------------------------------
-           RESOLVE MULTI-BRANCH ACCESS
+           RESOLVE BRANCH ACCESS
         -------------------------------------------------------- */
 
         let gymBranches =
@@ -589,40 +731,32 @@ const loginAdmin = async(req, res) => {
                 admin
             );
 
-
-        /* --------------------------------------------------------
-           RECEPTIONIST / STAFF
-        -------------------------------------------------------- */
-
         if (
             isReceptionistRole(
                 normalizedRole
-            )
+            ) &&
+            gymBranches.length === 0
         ) {
-            if (
-                gymBranches.length === 0
-            ) {
-                console.error(
-                    '[LOGIN BRANCH ERROR]',
-                    JSON.stringify({
-                        email: normalizedEmail,
 
-                        role: normalizedRole,
+            console.error(
+                '[LOGIN BRANCH ERROR]',
+                JSON.stringify({
+                    email: normalizedEmail,
 
-                        dbGymBranches: admin.gymBranches,
+                    role: normalizedRole,
 
-                        dbGymBranch: admin.gymBranch,
+                    dbGymBranches: admin.gymBranches,
 
-                        resolvedBranches: gymBranches,
-                    })
-                );
+                    dbGymBranch: admin.gymBranch,
 
-                return res.status(403).json({
-                    message: 'Your account is not assigned to a valid gym branch. Please contact the administrator.',
-                });
-            }
+                    resolvedBranches: gymBranches,
+                })
+            );
+
+            return res.status(403).json({
+                message: 'Your account is not assigned to a valid gym branch. Please contact the administrator.',
+            });
         }
-
 
         /* --------------------------------------------------------
            MAIN ADMIN
@@ -633,15 +767,14 @@ const loginAdmin = async(req, res) => {
                 normalizedRole
             )
         ) {
+
             /*
-             * Main admins can access all branches.
-             *
-             * Empty gymBranches means:
-             * unrestricted branch access.
+             * Empty array represents unrestricted
+             * branch access in the stored admin data.
              */
+
             gymBranches = [];
         }
-
 
         /* --------------------------------------------------------
            LEGACY SINGLE BRANCH
@@ -652,9 +785,8 @@ const loginAdmin = async(req, res) => {
             gymBranches[0] :
             null;
 
-
         /* --------------------------------------------------------
-           PERMISSIONS
+           CLEAN RECEPTIONIST PERMISSIONS
         -------------------------------------------------------- */
 
         let permissions =
@@ -663,29 +795,49 @@ const loginAdmin = async(req, res) => {
         if (
             isReceptionistRole(
                 normalizedRole
-            ) &&
-            (!permissions ||
-                typeof permissions !==
-                'object'
             )
         ) {
+
+            const cleanedPermissions =
+                cleanPermissions(
+                    permissions
+                );
+
+            const permissionsChanged =
+                JSON.stringify(
+                    permissions || {}
+                ) !==
+                JSON.stringify(
+                    cleanedPermissions
+                );
+
             permissions =
-                getDefaultReceptionistPermissions();
+                cleanedPermissions;
 
-            admin.permissions =
-                permissions;
+            if (
+                permissionsChanged
+            ) {
 
-            await admin.save();
+                admin.permissions =
+                    permissions;
+
+                await admin.save();
+            }
         }
-
 
         /* --------------------------------------------------------
            JWT SECRET
         -------------------------------------------------------- */
 
-        if (!process.env.JWT_SECRET) {
+        const jwtSecret =
+            process.env.JWT_SECRET;
+
+        if (!jwtSecret ||
+            !String(jwtSecret).trim()
+        ) {
+
             console.error(
-                'JWT_SECRET is not configured.'
+                '[LOGIN] JWT_SECRET is not configured.'
             );
 
             return res.status(500).json({
@@ -693,48 +845,47 @@ const loginAdmin = async(req, res) => {
             });
         }
 
+        /* --------------------------------------------------------
+           JWT PAYLOAD
+        -------------------------------------------------------- */
+
+        const payload = {
+
+            id: admin._id.toString(),
+
+            email: admin.email,
+
+            role: normalizedRole,
+
+            gymBranches: gymBranches,
+
+            gymBranch: gymBranch,
+        };
 
         /* --------------------------------------------------------
            CREATE JWT
         -------------------------------------------------------- */
 
         const token =
-            jwt.sign({
-                    id: admin._id.toString(),
-
-                    email: admin.email,
-
-                    role: normalizedRole,
-
-                    /*
-                     * Multi-branch access
-                     */
-                    gymBranches,
-
-                    /*
-                     * Legacy compatibility
-                     */
-                    gymBranch,
-                },
-
-                process.env.JWT_SECRET,
-
-                {
+            jwt.sign(
+                payload,
+                jwtSecret, {
                     expiresIn: '1d',
                 }
             );
-
 
         /* --------------------------------------------------------
            LOGIN RESPONSE
         -------------------------------------------------------- */
 
         return res.status(200).json({
+
             message: 'Login successful.',
 
             token,
 
             admin: {
+
                 id: admin._id,
 
                 name: admin.name,
@@ -743,30 +894,18 @@ const loginAdmin = async(req, res) => {
 
                 role: normalizedRole,
 
-                /*
-                 * IMPORTANT:
-                 * Receptionist gets:
-                 *
-                 * ['Kalyanpur', 'Gopalpur']
-                 *
-                 * Main admin gets:
-                 *
-                 * []
-                 */
-                gymBranches,
+                gymBranches: gymBranches,
 
-                /*
-                 * Legacy compatibility
-                 */
-                gymBranch,
+                gymBranch: gymBranch,
 
                 status: admin.status,
 
-                permissions,
+                permissions: permissions,
             },
         });
 
     } catch (error) {
+
         console.error(
             'Admin Login Error:',
             error
@@ -778,10 +917,9 @@ const loginAdmin = async(req, res) => {
     }
 };
 
-
 /* ============================================================
    EXPORT
-   ============================================================ */
+============================================================ */
 
 module.exports = {
     registerAdmin,

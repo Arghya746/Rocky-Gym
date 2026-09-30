@@ -14,9 +14,9 @@ const {
 
 const router = express.Router();
 
-// =====================================
+// ============================================================
 // MAIN ADMIN ROLES
-// =====================================
+// ============================================================
 
 const MAIN_ADMIN_ROLES = [
     'admin',
@@ -24,10 +24,12 @@ const MAIN_ADMIN_ROLES = [
     'super_admin',
 ];
 
-// =====================================
-// GET ALL RECEPTIONISTS
+// ============================================================
+// GET ALL RECEPTIONISTS / STAFF
 // GET /api/admin/staff
-// =====================================
+//
+// Main Admin only.
+// ============================================================
 
 router.get(
     '/',
@@ -36,10 +38,12 @@ router.get(
     getStaff
 );
 
-// =====================================
-// UPDATE RECEPTIONIST BRANCHES
+// ============================================================
+// UPDATE STAFF BRANCHES
 // PUT /api/admin/staff/:id/branches
-// =====================================
+//
+// Main Admin only.
+// ============================================================
 
 router.put(
     '/:id/branches',
@@ -48,10 +52,17 @@ router.put(
     updateStaffBranches
 );
 
-// =====================================
-// UPDATE RECEPTIONIST PERMISSIONS
+// ============================================================
+// UPDATE STAFF PERMISSIONS
 // PUT /api/admin/staff/:id/permissions
-// =====================================
+//
+// Main Admin only.
+//
+// Available permission groups are handled by the
+// staffController/Admin model.
+//
+// No "plans" permission.
+// ============================================================
 
 router.put(
     '/:id/permissions',
@@ -60,10 +71,12 @@ router.put(
     updateStaffPermissions
 );
 
-// =====================================
-// ACTIVATE / DEACTIVATE RECEPTIONIST
+// ============================================================
+// ACTIVATE / DEACTIVATE STAFF
 // PUT /api/admin/staff/:id/status
-// =====================================
+//
+// Main Admin only.
+// ============================================================
 
 router.put(
     '/:id/status',
@@ -71,5 +84,9 @@ router.put(
     authorize(...MAIN_ADMIN_ROLES),
     updateStaffStatus
 );
+
+// ============================================================
+// EXPORT
+// ============================================================
 
 module.exports = router;

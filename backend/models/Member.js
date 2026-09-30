@@ -1,21 +1,33 @@
 const mongoose = require('mongoose');
 
-const memberSchema = new mongoose.Schema({
+/* =========================================================
+   VALID BRANCHES
+   ========================================================= */
 
-    // =========================================
-    // GYM BRANCH
-    // =========================================
+const VALID_GYM_BRANCHES = [
+    'Kalyanpur',
+    'Gopalpur',
+];
+
+/* =========================================================
+   MEMBER SCHEMA
+   ========================================================= */
+
+const memberSchema = new mongoose.Schema({
+    /* =====================================================
+       GYM BRANCH
+    ===================================================== */
 
     gymBranch: {
         type: String,
-        enum: ['Kalyanpur', 'Gopalpur'],
+        enum: VALID_GYM_BRANCHES,
         required: true,
+        trim: true,
     },
 
-
-    // =========================================
-    // PERSONAL INFORMATION
-    // =========================================
+    /* =====================================================
+       PERSONAL INFORMATION
+    ===================================================== */
 
     name: {
         type: String,
@@ -33,39 +45,43 @@ const memberSchema = new mongoose.Schema({
         type: String,
         trim: true,
         lowercase: true,
+        default: '',
     },
 
     age: {
         type: Number,
+        min: 1,
+        max: 120,
     },
 
     gender: {
         type: String,
-        enum: ['Male', 'Female', 'Other'],
-    },
-
-
-    // =========================================
-    // MEMBERSHIP
-    // =========================================
-
-    membershipPlan: {
-        type: String,
         enum: [
-            'Monthly',
-            'Quarterly',
-            'Half-Yearly',
-            'Yearly',
+            'Male',
+            'Female',
+            'Other',
         ],
-        required: true,
     },
 
-    // Selected promotional offer
+    /* =====================================================
+       PUJA OFFER
+    =====================================================
+
+       A member may optionally be registered using
+       a current Puja promotional offer.
+
+       This is NOT a membership-plan reference.
+    ===================================================== */
+
     membershipOffer: {
         type: mongoose.Schema.Types.ObjectId,
         ref: 'Offer',
         default: null,
     },
+
+    /* =====================================================
+       ACCESS / MEMBERSHIP PERIOD
+    ===================================================== */
 
     membershipStartDate: {
         type: Date,
@@ -77,10 +93,19 @@ const memberSchema = new mongoose.Schema({
         required: true,
     },
 
+    /* =====================================================
+       AMOUNT
+    ===================================================== */
+
     amount: {
         type: Number,
         required: true,
+        min: 0,
     },
+
+    /* =====================================================
+       MEMBER STATUS
+    ===================================================== */
 
     status: {
         type: String,
@@ -90,10 +115,44 @@ const memberSchema = new mongoose.Schema({
         ],
         default: 'Active',
     },
-
 }, {
     timestamps: true,
 });
+
+/* =========================================================
+   DATABASE INDEXES
+   ========================================================= */
+
+/* ---------------------------------------------------------
+   Branch + member listing
+--------------------------------------------------------- */
+
+memberSchema.index({
+    gymBranch: 1,
+    createdAt: -1,
+});
+
+/* ---------------------------------------------------------
+   Branch + status
+--------------------------------------------------------- */
+
+memberSchema.index({
+    gymBranch: 1,
+    status: 1,
+});
+
+/* ---------------------------------------------------------
+   Phone lookup
+--------------------------------------------------------- */
+
+memberSchema.index({
+    gymBranch: 1,
+    phone: 1,
+});
+
+/* =========================================================
+   MODEL
+   ========================================================= */
 
 module.exports = mongoose.model(
     'Member',

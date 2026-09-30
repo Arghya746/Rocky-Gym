@@ -10,60 +10,110 @@ const {
 
 const {
     protect,
+    authorizeBranch,
     requirePermission,
 } = require('../middleware/authMiddleware');
 
 const router = express.Router();
 
-
-// =====================================
+// ============================================================
 // TRAINERS
-// =====================================
+// ============================================================
 
+// ============================================================
+// GET ALL TRAINERS
+// GET /api/trainers
+//
+// Main Admin:
+// - Can access both branches
+//
+// Receptionist / Staff:
+// - Can access assigned branch(es)
+//
+// Permission:
+// trainers.view
+// ============================================================
 
-// Get all trainers
 router.get(
     '/',
     protect,
+    authorizeBranch,
     requirePermission('trainers.view'),
     getTrainers
 );
 
+// ============================================================
+// CREATE TRAINER
+// POST /api/trainers
+//
+// Main Admin:
+// - Can create for Kalyanpur or Gopalpur
+//
+// Receptionist / Staff:
+// - Can create only in assigned branch
+//
+// Permission:
+// trainers.add
+// ============================================================
 
-// Create trainer
 router.post(
     '/',
     protect,
+    authorizeBranch,
     requirePermission('trainers.add'),
     createTrainer
 );
 
+// ============================================================
+// GET SINGLE TRAINER
+// GET /api/trainers/:id
+//
+// Permission:
+// trainers.view
+// ============================================================
 
-// Get single trainer
 router.get(
     '/:id',
     protect,
+    authorizeBranch,
     requirePermission('trainers.view'),
     getTrainerById
 );
 
+// ============================================================
+// UPDATE TRAINER
+// PUT /api/trainers/:id
+//
+// Permission:
+// trainers.edit
+// ============================================================
 
-// Update trainer
 router.put(
     '/:id',
     protect,
+    authorizeBranch,
     requirePermission('trainers.edit'),
     updateTrainer
 );
 
+// ============================================================
+// DELETE TRAINER
+// DELETE /api/trainers/:id
+//
+// Permission:
+// trainers.delete
+// ============================================================
 
-// Delete trainer
 router.delete(
     '/:id',
     protect,
+    authorizeBranch,
     requirePermission('trainers.delete'),
     deleteTrainer
 );
 
+// ============================================================
+// EXPORT
+// ============================================================
 
 module.exports = router;

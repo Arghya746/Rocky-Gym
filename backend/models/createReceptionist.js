@@ -76,15 +76,22 @@ async function createReceptionist() {
                     delete: false
                 },
 
-                plans: {
+                offers: {
                     view: true,
                     add: false,
                     edit: false,
                     delete: false
                 },
 
-                offers: {
+                accessPasses: {
                     view: true,
+                    add: false,
+                    edit: false,
+                    delete: false
+                },
+
+                staff: {
+                    view: false,
                     add: false,
                     edit: false,
                     delete: false
@@ -102,7 +109,10 @@ async function createReceptionist() {
         console.log('--------------------------------');
 
     } catch (error) {
-        console.error('Error creating receptionist:', error);
+        console.error(
+            'Error creating receptionist:',
+            error
+        );
     } finally {
         await mongoose.disconnect();
         console.log('MongoDB disconnected');

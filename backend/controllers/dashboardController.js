@@ -2,59 +2,88 @@ const Member = require('../models/Member');
 const Payment = require('../models/Payment');
 const Attendance = require('../models/Attendance');
 
+const {
+    getBranchFilter,
+} = require('../utils/branchAccess');
 
-// ===============================
-// GET ACCESSIBLE BRANCH
-// ===============================
 
-const getAccessibleBranch = (req) => {
+// =====================================
+// GET TODAY IN INDIA
+// =====================================
 
-    // Main admin can manage both branches
-    if (req.admin && req.admin.role === 'admin') {
-        return null;
-    }
-
-    // Receptionist is restricted to assigned branch
-    if (req.admin && req.admin.gymBranch) {
-        return req.admin.gymBranch;
-    }
-
-    // Fallback for old accounts
-    return 'Kalyanpur';
+const getTodayAttendanceDay = () => {
+    return new Intl.DateTimeFormat(
+        'en-CA', {
+            timeZone: 'Asia/Kolkata',
+            year: 'numeric',
+            month: '2-digit',
+            day: '2-digit',
+        }
+    ).format(
+        new Date()
+    );
 };
 
 
-// ===============================
+// =====================================
 // GET DASHBOARD STATS
-// ===============================
+// =====================================
 
-const getDashboardStats = async(req, res) => {
+const getDashboardStats = async(
+    req,
+    res
+) => {
     try {
 
-        const branch =
-            getAccessibleBranch(req);
+        // =====================================
+        // AUTHENTICATION
+        // =====================================
+
+        if (!req.admin) {
+            return res.status(401).json({
+                message: 'Not authorized.',
+            });
+        }
 
 
-        // ===============================
-        // BUILD BRANCH QUERIES
-        // ===============================
+        // =====================================
+        // BRANCH FILTER
+        // =====================================
 
-        const memberQuery = branch ?
-            { gymBranch: branch } :
-            {};
+        /*
+         * Main admin:
+         *     {} = all branches
+         *
+         * Branch user:
+         *     { gymBranch: assignedBranch }
+         *
+         * If a main admin selects a branch,
+         * getBranchFilter(req) should return
+         * that selected branch.
+         */
 
-        const paymentQuery = branch ?
-            { gymBranch: branch } :
-            {};
-
-        const attendanceQuery = branch ?
-            { gymBranch: branch } :
-            {};
+        const branchQuery =
+            getBranchFilter(req);
 
 
-        // ===============================
+        const memberQuery = {
+            ...branchQuery,
+        };
+
+
+        const paymentQuery = {
+            ...branchQuery,
+        };
+
+
+        const attendanceQuery = {
+            ...branchQuery,
+        };
+
+
+        // =====================================
         // MEMBER STATISTICS
-        // ===============================
+        // =====================================
 
         const totalMembers =
             await Member.countDocuments(
@@ -64,27 +93,23 @@ const getDashboardStats = async(req, res) => {
 
         const activeMembers =
             await Member.countDocuments({
-
                 ...memberQuery,
 
                 status: 'Active',
-
             });
 
 
         const expiredMembers =
             await Member.countDocuments({
-
                 ...memberQuery,
 
                 status: 'Expired',
-
             });
 
 
-        // ===============================
+        // =====================================
         // PAYMENT STATISTICS
-        // ===============================
+        // =====================================
 
         const totalPayments =
             await Payment.countDocuments(
@@ -92,20 +117,18 @@ const getDashboardStats = async(req, res) => {
             );
 
 
-        // ===============================
+        // =====================================
         // TOTAL REVENUE
-        // ===============================
+        // =====================================
 
         const revenueResult =
             await Payment.aggregate([
 
                 {
                     $match: {
-
                         ...paymentQuery,
 
                         status: 'Paid',
-
                     },
                 },
 
@@ -117,7 +140,6 @@ const getDashboardStats = async(req, res) => {
                         totalRevenue: {
                             $sum: '$amount',
                         },
-
                     },
                 },
 
@@ -126,63 +148,48 @@ const getDashboardStats = async(req, res) => {
 
         const totalRevenue =
             revenueResult.length > 0 ?
-            revenueResult[0].totalRevenue :
+            Number(
+                revenueResult[0]
+                .totalRevenue
+            ) :
             0;
 
 
-        // ===============================
-        // TODAY'S DATE
-        // ===============================
-
-        const startOfToday =
-            new Date();
-
-        startOfToday.setHours(
-            0,
-            0,
-            0,
-            0
-        );
-
-
-        const endOfToday =
-            new Date();
-
-        endOfToday.setHours(
-            23,
-            59,
-            59,
-            999
-        );
-
-
-        // ===============================
+        // =====================================
         // TODAY'S ATTENDANCE
-        // ===============================
+        // =====================================
+
+        /*
+         * AttendanceController stores:
+         *
+         * attendanceDay:
+         * YYYY-MM-DD
+         *
+         * Using this field avoids timezone
+         * problems caused by comparing Date
+         * objects across servers.
+         */
+
+        const today =
+            getTodayAttendanceDay();
+
 
         const todayAttendance =
             await Attendance.countDocuments({
 
                 ...attendanceQuery,
 
-                date: {
-
-                    $gte: startOfToday,
-
-                    $lte: endOfToday,
-
-                },
+                attendanceDay: today,
 
                 status: 'Present',
-
             });
 
 
-        // ===============================
+        // =====================================
         // RESPONSE
-        // ===============================
+        // =====================================
 
-        res.status(200).json({
+        return res.status(200).json({
 
             message: 'Dashboard statistics fetched successfully.',
 
@@ -208,10 +215,10 @@ const getDashboardStats = async(req, res) => {
 
         console.error(
             'Dashboard Stats Error:',
-            error.message
+            error
         );
 
-        res.status(500).json({
+        return res.status(500).json({
 
             message: 'Server error. Please try again.',
 
@@ -220,12 +227,10 @@ const getDashboardStats = async(req, res) => {
 };
 
 
-// ===============================
-// EXPORT CONTROLLER
-// ===============================
+// =====================================
+// EXPORT
+// =====================================
 
 module.exports = {
-
     getDashboardStats,
-
 };
