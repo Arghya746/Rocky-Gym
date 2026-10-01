@@ -1,4 +1,4 @@
-import pujaOfferImage from '../assets/puja-offer.jpg.jpeg';
+import pujaOfferImage from '../assets/PUJA OFFERS.jpg';
 
 export default function OffersSection({
   onClaimOffer,
@@ -69,13 +69,15 @@ export default function OffersSection({
 
               <img
                 src={pujaOfferImage}
-                alt={`${displayName} Puja Offer`}
+                alt={`${displayName} Puja Offers`}
                 className="puja-offer-image"
               />
 
             </div>
 
-            {/* OFFER ACTIONS */}
+            {/* =================================================
+                OFFER ACTION
+                ================================================= */}
             <div className="puja-offer-actions">
 
               <button
@@ -102,6 +104,7 @@ export default function OffersSection({
         <div className="offers-whatsapp">
 
           <div>
+
             <span>
               📲 PUJA OFFER ENQUIRY
             </span>
@@ -113,6 +116,7 @@ export default function OffersSection({
             <p>
               Talk to {displayName} directly on WhatsApp.
             </p>
+
           </div>
 
           <a

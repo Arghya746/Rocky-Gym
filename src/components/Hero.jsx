@@ -1,4 +1,4 @@
-import athleteImage from '../assets/puja-offer.jpg.jpeg';
+import athleteImage from '../assets/alpha-gym-unisex.jpg';
 
 export default function Hero({ branchConfig }) {
   const branchName =

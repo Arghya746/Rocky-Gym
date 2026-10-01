@@ -88,9 +88,9 @@ const DEFAULT_RECEPTIONIST_PERMISSIONS = {
     ======================================================== */
 
     staff: {
-        view: false,
-        add: false,
-        edit: false,
+        view: true,
+        add: true,
+        edit: true,
         delete: false,
     },
 };
@@ -318,8 +318,7 @@ adminSchema.pre(
                 this.gymBranches
                 .filter(Boolean)
                 .map(normalizeBranch)
-                .filter(Boolean) :
-                [];
+                .filter(Boolean) : [];
 
             /* ----------------------------------------------------
                LEGACY COMPATIBILITY

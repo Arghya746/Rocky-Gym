@@ -97,8 +97,6 @@ router.get(
 //
 // Permission:
 // offers.add
-//
-// No membership plans are involved.
 // ============================================================
 
 router.post(

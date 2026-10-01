@@ -436,17 +436,6 @@ export default function MemberDetails() {
 
                 <div className="member-info-grid">
 
-                    {/* PLAN */}
-
-                    <div className="member-info-item">
-                        <span>PLAN</span>
-
-                        <strong>
-                            {member.membershipPlan || '—'}
-                        </strong>
-                    </div>
-
-
                     {/* OFFER */}
 
                     <div className="member-info-item">

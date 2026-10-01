@@ -1456,79 +1456,29 @@ const handleToggleOfferStatus = async (offer) => {
   });
 
   const fetchOffers = async () => {
-  try {
-    setOffersLoading(true);
-    setOffersError('');
-
-    const token = localStorage.getItem('adminToken');
-
-    if (!token) {
-      throw new Error('Admin session expired. Please login again.');
+    try {
+      setOffersLoading(true);
+      setOffersError('');
+      const token = localStorage.getItem('adminToken');
+      if (!token) throw new Error('Admin session expired. Please login again.');
+      const response = await fetch(`${API_URL}/api/offers`, { headers: { Authorization: `Bearer ${token}` } });
+      const data = await response.json();
+      if (!response.ok) throw new Error(data.message || 'Failed to fetch Puja offers.');
+      const rawOffers = filterBySelectedBranch(Array.isArray(data.offers) ? data.offers : []);
+      const pujaOffers = rawOffers.filter((offer) => /puja/i.test(String(offer?.name || '')));
+      const uniqueOffers = Array.from(new Map(pujaOffers.map((offer) => [
+        `${normalizeBranch(offer.gymBranch)}-${String(offer.name || '').trim().toLowerCase()}`, offer
+      ])).values());
+      setOffers(uniqueOffers);
+    } catch (error) {
+      console.error('Fetch Puja offers error:', error);
+      setOffersError(error.message || 'Unable to load Puja offers.');
+      setOffers([]);
+    } finally {
+      setOffersLoading(false);
     }
+  };
 
-    // Get the currently selected/active branch
-    const activeBranch =
-      selectedBranchId && selectedBranchId !== 'all'
-        ? normalizeBranch(selectedBranchId)
-        : '';
-
-    // Main admin with "All Branches" can request all offers.
-    // Branch users / selected branch users send the active branch.
-    const offersUrl = activeBranch
-      ? `${API_URL}/api/offers?branch=${encodeURIComponent(activeBranch)}`
-      : `${API_URL}/api/offers`;
-
-    const response = await fetch(offersUrl, {
-      headers: {
-        Authorization: `Bearer ${token}`,
-        ...(activeBranch
-          ? {
-              'X-Gym-Branch': activeBranch,
-            }
-          : {}),
-      },
-    });
-
-    const data = await response.json();
-
-    if (!response.ok) {
-      throw new Error(
-        data.message || 'Failed to fetch Puja offers.'
-      );
-    }
-
-    const rawOffers = filterBySelectedBranch(
-      Array.isArray(data.offers) ? data.offers : []
-    );
-
-    const pujaOffers = rawOffers.filter((offer) =>
-      /puja/i.test(String(offer?.name || ''))
-    );
-
-    const uniqueOffers = Array.from(
-      new Map(
-        pujaOffers.map((offer) => [
-          `${normalizeBranch(offer.gymBranch)}-${String(
-            offer.name || ''
-          )
-            .trim()
-            .toLowerCase()}`,
-          offer,
-        ])
-      ).values()
-    );
-
-    setOffers(uniqueOffers);
-  } catch (error) {
-    console.error('Fetch Puja offers error:', error);
-    setOffersError(
-      error.message || 'Unable to load Puja offers.'
-    );
-    setOffers([]);
-  } finally {
-    setOffersLoading(false);
-  }
-};
   const [showPujaOfferForm, setShowPujaOfferForm] = useState(false);
   const [savingPujaOffer, setSavingPujaOffer] = useState(false);
   const [pujaOfferError, setPujaOfferError] = useState('');

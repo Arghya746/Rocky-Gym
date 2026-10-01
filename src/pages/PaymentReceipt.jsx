@@ -272,12 +272,12 @@ export default function PaymentReceipt() {
                         <div className="payment-receipt-info-item">
 
                             <span>
-                                MEMBERSHIP PLAN
+                                OFFER
                             </span>
 
                             <strong>
-                                {member?.membershipPlan ||
-                                    '—'}
+                                {member?.membershipOffer?.name ||
+                                    'No Offer'}
                             </strong>
 
                         </div>

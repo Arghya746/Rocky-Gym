@@ -1,6 +1,7 @@
 import { useEffect, useState } from 'react';
 import { useNavigate } from 'react-router-dom';
 import AdminLogout from '../components/AdminLogout';
+import StaffManagement from '../components/StaffManagement';
 import API_URL from '../config/api';
 
 const GYM_BRANCHES = [
@@ -184,7 +185,12 @@ export default function AdminDashboard() {
     userRole === 'main_admin' ||
     userRole === 'super_admin';
 
-    const branches = GYM_BRANCHES;
+  const canAccessStaffManagement =
+    isMainAdmin ||
+    userRole === 'receptionist' ||
+    userRole === 'staff';
+
+  const branches = GYM_BRANCHES;
 
   // Main admin can see ALL branches or select one.
   // Receptionists/staff can select only from their assigned branches.
@@ -569,7 +575,7 @@ export default function AdminDashboard() {
   });
 
   const fetchStaff = async () => {
-    if (!isMainAdmin) {
+    if (!canAccessStaffManagement) {
       setStaff([]);
       setSelectedStaff(null);
       return;
@@ -1456,79 +1462,29 @@ const handleToggleOfferStatus = async (offer) => {
   });
 
   const fetchOffers = async () => {
-  try {
-    setOffersLoading(true);
-    setOffersError('');
-
-    const token = localStorage.getItem('adminToken');
-
-    if (!token) {
-      throw new Error('Admin session expired. Please login again.');
+    try {
+      setOffersLoading(true);
+      setOffersError('');
+      const token = localStorage.getItem('adminToken');
+      if (!token) throw new Error('Admin session expired. Please login again.');
+      const response = await fetch(`${API_URL}/api/offers`, { headers: { Authorization: `Bearer ${token}` } });
+      const data = await response.json();
+      if (!response.ok) throw new Error(data.message || 'Failed to fetch Puja offers.');
+      const rawOffers = filterBySelectedBranch(Array.isArray(data.offers) ? data.offers : []);
+      const pujaOffers = rawOffers.filter((offer) => /puja/i.test(String(offer?.name || '')));
+      const uniqueOffers = Array.from(new Map(pujaOffers.map((offer) => [
+        `${normalizeBranch(offer.gymBranch)}-${String(offer.name || '').trim().toLowerCase()}`, offer
+      ])).values());
+      setOffers(uniqueOffers);
+    } catch (error) {
+      console.error('Fetch Puja offers error:', error);
+      setOffersError(error.message || 'Unable to load Puja offers.');
+      setOffers([]);
+    } finally {
+      setOffersLoading(false);
     }
+  };
 
-    // Get the currently selected/active branch
-    const activeBranch =
-      selectedBranchId && selectedBranchId !== 'all'
-        ? normalizeBranch(selectedBranchId)
-        : '';
-
-    // Main admin with "All Branches" can request all offers.
-    // Branch users / selected branch users send the active branch.
-    const offersUrl = activeBranch
-      ? `${API_URL}/api/offers?branch=${encodeURIComponent(activeBranch)}`
-      : `${API_URL}/api/offers`;
-
-    const response = await fetch(offersUrl, {
-      headers: {
-        Authorization: `Bearer ${token}`,
-        ...(activeBranch
-          ? {
-              'X-Gym-Branch': activeBranch,
-            }
-          : {}),
-      },
-    });
-
-    const data = await response.json();
-
-    if (!response.ok) {
-      throw new Error(
-        data.message || 'Failed to fetch Puja offers.'
-      );
-    }
-
-    const rawOffers = filterBySelectedBranch(
-      Array.isArray(data.offers) ? data.offers : []
-    );
-
-    const pujaOffers = rawOffers.filter((offer) =>
-      /puja/i.test(String(offer?.name || ''))
-    );
-
-    const uniqueOffers = Array.from(
-      new Map(
-        pujaOffers.map((offer) => [
-          `${normalizeBranch(offer.gymBranch)}-${String(
-            offer.name || ''
-          )
-            .trim()
-            .toLowerCase()}`,
-          offer,
-        ])
-      ).values()
-    );
-
-    setOffers(uniqueOffers);
-  } catch (error) {
-    console.error('Fetch Puja offers error:', error);
-    setOffersError(
-      error.message || 'Unable to load Puja offers.'
-    );
-    setOffers([]);
-  } finally {
-    setOffersLoading(false);
-  }
-};
   const [showPujaOfferForm, setShowPujaOfferForm] = useState(false);
   const [savingPujaOffer, setSavingPujaOffer] = useState(false);
   const [pujaOfferError, setPujaOfferError] = useState('');
@@ -3761,6 +3717,20 @@ const handleAttendanceChange = (e) => {
 
 
       {/* =====================================================
+          STAFF MANAGEMENT
+
+          Staff/receptionist account management is available to
+          main admins and receptionists. Branch access remains
+          enforced by the existing branch restrictions and backend
+          API authorization.
+      ===================================================== */}
+
+      {canAccessStaffManagement && (
+        <StaffManagement />
+      )}
+
+
+      {/* =====================================================
           DAILY / WEEKLY ACCESS
       ===================================================== */}
 
@@ -4778,616 +4748,6 @@ const handleAttendanceChange = (e) => {
 
       </section>
 
-     {/* =====================================================
-    STAFF MANAGEMENT
-===================================================== */}
-
-{isMainAdmin && (
-<section className="admin-staff-management">
-
-  {/* STAFF HEADER */}
-  <div className="staff-header">
-
-    <div>
-      <span className="staff-eyebrow">
-        TEAM & ACCESS
-      </span>
-
-      <h2>
-        STAFF <span>MANAGEMENT.</span>
-      </h2>
-
-      <p>
-        Manage receptionist accounts and control dashboard access.
-        {isMainAdmin && selectedBranchId !== 'all'
-          ? ` — ${selectedBranchName}`
-          : ''}
-      </p>
-    </div>
-
-    <div className="staff-header-stats">
-
-      <div className="staff-stat-card">
-        <span className="staff-stat-number">
-          {staff.length}
-        </span>
-
-        <span className="staff-stat-label">
-          TOTAL STAFF
-        </span>
-      </div>
-
-      <div className="staff-stat-card">
-        <span className="staff-stat-number staff-green">
-          {
-            staff.filter(
-              (member) => member.status === 'active'
-            ).length
-          }
-        </span>
-
-        <span className="staff-stat-label">
-          ACTIVE
-        </span>
-      </div>
-
-    </div>
-
-  </div>
-
-  {/* MESSAGES */}
-
-  {staffError && !selectedStaff && (
-    <div className="staff-message staff-message-error">
-      <span>!</span>
-      {staffError}
-    </div>
-  )}
-
-  {staffSuccess && (
-    <div className="staff-message staff-message-success">
-      <span>✓</span>
-      {staffSuccess}
-    </div>
-  )}
-
-  {/* MAIN STAFF AREA */}
-
-  <div className="staff-layout">
-
-    {/* ==========================================
-        STAFF ACCOUNTS
-    ========================================== */}
-
-    <div className="staff-list-panel">
-
-      <div className="staff-panel-heading">
-
-        <div>
-          <span className="staff-panel-label">
-            TEAM
-          </span>
-
-          <h3>
-            STAFF ACCOUNTS
-          </h3>
-        </div>
-
-        <span className="staff-panel-count">
-          {staff.length}
-        </span>
-
-      </div>
-
-      {staff.length === 0 ? (
-
-        <div className="staff-empty">
-          <div className="staff-empty-icon">
-            👤
-          </div>
-
-          <strong>
-            No staff accounts
-          </strong>
-
-          <span>
-            Staff accounts will appear here.
-          </span>
-        </div>
-
-      ) : (
-
-        <div className="staff-account-list">
-
-          {staff.map((member) => {
-
-            const initials = member.name
-              ? member.name
-                  .split(/\s+/)
-                  .map((part) => part.charAt(0))
-                  .join('')
-                  .slice(0, 2)
-                  .toUpperCase()
-              : 'ST';
-
-            const isSelected =
-              selectedStaff?._id === member._id;
-
-            const isActive =
-              member.status === 'active';
-
-            return (
-              <button
-                type="button"
-                key={member._id}
-                className={`staff-account ${
-                  isSelected
-                    ? 'staff-account-selected'
-                    : ''
-                }`}
-                onClick={() => {
-                  setSelectedStaff(member);
-
-                  setPermissions(
-                    normalizeStaffPermissions(member)
-                  );
-
-                  setStaffSuccess('');
-                  setStaffError('');
-                }}
-              >
-
-                {/* AVATAR */}
-
-                <div className="staff-avatar">
-                  {initials}
-                </div>
-
-                {/* INFO */}
-
-                <div className="staff-account-info">
-
-                  <strong>
-                    {member.name || 'Staff Member'}
-                  </strong>
-
-                  <span className="staff-account-meta">
-                    {member.email}
-                  </span>
-
-                  <span className="staff-account-meta">
-                    BRANCH: {member.gymBranch || 'NOT ASSIGNED'}
-                  </span>
-
-                  <span
-                    className={`staff-status ${
-                      isActive
-                        ? 'staff-status-active'
-                        : 'staff-status-inactive'
-                    }`}
-                  >
-                    {isActive
-                      ? 'ACTIVE'
-                      : 'INACTIVE'}
-                  </span>
-
-                </div>
-
-                {/* ARROW */}
-
-                <span className="staff-account-arrow">
-                  →
-                </span>
-
-              </button>
-            );
-          })}
-
-        </div>
-
-      )}
-
-    </div>
-
-
-    {/* ==========================================
-        ACCESS CONTROL
-    ========================================== */}
-
-    <div className="staff-permission-panel">
-
-      {!selectedStaff ? (
-
-        <div className="staff-no-selection">
-
-          <div className="staff-no-selection-icon">
-            👤
-          </div>
-
-          <h3>
-            SELECT A STAFF ACCOUNT
-          </h3>
-
-          <p>
-            Select a staff member from the left
-            to manage their permissions.
-          </p>
-
-        </div>
-
-      ) : (
-
-        <>
-
-          {/* PROFILE HEADER */}
-
-          <div className="staff-profile">
-
-            <div className="staff-profile-main">
-
-              <div className="staff-profile-identity">
-
-                <div className="staff-profile-avatar">
-
-                  {selectedStaff.name
-                    ? selectedStaff.name
-                        .split(/\s+/)
-                        .map((part) =>
-                          part.charAt(0)
-                        )
-                        .join('')
-                        .slice(0, 2)
-                        .toUpperCase()
-                    : 'ST'}
-
-                </div>
-
-                <div>
-
-                  <span className="staff-panel-label">
-                    STAFF PROFILE
-                  </span>
-
-                  <h3>
-                    {selectedStaff.name}
-                  </h3>
-
-                  <p>
-                    {selectedStaff.email}
-                  </p>
-
-                  <p className="staff-branch-label">
-                    BRANCH: {selectedStaff.gymBranch || 'NOT ASSIGNED'}
-                  </p>
-
-                </div>
-
-              </div>
-
-
-              {/* ACCOUNT STATUS */}
-
-              <div className="staff-profile-status">
-
-                <span
-                  className={`staff-profile-status-badge ${
-                    selectedStaff.status === 'active'
-                      ? 'staff-badge-active'
-                      : 'staff-badge-inactive'
-                  }`}
-                >
-                  <span className="staff-status-dot" />
-                  {selectedStaff.status === 'active'
-                    ? 'ACTIVE'
-                    : 'INACTIVE'}
-                </span>
-
-                <button
-                  type="button"
-                  className={`staff-status-button ${
-                    selectedStaff.status === 'active'
-                      ? 'staff-deactivate'
-                      : 'staff-activate'
-                  }`}
-                  onClick={() =>
-                    handleToggleStaffStatus(
-                      selectedStaff
-                    )
-                  }
-                >
-                  {selectedStaff.status === 'active'
-                    ? 'DEACTIVATE'
-                    : 'ACTIVATE'}
-                </button>
-
-              </div>
-
-            </div>
-
-
-            {/* PERMISSION SUMMARY */}
-
-            <div className="staff-permission-summary">
-
-              <div>
-                <span>
-                  ACCESS LEVEL
-                </span>
-
-                <strong>
-                  RECEPTIONIST
-                </strong>
-              </div>
-
-              <div>
-                <span>
-                  PERMISSIONS
-                </span>
-
-                <strong>
-                  {permissionCount}
-                  <small>/18</small>
-                </strong>
-              </div>
-
-              <div>
-                <span>
-                  ACCOUNT
-                </span>
-
-                <strong>
-                  {selectedStaff.status === 'active'
-                    ? 'ENABLED'
-                    : 'DISABLED'}
-                </strong>
-              </div>
-
-            </div>
-
-          </div>
-
-
-          {/* PERMISSION HEADING */}
-
-          <div className="staff-permission-heading">
-
-            <div>
-
-              <span className="staff-panel-label">
-                ACCESS CONTROL
-              </span>
-
-              <h3>
-                PERMISSION <span>CONTROL.</span>
-              </h3>
-
-              <p>
-                Choose exactly what this staff member
-                can view, add, edit or delete.
-              </p>
-
-            </div>
-
-            <div className="staff-permission-total">
-
-              <strong>
-                {permissionCount}
-              </strong>
-
-              <span>
-                ENABLED
-              </span>
-
-            </div>
-
-          </div>
-
-
-          {/* PERMISSION CARDS */}
-
-          <div className="staff-permission-grid">
-
-            {[
-              {
-                key: 'members',
-                label: 'MEMBERS',
-                icon: '👥',
-                description:
-                  'Member records and profiles',
-                permissions: [
-                  'view',
-                  'add',
-                  'edit',
-                  'delete',
-                ],
-              },
-
-              {
-                key: 'payments',
-                label: 'PAYMENTS',
-                icon: '₹',
-                description:
-                  'Membership payments',
-                permissions: [
-                  'view',
-                  'add',
-                  'edit',
-                  'delete',
-                ],
-              },
-
-              {
-                key: 'attendance',
-                label: 'ATTENDANCE',
-                icon: '✓',
-                description:
-                  'Member attendance',
-                permissions: [
-                  'view',
-                  'add',
-                  'edit',
-                  'delete',
-                ],
-              },
-
-              {
-                key: 'workouts',
-                label: 'WORKOUTS',
-                icon: '⚡',
-                description:
-                  'Workout programmes',
-                permissions: [
-                  'view',
-                  'add',
-                  'edit',
-                  'delete',
-                ],
-              },
-
-              {
-                key: 'enquiries',
-                label: 'ENQUIRIES',
-                icon: '✉',
-                description:
-                  'Member enquiries',
-                permissions: [
-                  'view',
-                  'delete',
-                ],
-              },
-            ].map((section) => {
-
-              const enabledCount =
-                Object.values(
-                  permissions[section.key] || {}
-                ).filter(Boolean).length;
-
-              return (
-                <div
-                  className="staff-permission-card"
-                  key={section.key}
-                >
-
-                  {/* CARD HEADER */}
-
-                  <div className="staff-permission-card-header">
-
-                    <div className="staff-permission-title">
-
-                      <div className="staff-permission-icon">
-                        {section.icon}
-                      </div>
-
-                      <div>
-                        <strong>
-                          {section.label}
-                        </strong>
-
-                        <span>
-                          {section.description}
-                        </span>
-                      </div>
-
-                    </div>
-
-                    <div className="staff-permission-counter">
-                      {enabledCount}/
-                      {section.permissions.length}
-                    </div>
-
-                  </div>
-
-
-                  {/* PERMISSION OPTIONS */}
-
-                  <div className="staff-permission-options">
-
-                    {section.permissions.map(
-                      (permission) => {
-
-                        const checked =
-                          permissions[
-                            section.key
-                          ]?.[permission] || false;
-
-                        return (
-                          <label
-                            key={permission}
-                            className={`staff-permission-option ${
-                              checked
-                                ? 'staff-permission-enabled'
-                                : ''
-                            }`}
-                          >
-
-                            <input
-                              type="checkbox"
-                              checked={checked}
-                              onChange={() =>
-                                handlePermissionChange(
-                                  section.key,
-                                  permission
-                                )
-                              }
-                            />
-
-                            <span className="staff-custom-check">
-                              {checked ? '✓' : ''}
-                            </span>
-
-                            <span className="staff-permission-name">
-                              {permission
-                                .charAt(0)
-                                .toUpperCase() +
-                                permission.slice(1)}
-                            </span>
-
-                          </label>
-                        );
-                      }
-                    )}
-
-                  </div>
-
-                </div>
-              );
-            })}
-
-          </div>
-
-
-          {/* SAVE */}
-
-          <div className="staff-save-area">
-
-            <div className="staff-save-note">
-              <span>●</span>
-              Changes are saved to this account.
-            </div>
-
-            <button
-              type="button"
-              className="staff-save-button"
-              onClick={handleSavePermissions}
-              disabled={savingPermissions}
-            >
-              {savingPermissions
-                ? 'SAVING...'
-                : 'SAVE PERMISSIONS  →'}
-            </button>
-
-          </div>
-
-        </>
-
-      )}
-
-    </div>
-
-  </div>
-
-</section>
-)}
 
       {/* =====================================================
           PAYMENT MANAGEMENT

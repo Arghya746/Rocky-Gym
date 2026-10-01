@@ -9,32 +9,83 @@ const {
 
 const {
     protect,
-    authorize,
 } = require('../middleware/authMiddleware');
+
+const {
+    MAIN_ADMIN_ROLES,
+    RECEPTION_ROLES,
+    normalizeRole,
+    resolveAdminBranches,
+} = require('../utils/branchAccess');
 
 const router = express.Router();
 
 // ============================================================
-// MAIN ADMIN ROLES
+// STAFF MANAGEMENT AUTHORIZATION
+// ============================================================
+// Main admins have unrestricted access. Receptionist/staff users
+// are allowed only when their account has at least one valid
+// assigned branch. protect() remains responsible for JWT/auth.
+// Branch-level record filtering remains in staffController.
+
+const authorizeStaffManagement = (req, res, next) => {
+    if (!req.admin) {
+        return res.status(401).json({
+            success: false,
+            message: 'Not authorized.',
+        });
+    }
+
+    const role = normalizeRole(
+        req.adminRole || req.admin.role
+    );
+
+    if (MAIN_ADMIN_ROLES.includes(role)) {
+        return next();
+    }
+
+    if (!RECEPTION_ROLES.includes(role)) {
+        return res.status(403).json({
+            success: false,
+            message: 'Access denied. You do not have permission.',
+        });
+    }
+
+    const branches = resolveAdminBranches(req.admin);
+
+    if (!branches.length) {
+        return res.status(403).json({
+            success: false,
+            message: 'Your account is not assigned to a valid gym branch.',
+        });
+    }
+
+    return next();
+};
+
+// ============================================================
+// ALLOWED STAFF MANAGEMENT ROLES
 // ============================================================
 
-const MAIN_ADMIN_ROLES = [
+const STAFF_MANAGEMENT_ROLES = [
     'admin',
     'main_admin',
     'super_admin',
+    'receptionist',
+    'staff',
 ];
 
 // ============================================================
 // GET ALL RECEPTIONISTS / STAFF
 // GET /api/admin/staff
 //
-// Main Admin only.
+// Main admin + assigned receptionist/staff.
 // ============================================================
 
 router.get(
     '/',
     protect,
-    authorize(...MAIN_ADMIN_ROLES),
+    authorizeStaffManagement,
     getStaff
 );
 
@@ -42,13 +93,13 @@ router.get(
 // UPDATE STAFF BRANCHES
 // PUT /api/admin/staff/:id/branches
 //
-// Main Admin only.
+// Main admin + assigned receptionist/staff.
 // ============================================================
 
 router.put(
     '/:id/branches',
     protect,
-    authorize(...MAIN_ADMIN_ROLES),
+    authorizeStaffManagement,
     updateStaffBranches
 );
 
@@ -67,7 +118,7 @@ router.put(
 router.put(
     '/:id/permissions',
     protect,
-    authorize(...MAIN_ADMIN_ROLES),
+    authorizeStaffManagement,
     updateStaffPermissions
 );
 
@@ -75,13 +126,13 @@ router.put(
 // ACTIVATE / DEACTIVATE STAFF
 // PUT /api/admin/staff/:id/status
 //
-// Main Admin only.
+// Main admin + assigned receptionist/staff.
 // ============================================================
 
 router.put(
     '/:id/status',
     protect,
-    authorize(...MAIN_ADMIN_ROLES),
+    authorizeStaffManagement,
     updateStaffStatus
 );
 

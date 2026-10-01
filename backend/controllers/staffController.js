@@ -16,6 +16,11 @@ const MAIN_ADMIN_ROLES = [
     'super_admin',
 ];
 
+const BRANCH_STAFF_ROLES = [
+    'receptionist',
+    'staff',
+];
+
 // =====================================================
 // NORMALIZE ROLE
 // =====================================================
@@ -88,6 +93,20 @@ const isMainAdmin = (req) => {
             )
         )
     );
+};
+
+
+const isBranchStaff = (req) => {
+    return Boolean(
+        req.admin &&
+        BRANCH_STAFF_ROLES.includes(
+            normalizeRole(req.admin.role)
+        )
+    );
+};
+
+const canManageStaff = (req) => {
+    return isMainAdmin(req) || isBranchStaff(req);
 };
 
 // =====================================================
@@ -192,15 +211,16 @@ const getStaff = async(
         }
 
         const query = {
-            role: 'receptionist',
+            role: { $in: ['receptionist', 'staff'] },
         };
 
         // Branch users can only see
         // receptionists sharing a branch.
         if (!isMainAdmin(req)) {
-            query.gymBranches = {
-                $in: accessibleBranches,
-            };
+            query.$or = [
+                { gymBranches: { $in: accessibleBranches } },
+                { gymBranch: { $in: accessibleBranches } },
+            ];
         }
 
         const staff =
@@ -241,9 +261,9 @@ const updateStaffBranches = async(
     res
 ) => {
     try {
-        if (!isMainAdmin(req)) {
+        if (!canManageStaff(req)) {
             return res.status(403).json({
-                message: 'Only the main admin can assign receptionist branches.',
+                message: 'You do not have permission to manage staff accounts.',
             });
         }
 
@@ -293,15 +313,34 @@ const updateStaffBranches = async(
             });
         }
 
-        const staff =
-            await Admin.findOne({
-                _id: id,
-                role: 'receptionist',
+        const accessibleBranches = getAccessibleBranches(req);
+
+        if (!isMainAdmin(req) && normalizedBranches.some(
+                (branch) => !accessibleBranches.includes(branch)
+            )) {
+            return res.status(403).json({
+                message: 'Access denied. You can only assign staff to your accessible gym branches.',
             });
+        }
+
+        const staffQuery = {
+            _id: id,
+            role: { $in: ['receptionist', 'staff'] },
+        };
+
+        if (!isMainAdmin(req)) {
+            staffQuery.$or = [
+                { gymBranches: { $in: getAccessibleBranches(req) } },
+                { gymBranch: { $in: getAccessibleBranches(req) } },
+            ];
+        }
+
+        const staff =
+            await Admin.findOne(staffQuery);
 
         if (!staff) {
             return res.status(404).json({
-                message: 'Receptionist not found.',
+                message: 'Receptionist or staff account not found.',
             });
         }
 
@@ -340,9 +379,9 @@ const updateStaffPermissions = async(
     res
 ) => {
     try {
-        if (!isMainAdmin(req)) {
+        if (!canManageStaff(req)) {
             return res.status(403).json({
-                message: 'Only the main admin can update staff permissions.',
+                message: 'You do not have permission to manage staff accounts.',
             });
         }
 
@@ -372,15 +411,24 @@ const updateStaffPermissions = async(
             });
         }
 
+        const staffQuery = {
+            _id: id,
+            role: { $in: ['receptionist', 'staff'] },
+        };
+
+        if (!isMainAdmin(req)) {
+            staffQuery.$or = [
+                { gymBranches: { $in: getAccessibleBranches(req) } },
+                { gymBranch: { $in: getAccessibleBranches(req) } },
+            ];
+        }
+
         const staff =
-            await Admin.findOne({
-                _id: id,
-                role: 'receptionist',
-            });
+            await Admin.findOne(staffQuery);
 
         if (!staff) {
             return res.status(404).json({
-                message: 'Receptionist not found.',
+                message: 'Receptionist or staff account not found.',
             });
         }
 
@@ -388,8 +436,7 @@ const updateStaffPermissions = async(
             staff.permissions ?
             staff.permissions.toObject ?
             staff.permissions.toObject() :
-            staff.permissions :
-            {};
+            staff.permissions : {};
 
         /*
          * IMPORTANT:
@@ -435,15 +482,9 @@ const updateStaffPermissions = async(
                 ...(permissions.offers || {}),
             },
 
-            /*
-             * Staff management is controlled by main admin.
-             * Receptionists should not modify staff accounts.
-             */
             staff: {
-                view: false,
-                add: false,
-                edit: false,
-                delete: false,
+                ...(existingPermissions.staff || {}),
+                ...(permissions.staff || {}),
             },
         };
 
@@ -476,9 +517,9 @@ const updateStaffStatus = async(
     res
 ) => {
     try {
-        if (!isMainAdmin(req)) {
+        if (!canManageStaff(req)) {
             return res.status(403).json({
-                message: 'Only the main admin can update staff status.',
+                message: 'You do not have permission to manage staff accounts.',
             });
         }
 
@@ -507,15 +548,24 @@ const updateStaffStatus = async(
             });
         }
 
+        const staffQuery = {
+            _id: id,
+            role: { $in: ['receptionist', 'staff'] },
+        };
+
+        if (!isMainAdmin(req)) {
+            staffQuery.$or = [
+                { gymBranches: { $in: getAccessibleBranches(req) } },
+                { gymBranch: { $in: getAccessibleBranches(req) } },
+            ];
+        }
+
         const staff =
-            await Admin.findOne({
-                _id: id,
-                role: 'receptionist',
-            });
+            await Admin.findOne(staffQuery);
 
         if (!staff) {
             return res.status(404).json({
-                message: 'Receptionist not found.',
+                message: 'Receptionist or staff account not found.',
             });
         }
 

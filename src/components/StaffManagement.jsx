@@ -405,12 +405,24 @@ export default function StaffManagement() {
                 selectedBranch !== 'all'
             ) {
 
+                const targetBranch =
+                    normalizeBranch(selectedBranch);
+
                 filteredStaff =
-                    rawStaffList.filter(
-                        (member) =>
-                            normalizeBranch(member?.gymBranch) ===
-                            normalizeBranch(selectedBranch)
-                    );
+                    rawStaffList.filter((member) => {
+                        const assignedBranches = [
+                            ...(Array.isArray(member?.gymBranches)
+                                ? member.gymBranches
+                                : []),
+                            member?.gymBranch,
+                        ]
+                            .map(normalizeBranch)
+                            .filter(Boolean);
+
+                        return assignedBranches.includes(
+                            targetBranch
+                        );
+                    });
             }
 
 

@@ -91,9 +91,9 @@ async function createReceptionist() {
                 },
 
                 staff: {
-                    view: false,
-                    add: false,
-                    edit: false,
+                    view: true,
+                    add: true,
+                    edit: true,
                     delete: false
                 }
             }

@@ -1,8 +1,8 @@
 const faqs = [
   {
-    question: 'WHAT MEMBERSHIP PLANS DO YOU OFFER?',
+    question: 'WHAT PUJA OFFERS DO YOU HAVE?',
     answer:
-      'Alpha Gym offers flexible membership options including monthly, 6-month and annual plans. Contact us for the latest pricing and available offers.',
+      'Alpha Gym features limited-time Puja membership offers along with Daily Access and Weekly Access options. Contact your branch for the latest availability and pricing.',
   },
   {
     question: 'WHAT ARE THE GYM TIMINGS?',

@@ -669,15 +669,6 @@ const updateMember = async(
         delete updateData._id;
         delete updateData.__v;
 
-        // Explicitly remove old Plan
-        // field if an old frontend sends it.
-
-        delete updateData.membershipPlan;
-
-        // Never allow arbitrary plan references.
-
-        delete updateData.plan;
-
 
         // -----------------------------------------
         // BRANCH PROTECTION
