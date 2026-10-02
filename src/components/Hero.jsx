@@ -59,7 +59,7 @@ export default function Hero({ branchConfig }) {
           <div className="hero-buttons">
 
             <a
-              href="#plans"
+              href="#offers"
               className="primary-btn"
             >
               START YOUR JOURNEY

@@ -438,14 +438,6 @@ const updateStaffPermissions = async(
             staff.permissions.toObject() :
             staff.permissions : {};
 
-        /*
-         * IMPORTANT:
-         *
-         * There is NO "plans" permission anymore.
-         *
-         * Access products use "accessPasses".
-         */
-
         staff.permissions = {
             members: {
                 ...(existingPermissions.members || {}),

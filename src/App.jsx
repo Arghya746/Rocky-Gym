@@ -15,7 +15,7 @@ import './App.css';
    ========================================================= */
 
 import akramTrainerImage from './assets/Akram trainer.jpeg';
-import gopalpurTrainerImage from './assets/Gopalpur trainer.jpeg';
+import shariqueTrainerImage from './assets/Sharique trainer.jpeg';
 import nikitaTrainerImage from './assets/Nikita Trainer.jpeg';
 
 /* =========================================================
@@ -33,7 +33,6 @@ import Marquee from './components/Marquee';
 import MotivationSection from './components/MotivationSection';
 import Navbar from './components/Navbar';
 import OffersSection from './components/OffersSection';
-import PricingSection from './components/PricingSection';
 import ServicesSection from './components/ServicesSection';
 import SoftwareSection from './components/SoftwareSection';
 import TestimonialSection from './components/TestimonialSection';
@@ -121,9 +120,9 @@ const BRANCH_CONFIG = {
 
     /* -------------------------------------------------------
        TRAINERS
-       
+
        KALYANPUR:
-       1. Akram
+       1. Sharique
        2. Nikita
     ------------------------------------------------------- */
 
@@ -131,19 +130,19 @@ const BRANCH_CONFIG = {
       {
         id: 'kalyanpur-trainer-1',
 
-        name: 'Akram',
+        name: 'Sharique',
 
-        role: 'STRENGTH & FITNESS COACH',
+        role: 'FITNESS & PERSONAL TRAINING COACH',
 
-        image: akramTrainerImage,
+        image: shariqueTrainerImage,
 
-        photo: akramTrainerImage,
+        photo: shariqueTrainerImage,
 
         experience: 'EXPERIENCED TRAINER',
 
-        specialization: 'STRENGTH & FITNESS',
+        specialization: 'FITNESS TRAINING',
 
-        className: 'trainer-orange',
+        className: 'trainer-cyan',
       },
 
       {
@@ -166,88 +165,10 @@ const BRANCH_CONFIG = {
     ],
 
     /* -------------------------------------------------------
-       MEMBERSHIP PLANS
-    ------------------------------------------------------- */
-
-    membershipPlans: [
-      {
-        id: 'kalyanpur-monthly',
-
-        name: 'Monthly',
-
-        title: 'MONTHLY',
-
-        price: 1500,
-
-        durationMonths: 1,
-
-        duration: '1 Month',
-
-        label: 'STARTER',
-
-        popular: false,
-
-        perks: [
-          'Gym Access',
-          'Basic Workout Guidance',
-          'Attendance Tracking',
-          'No Long Commitment',
-        ],
-      },
-
-      {
-        id: 'kalyanpur-half-yearly',
-
-        name: 'Half-Yearly',
-
-        title: 'HALF-YEARLY',
-
-        price: 4500,
-
-        durationMonths: 6,
-
-        duration: '6 Months',
-
-        label: 'TRANSFORMATION',
-
-        popular: true,
-
-        perks: [
-          'Full Gym Access',
-          'Advanced Workout Plan',
-          'Digital Member Profile',
-          'Progress Tracking',
-        ],
-      },
-
-      {
-        id: 'kalyanpur-yearly',
-
-        name: 'Yearly',
-
-        title: 'YEARLY',
-
-        price: 8000,
-
-        durationMonths: 12,
-
-        duration: '12 Months',
-
-        label: 'ULTIMATE',
-
-        popular: false,
-
-        perks: [
-          'Full Gym Access',
-          'Advanced Tracking',
-          'Digital Workout Plan',
-          'Best Value',
-        ],
-      },
-    ],
-
-    /* -------------------------------------------------------
        OFFERS
+
+       Membership Plans are intentionally removed.
+       Offers remain separate.
     ------------------------------------------------------- */
 
     offers: [
@@ -443,13 +364,31 @@ const BRANCH_CONFIG = {
        TRAINERS
 
        GOPALPUR:
-       1. Nikita
-       2. Gopalpur Trainer Profile
+       1. Akram
+       2. Nikita
     ------------------------------------------------------- */
 
     trainers: [
       {
         id: 'gopalpur-trainer-1',
+
+        name: 'Akram',
+
+        role: 'STRENGTH & FITNESS COACH',
+
+        image: akramTrainerImage,
+
+        photo: akramTrainerImage,
+
+        experience: 'EXPERIENCED TRAINER',
+
+        specialization: 'STRENGTH & FITNESS',
+
+        className: 'trainer-orange',
+      },
+
+      {
+        id: 'gopalpur-trainer-2',
 
         name: 'Nikita',
 
@@ -464,105 +403,6 @@ const BRANCH_CONFIG = {
         specialization: 'PERSONAL TRAINING',
 
         className: 'trainer-purple',
-      },
-
-      {
-        id: 'gopalpur-trainer-2',
-
-        name: 'TRAINER PROFILE',
-
-        role: 'FITNESS & PERSONAL TRAINING COACH',
-
-        image: gopalpurTrainerImage,
-
-        photo: gopalpurTrainerImage,
-
-        experience: 'EXPERIENCED TRAINER',
-
-        specialization: 'FITNESS TRAINING',
-
-        className: 'trainer-cyan',
-      },
-    ],
-
-    /* -------------------------------------------------------
-       MEMBERSHIP PLANS
-    ------------------------------------------------------- */
-
-    membershipPlans: [
-      {
-        id: 'gopalpur-monthly',
-
-        name: 'Monthly',
-
-        title: 'MONTHLY',
-
-        price: 1500,
-
-        durationMonths: 1,
-
-        duration: '1 Month',
-
-        label: 'STARTER',
-
-        popular: false,
-
-        perks: [
-          'Gym Access',
-          'Basic Workout Guidance',
-          'Attendance Tracking',
-          'No Long Commitment',
-        ],
-      },
-
-      {
-        id: 'gopalpur-half-yearly',
-
-        name: 'Half-Yearly',
-
-        title: 'HALF-YEARLY',
-
-        price: 4500,
-
-        durationMonths: 6,
-
-        duration: '6 Months',
-
-        label: 'TRANSFORMATION',
-
-        popular: true,
-
-        perks: [
-          'Full Gym Access',
-          'Advanced Workout Plan',
-          'Digital Member Profile',
-          'Progress Tracking',
-        ],
-      },
-
-      {
-        id: 'gopalpur-yearly',
-
-        name: 'Yearly',
-
-        title: 'YEARLY',
-
-        price: 8000,
-
-        durationMonths: 12,
-
-        duration: '12 Months',
-
-        label: 'ULTIMATE',
-
-        popular: false,
-
-        perks: [
-          'Full Gym Access',
-          'Advanced Tracking',
-          'Digital Workout Plan',
-          'Best Value',
-        ],
       },
     ],
 
@@ -709,7 +549,6 @@ const BRANCH_CONFIG = {
 
 function HomePage({
   branchConfig,
-  onSelectPlan,
   onClaimOffer,
   theme,
   onToggleTheme,
@@ -782,15 +621,6 @@ function HomePage({
         <OffersSection
           branchConfig={branchConfig}
           onClaimOffer={onClaimOffer}
-        />
-
-        {/* =================================================
-            PRICING
-        ================================================= */}
-
-        <PricingSection
-          branchConfig={branchConfig}
-          onSelectPlan={onSelectPlan}
         />
 
         {/* =================================================
@@ -1020,35 +850,6 @@ function App() {
   };
 
   /* =======================================================
-     MEMBERSHIP PLAN
-  ======================================================= */
-
-  const handleSelectPlan = (
-    plan,
-    price
-  ) => {
-    const numericPrice = Number(price);
-
-    const formattedPrice =
-      Number.isFinite(numericPrice)
-        ? numericPrice.toLocaleString('en-IN')
-        : price;
-
-    showToast(
-      `${plan} selected • ₹${formattedPrice}`
-    );
-
-    window.setTimeout(() => {
-      document
-        .getElementById('contact')
-        ?.scrollIntoView({
-          behavior: 'smooth',
-          block: 'start',
-        });
-    }, 100);
-  };
-
-  /* =======================================================
      OFFER
   ======================================================= */
 
@@ -1112,10 +913,6 @@ function App() {
                 BRANCH_CONFIG.kalyanpur
               }
 
-              onSelectPlan={
-                handleSelectPlan
-              }
-
               onClaimOffer={
                 handleClaimOffer
               }
@@ -1139,10 +936,6 @@ function App() {
             <HomePage
               branchConfig={
                 BRANCH_CONFIG.gopalpur
-              }
-
-              onSelectPlan={
-                handleSelectPlan
               }
 
               onClaimOffer={

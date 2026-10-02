@@ -69,6 +69,18 @@ const normalizeBranch = (value) => {
         return '';
     }
 
+    /*
+     * Support branch objects as well as strings.
+     */
+    if (typeof value === 'object') {
+        value =
+            value._id ||
+            value.name ||
+            value.branchName ||
+            value.gymBranch ||
+            '';
+    }
+
     const branch = String(value)
         .trim()
         .toLowerCase();
@@ -86,13 +98,13 @@ const normalizeBranch = (value) => {
 
 /*
  * Main admin:
- *     all branches
+ *     access to both branches.
  *
  * Receptionist/staff:
- *     gymBranches is authoritative
+ *     gymBranches is authoritative.
  *
  * Legacy:
- *     gymBranch is supported as fallback
+ *     gymBranch is supported as fallback.
  */
 const getAccessibleBranches = (req) => {
     if (!req || !req.admin) {
@@ -111,6 +123,9 @@ const getAccessibleBranches = (req) => {
             .filter(Boolean);
     }
 
+    /*
+     * Legacy single-branch fallback.
+     */
     if (
         branches.length === 0 &&
         req.admin.gymBranch
@@ -159,10 +174,17 @@ const validateAccess = (req, res) => {
         req.admin.role
     );
 
+    /*
+     * Main admins can access both branches.
+     */
     if (MAIN_ADMIN_ROLES.includes(role)) {
         return true;
     }
 
+    /*
+     * Only receptionist/staff can manage
+     * branch-level access products.
+     */
     if (!BRANCH_USER_ROLES.includes(role)) {
         res.status(403).json({
             success: false,
@@ -302,7 +324,7 @@ const parseBoolean = (
 };
 
 /* =========================================================
-   DESCRIPTION
+   DESCRIPTION HELPER
    ========================================================= */
 
 const normalizeDescription = (value) => {
@@ -324,6 +346,10 @@ const resolveRequestedBranch = (
     req,
     requestedBranch
 ) => {
+    /*
+     * Main admin must explicitly select
+     * a branch when creating/updating.
+     */
     if (isMainAdmin(req)) {
         const branch = normalizeBranch(
             requestedBranch
@@ -352,8 +378,7 @@ const resolveRequestedBranch = (
     }
 
     /*
-     * Branch user must never be able to write
-     * to a branch outside their assignment.
+     * Branch user requested a specific branch.
      */
     if (requestedBranch) {
         const requested =
@@ -381,18 +406,22 @@ const resolveRequestedBranch = (
     }
 
     /*
-     * If a receptionist has multiple branches,
-     * the frontend must explicitly select one.
+     * Single-branch receptionist/staff can
+     * automatically use their assigned branch.
      */
-    if (accessibleBranches.length > 1) {
+    if (accessibleBranches.length === 1) {
         return {
-            error: 'Please select a gym branch.',
-            status: 400,
+            branch: accessibleBranches[0],
         };
     }
 
+    /*
+     * Multi-branch receptionist/staff must select
+     * the branch explicitly.
+     */
     return {
-        branch: accessibleBranches[0],
+        error: 'Please select a gym branch.',
+        status: 400,
     };
 };
 
@@ -414,6 +443,13 @@ const getAccessPasses = async(
             isActive: true,
         };
 
+        /*
+         * Main admin:
+         *     all branches.
+         *
+         * Receptionist/staff:
+         *     assigned branches only.
+         */
         if (!isMainAdmin(req)) {
             const branches =
                 getAccessibleBranches(req);
@@ -435,12 +471,17 @@ const getAccessPasses = async(
             .sort({
                 gymBranch: 1,
                 durationDays: 1,
+                createdAt: -1,
             });
 
+        /*
+         * IMPORTANT:
+         * AdminDashboard expects data.accessPasses.
+         */
         return res.status(200).json({
             success: true,
             count: passes.length,
-            passes,
+            accessPasses: passes,
         });
 
     } catch (error) {
@@ -472,6 +513,13 @@ const getAllAccessPasses = async(
 
         const query = {};
 
+        /*
+         * Main admin:
+         *     all branches.
+         *
+         * Receptionist/staff:
+         *     assigned branches only.
+         */
         if (!isMainAdmin(req)) {
             const branches =
                 getAccessibleBranches(req);
@@ -496,10 +544,14 @@ const getAllAccessPasses = async(
                 createdAt: -1,
             });
 
+        /*
+         * IMPORTANT:
+         * AdminDashboard expects data.accessPasses.
+         */
         return res.status(200).json({
             success: true,
             count: passes.length,
-            passes,
+            accessPasses: passes,
         });
 
     } catch (error) {
@@ -544,8 +596,12 @@ const getPublicAccessPasses = async(
             .sort({
                 gymBranch: 1,
                 durationDays: 1,
+                createdAt: -1,
             });
 
+        /*
+         * Keep public API response unchanged.
+         */
         return res.status(200).json({
             success: true,
             count: passes.length,
@@ -566,7 +622,7 @@ const getPublicAccessPasses = async(
 };
 
 /* =========================================================
-   GET SINGLE PASS
+   GET SINGLE ACCESS PASS
    GET /api/access-passes/:id
    ========================================================= */
 
@@ -655,13 +711,13 @@ const createAccessPass = async(
 
         /*
          * Accept:
-         * type = Daily / Weekly
+         *     type = Daily / Weekly
          *
-         * Also accept old values temporarily:
-         * passType = Daily Access / Weekly Access
+         * Also accept:
+         *     passType = Daily Access / Weekly Access
          *
-         * This prevents an old frontend request from
-         * breaking while the project is being cleaned.
+         * This keeps the API backward-compatible
+         * with an older frontend request.
          */
         const normalizedType =
             normalizePassType(
@@ -716,7 +772,7 @@ const createAccessPass = async(
          * Daily = 1 day
          * Weekly = 7 days
          *
-         * Do not allow arbitrary duration.
+         * Arbitrary duration is not allowed.
          */
         if (
             durationDays !== undefined &&
@@ -725,21 +781,33 @@ const createAccessPass = async(
         ) {
             return res.status(400).json({
                 success: false,
-                message: `${getPassName(normalizedType)} must have a duration of ${expectedDuration} day(s).`,
+                message: `${getPassName(
+                        normalizedType
+                    )} must have a duration of ${expectedDuration} day(s).`,
             });
         }
 
+        /*
+         * Prevent duplicate active products
+         * for the same branch and pass type.
+         */
         const existingPass =
             await AccessPass.findOne({
                 gymBranch: selectedBranch,
-                type: normalizedType,
+
+                passType: getPassName(
+                    normalizedType
+                ),
+
                 isActive: true,
             });
 
         if (existingPass) {
             return res.status(409).json({
                 success: false,
-                message: `${getPassName(normalizedType)} already exists for ${selectedBranch}.`,
+                message: `${getPassName(
+                        normalizedType
+                    )} already exists for ${selectedBranch}.`,
             });
         }
 
@@ -747,11 +815,9 @@ const createAccessPass = async(
             await AccessPass.create({
                 gymBranch: selectedBranch,
 
-                name: getPassName(
+                passType: getPassName(
                     normalizedType
                 ),
-
-                type: normalizedType,
 
                 durationDays: expectedDuration,
 
@@ -817,6 +883,10 @@ const updateAccessPass = async(
             _id: id,
         };
 
+        /*
+         * Branch users can update only passes
+         * belonging to their assigned branches.
+         */
         if (!isMainAdmin(req)) {
             const branches =
                 getAccessibleBranches(req);
@@ -882,7 +952,9 @@ const updateAccessPass = async(
         ----------------------------------------------------- */
 
         let finalType =
-            pass.type;
+            normalizePassType(
+                pass.passType
+            );
 
         if (
             type !== undefined ||
@@ -907,7 +979,9 @@ const updateAccessPass = async(
         }
 
         const finalDuration =
-            getDurationDays(finalType);
+            getDurationDays(
+                finalType
+            );
 
         if (
             durationDays !== undefined &&
@@ -916,7 +990,9 @@ const updateAccessPass = async(
         ) {
             return res.status(400).json({
                 success: false,
-                message: `${getPassName(finalType)} must have a duration of ${finalDuration} day(s).`,
+                message: `${getPassName(
+                        finalType
+                    )} must have a duration of ${finalDuration} day(s).`,
             });
         }
 
@@ -962,7 +1038,9 @@ const updateAccessPass = async(
 
                     gymBranch: finalBranch,
 
-                    type: finalType,
+                    passType: getPassName(
+                        finalType
+                    ),
 
                     isActive: true,
                 });
@@ -970,23 +1048,24 @@ const updateAccessPass = async(
             if (duplicate) {
                 return res.status(409).json({
                     success: false,
-                    message: `${getPassName(finalType)} already exists for ${finalBranch}.`,
+                    message: `${getPassName(
+                            finalType
+                        )} already exists for ${finalBranch}.`,
                 });
             }
         }
 
         /* -----------------------------------------------------
-           UPDATE
+           APPLY UPDATE
         ----------------------------------------------------- */
 
         pass.gymBranch =
             finalBranch;
 
-        pass.name =
-            getPassName(finalType);
-
-        pass.type =
-            finalType;
+        pass.passType =
+            getPassName(
+                finalType
+            );
 
         pass.durationDays =
             finalDuration;
@@ -1035,7 +1114,7 @@ const updateAccessPass = async(
 };
 
 /* =========================================================
-   DELETE / DEACTIVATE
+   DELETE / DEACTIVATE ACCESS PASS
    DELETE /api/access-passes/:id
    ========================================================= */
 
@@ -1061,6 +1140,10 @@ const deleteAccessPass = async(
             _id: id,
         };
 
+        /*
+         * Branch users can deactivate only
+         * passes belonging to their branches.
+         */
         if (!isMainAdmin(req)) {
             const branches =
                 getAccessibleBranches(req);

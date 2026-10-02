@@ -70,13 +70,6 @@ async function createReceptionist() {
                     delete: false,
                 },
 
-                plans: {
-                    view: true,
-                    add: false,
-                    edit: false,
-                    delete: false,
-                },
-
                 offers: {
                     view: true,
                     add: false,

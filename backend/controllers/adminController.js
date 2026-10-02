@@ -704,22 +704,6 @@ const loginAdmin = async(req, res) => {
 
 
         /* --------------------------------------------------------
-           REMOVE OLD MEMBERSHIP PLANS PERMISSION
-        -------------------------------------------------------- */
-
-        if (
-            Object.prototype.hasOwnProperty.call(
-                permissions,
-                'plans'
-            )
-        ) {
-            delete permissions.plans;
-
-            permissionsChanged = true;
-        }
-
-
-        /* --------------------------------------------------------
            RECEPTIONIST / STAFF DEFAULT PERMISSIONS
         -------------------------------------------------------- */
 

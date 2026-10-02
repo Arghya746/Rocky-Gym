@@ -64,6 +64,32 @@ const authorizeStaffManagement = (req, res, next) => {
 };
 
 // ============================================================
+// MAIN ADMIN ONLY MUTATIONS
+// ============================================================
+
+const authorizeMainAdmin = (req, res, next) => {
+    if (!req.admin) {
+        return res.status(401).json({
+            success: false,
+            message: 'Not authorized.',
+        });
+    }
+
+    const role = normalizeRole(
+        req.adminRole || req.admin.role
+    );
+
+    if (!MAIN_ADMIN_ROLES.includes(role)) {
+        return res.status(403).json({
+            success: false,
+            message: 'Only the main admin can modify staff accounts.',
+        });
+    }
+
+    return next();
+};
+
+// ============================================================
 // ALLOWED STAFF MANAGEMENT ROLES
 // ============================================================
 
@@ -93,13 +119,13 @@ router.get(
 // UPDATE STAFF BRANCHES
 // PUT /api/admin/staff/:id/branches
 //
-// Main admin + assigned receptionist/staff.
+// Main admin only.
 // ============================================================
 
 router.put(
     '/:id/branches',
     protect,
-    authorizeStaffManagement,
+    authorizeMainAdmin,
     updateStaffBranches
 );
 
@@ -112,13 +138,12 @@ router.put(
 // Available permission groups are handled by the
 // staffController/Admin model.
 //
-// No "plans" permission.
 // ============================================================
 
 router.put(
     '/:id/permissions',
     protect,
-    authorizeStaffManagement,
+    authorizeMainAdmin,
     updateStaffPermissions
 );
 
@@ -126,13 +151,13 @@ router.put(
 // ACTIVATE / DEACTIVATE STAFF
 // PUT /api/admin/staff/:id/status
 //
-// Main admin + assigned receptionist/staff.
+// Main admin only.
 // ============================================================
 
 router.put(
     '/:id/status',
     protect,
-    authorizeStaffManagement,
+    authorizeMainAdmin,
     updateStaffStatus
 );
 

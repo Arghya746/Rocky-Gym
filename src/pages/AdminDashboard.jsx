@@ -569,12 +569,6 @@ export default function AdminDashboard() {
   });
 
   const fetchStaff = async () => {
-    if (!isMainAdmin) {
-      setStaff([]);
-      setSelectedStaff(null);
-      return;
-    }
-
     try {
       setStaffError('');
 
@@ -754,6 +748,10 @@ export default function AdminDashboard() {
   };
 
   const handlePermissionChange = (section, permission) => {
+    if (!isMainAdmin) {
+      return;
+    }
+
     setPermissions((current) => ({
       ...current,
       [section]: {
@@ -767,6 +765,14 @@ export default function AdminDashboard() {
   };
 
   const handleToggleStaffStatus = async (staffMember) => {
+    if (!isMainAdmin) {
+      setStaffError(
+        'Only the main admin can activate or deactivate staff accounts.'
+      );
+      setStaffSuccess('');
+      return;
+    }
+
     try {
       const token = localStorage.getItem('adminToken');
 
@@ -838,6 +844,14 @@ export default function AdminDashboard() {
 
   const handleSavePermissions = async () => {
     if (!selectedStaff) {
+      return;
+    }
+
+    if (!isMainAdmin) {
+      setStaffError(
+        'Only the main admin can manage staff permissions.'
+      );
+      setStaffSuccess('');
       return;
     }
 
@@ -3761,475 +3775,658 @@ const handleAttendanceChange = (e) => {
 
 
       {/* =====================================================
-          DAILY / WEEKLY ACCESS
-      ===================================================== */}
+    DAILY / WEEKLY ACCESS
+===================================================== */}
 
-      <section
-        className="admin-enquiries"
-        style={{ marginBottom: '28px' }}
+<section
+  className="admin-enquiries"
+  style={{ marginBottom: '28px' }}
+>
+
+  {/* =================================================
+      SECTION HEADER
+  ================================================= */}
+
+  <div className="admin-section-heading">
+
+    <div>
+
+      <span className="section-tag">
+        ACCESS PRODUCTS
+      </span>
+
+      <h2>
+        DAILY / WEEKLY <span>ACCESS.</span>
+      </h2>
+
+      <p>
+        Manage one-day and seven-day access products
+        branch by branch.
+      </p>
+
+    </div>
+
+
+    <div className="admin-section-actions">
+
+      <span className="admin-count">
+        {accessPasses.length} ACCESS PASSES
+      </span>
+
+      <button
+        type="button"
+        className="admin-add-btn"
+        onClick={openCreateAccessPass}
+      >
+        + ADD ACCESS
+      </button>
+
+    </div>
+
+  </div>
+
+
+  {/* =================================================
+      ERROR
+  ================================================= */}
+
+  {accessPassesError && (
+    <div className="admin-message admin-error">
+      {accessPassesError}
+    </div>
+  )}
+
+
+  {/* =================================================
+      LOADING
+  ================================================= */}
+
+  {accessPassesLoading && (
+    <div className="admin-message">
+      Loading access products...
+    </div>
+  )}
+
+
+  {/* =================================================
+      EMPTY STATE
+  ================================================= */}
+
+  {!accessPassesLoading &&
+    accessPasses.length === 0 && (
+
+      <div className="admin-message">
+
+        No Daily or Weekly access products found
+        for this branch.
+
+      </div>
+
+    )}
+
+
+  {/* =================================================
+      ACCESS PRODUCT CARDS
+  ================================================= */}
+
+  {!accessPassesLoading &&
+    accessPasses.length > 0 && (
+
+      <div
+        style={{
+          display: 'grid',
+          gridTemplateColumns:
+            'repeat(auto-fit,minmax(280px,1fr))',
+          gap: '20px',
+        }}
       >
 
-        <div className="admin-section-heading">
+        {accessPasses.map((pass) => {
 
-          <div>
+          const isWeekly =
+            pass.passType === 'Weekly Access' ||
+            Number(pass.durationDays) === 7;
 
-            <span className="section-tag">
-              ACCESS PRODUCTS
-            </span>
+          const passName = isWeekly
+            ? 'Weekly Access'
+            : 'Daily Access';
 
-            <h2>
-              DAILY / WEEKLY <span>ACCESS.</span>
-            </h2>
+          const duration =
+            Number(pass.durationDays) ||
+            (isWeekly ? 7 : 1);
 
-            <p>
-              Manage one-day and seven-day access products
-              branch by branch.
-            </p>
+          const defaultDescription = isWeekly
+            ? 'Stay consistent with 7 days of full access to all gym facilities'
+            : 'Perfect for those who want to stay active with flexible short term access';
 
-          </div>
+          const description =
+            String(pass.description || '').trim() ||
+            defaultDescription;
 
-          <div className="admin-section-actions">
+          return (
 
-            <span className="admin-count">
-              {accessPasses.length} ACCESS PASSES
-            </span>
-
-            <button
-              type="button"
-              className="admin-add-btn"
-              onClick={openCreateAccessPass}
+            <article
+              key={pass._id}
+              style={{
+                padding: '24px',
+                borderRadius: '18px',
+                border:
+                  '1px solid rgba(255,255,255,.10)',
+                background:
+                  'linear-gradient(145deg,#17171e,#0d0d12)',
+                opacity:
+                  pass.isActive ? 1 : 0.62,
+                position: 'relative',
+                overflow: 'hidden',
+              }}
             >
-              + ADD ACCESS
-            </button>
 
-          </div>
+              {/* =====================================
+                  CARD HEADER
+              ===================================== */}
+
+              <div
+                style={{
+                  display: 'flex',
+                  justifyContent: 'space-between',
+                  gap: '12px',
+                  alignItems: 'flex-start',
+                }}
+              >
+
+                <div>
+
+                  <span className="section-tag">
+                    {getBranchLabel(
+                      pass.gymBranch
+                    )}
+                  </span>
+
+                  <h3
+                    style={{
+                      margin:
+                        '10px 0 5px',
+                      fontSize: '26px',
+                      lineHeight: '1.1',
+                    }}
+                  >
+                    {passName}
+                  </h3>
+
+                </div>
+
+
+                <span className="goal-badge">
+                  {pass.isActive
+                    ? 'ACTIVE'
+                    : 'INACTIVE'}
+                </span>
+
+              </div>
+
+
+              {/* =====================================
+                  PRICE
+              ===================================== */}
+
+              <div
+                style={{
+                  marginTop: '20px',
+                  marginBottom: '16px',
+                }}
+              >
+
+                <small
+                  style={{
+                    opacity: 0.6,
+                    display: 'block',
+                    marginBottom: '5px',
+                  }}
+                >
+                  ACCESS PRICE
+                </small>
+
+                <strong
+                  style={{
+                    display: 'block',
+                    fontSize: '34px',
+                    lineHeight: '1',
+                  }}
+                >
+                  ₹
+                  {Number(
+                    pass.price || 0
+                  ).toLocaleString('en-IN')}
+                </strong>
+
+              </div>
+
+
+              {/* =====================================
+                  DURATION + TYPE
+              ===================================== */}
+
+              <div
+                style={{
+                  display: 'grid',
+                  gridTemplateColumns:
+                    '1fr 1fr',
+                  gap: '12px',
+                  marginBottom: '18px',
+                }}
+              >
+
+                <div
+                  style={{
+                    padding: '12px',
+                    borderRadius: '12px',
+                    background:
+                      'rgba(255,255,255,.035)',
+                  }}
+                >
+
+                  <small
+                    style={{
+                      opacity: 0.6,
+                      display: 'block',
+                    }}
+                  >
+                    DURATION
+                  </small>
+
+                  <strong
+                    style={{
+                      display: 'block',
+                      fontSize: '19px',
+                      marginTop: '4px',
+                    }}
+                  >
+                    {duration}{' '}
+                    {duration === 1
+                      ? 'DAY'
+                      : 'DAYS'}
+                  </strong>
+
+                </div>
+
+
+                <div
+                  style={{
+                    padding: '12px',
+                    borderRadius: '12px',
+                    background:
+                      'rgba(255,255,255,.035)',
+                  }}
+                >
+
+                  <small
+                    style={{
+                      opacity: 0.6,
+                      display: 'block',
+                    }}
+                  >
+                    ACCESS TYPE
+                  </small>
+
+                  <strong
+                    style={{
+                      display: 'block',
+                      fontSize: '16px',
+                      marginTop: '6px',
+                    }}
+                  >
+                    {isWeekly
+                      ? '7 DAYS'
+                      : '1 DAY'}
+                  </strong>
+
+                </div>
+
+              </div>
+
+
+              {/* =====================================
+                  DESCRIPTION
+              ===================================== */}
+
+              <p
+                style={{
+                  minHeight: '66px',
+                  color: '#aaa',
+                  lineHeight: '1.55',
+                  margin:
+                    '0 0 20px',
+                }}
+              >
+                {description}
+              </p>
+
+
+              {/* =====================================
+                  ACTIONS
+              ===================================== */}
+
+              <div
+                style={{
+                  display: 'flex',
+                  gap: '8px',
+                  flexWrap: 'wrap',
+                }}
+              >
+
+                <button
+                  type="button"
+                  className="admin-edit-btn"
+                  onClick={() =>
+                    openEditAccessPass(
+                      pass
+                    )
+                  }
+                >
+                  EDIT
+                </button>
+
+                <button
+                  type="button"
+                  className="admin-add-btn"
+                  onClick={() =>
+                    handleToggleAccessPass(
+                      pass
+                    )
+                  }
+                >
+                  {pass.isActive
+                    ? 'DEACTIVATE'
+                    : 'ACTIVATE'}
+                </button>
+
+              </div>
+
+            </article>
+
+          );
+
+        })}
+
+      </div>
+
+    )}
+
+
+  {/* =================================================
+      ADD / EDIT ACCESS FORM
+  ================================================= */}
+
+  {showAccessPassForm && (
+
+    <form
+      onSubmit={handleSaveAccessPass}
+      style={{
+        marginTop: '22px',
+        padding: '22px',
+        borderRadius: '18px',
+        border:
+          '1px solid rgba(255,102,0,.25)',
+        background:
+          'linear-gradient(145deg,rgba(255,102,0,.07),rgba(255,255,255,.015))',
+      }}
+    >
+
+      <div className="admin-form-heading">
+
+        <span className="section-tag">
+
+          {editingAccessPass
+            ? 'EDIT ACCESS'
+            : 'NEW ACCESS'}
+
+        </span>
+
+        <h3>
+
+          {editingAccessPass
+            ? 'EDIT '
+            : 'ADD '}
+
+          <span>
+            ACCESS.
+          </span>
+
+        </h3>
+
+      </div>
+
+
+      {/* FORM ERROR */}
+
+      {accessPassFormError && (
+        <div className="admin-message admin-error">
+          {accessPassFormError}
+        </div>
+      )}
+
+
+      {/* FORM FIELDS */}
+
+      <div
+        style={{
+          display: 'grid',
+          gridTemplateColumns:
+            'repeat(auto-fit,minmax(210px,1fr))',
+          gap: '14px',
+        }}
+      >
+
+        {/* ACCESS TYPE */}
+
+        <div className="admin-login-field">
+
+          <label>
+            ACCESS TYPE
+          </label>
+
+          <select
+            name="passType"
+            value={
+              accessPassForm.passType
+            }
+            onChange={
+              handleAccessPassChange
+            }
+          >
+
+            <option value="Daily Access">
+              Daily Access
+            </option>
+
+            <option value="Weekly Access">
+              Weekly Access
+            </option>
+
+          </select>
 
         </div>
 
 
-        {accessPassesError && (
-          <div className="admin-message admin-error">
-            {accessPassesError}
-          </div>
-        )}
+        {/* PRICE */}
 
+        <div className="admin-login-field">
 
-        {accessPassesLoading && (
-          <div className="admin-message">
-            Loading access products...
-          </div>
-        )}
+          <label>
+            PRICE (₹)
+          </label>
 
+          <input
+            name="price"
+            type="number"
+            min="0"
+            value={
+              accessPassForm.price
+            }
+            onChange={
+              handleAccessPassChange
+            }
+            placeholder="200"
+            required
+          />
 
-        {!accessPassesLoading &&
-          accessPasses.length === 0 && (
+        </div>
 
-            <div className="admin-message">
-              No Daily or Weekly access products found
-              for this branch.
-            </div>
 
-          )}
+        {/* BRANCH */}
 
+        {isMainAdmin && (
 
-        {!accessPassesLoading &&
-          accessPasses.length > 0 && (
+          <div className="admin-login-field">
 
-            <div
-              style={{
-                display: 'grid',
-                gridTemplateColumns:
-                  'repeat(auto-fit,minmax(260px,1fr))',
-                gap: '18px',
-              }}
-            >
-
-              {accessPasses.map((pass) => (
-
-                <article
-                  key={pass._id}
-                  style={{
-                    padding: '22px',
-                    borderRadius: '18px',
-                    border:
-                      '1px solid rgba(255,255,255,.10)',
-                    background:
-                      'linear-gradient(145deg,#17171e,#0d0d12)',
-                    opacity:
-                      pass.isActive ? 1 : 0.62,
-                  }}
-                >
-
-                  <div
-                    style={{
-                      display: 'flex',
-                      justifyContent: 'space-between',
-                      gap: '12px',
-                      alignItems: 'flex-start',
-                    }}
-                  >
-
-                    <div>
-
-                      <span className="section-tag">
-                        {getBranchLabel(
-                          pass.gymBranch
-                        )}
-                      </span>
-
-                      <h3
-                        style={{
-                          margin: '8px 0 4px',
-                          fontSize: '26px',
-                        }}
-                      >
-                        {pass.passType ||
-                          (
-                            Number(
-                              pass.durationDays
-                            ) === 7
-                              ? 'Weekly Access'
-                              : 'Daily Access'
-                          )}
-                      </h3>
-
-                    </div>
-
-                    <span className="goal-badge">
-                      {pass.isActive
-                        ? 'ACTIVE'
-                        : 'INACTIVE'}
-                    </span>
-
-                  </div>
-
-
-                  <div
-                    style={{
-                      display: 'grid',
-                      gridTemplateColumns: '1fr 1fr',
-                      gap: '12px',
-                      margin: '18px 0',
-                    }}
-                  >
-
-                    <div>
-                      <small style={{ opacity: 0.6 }}>
-                        DURATION
-                      </small>
-
-                      <strong
-                        style={{
-                          display: 'block',
-                          fontSize: '21px',
-                          marginTop: '4px',
-                        }}
-                      >
-                        {pass.durationDays ||
-                          (
-                            pass.passType ===
-                            'Weekly Access'
-                              ? 7
-                              : 1
-                          )}{' '}
-                        DAYS
-                      </strong>
-                    </div>
-
-
-                    <div>
-                      <small style={{ opacity: 0.6 }}>
-                        PRICE
-                      </small>
-
-                      <strong
-                        style={{
-                          display: 'block',
-                          fontSize: '21px',
-                          marginTop: '4px',
-                        }}
-                      >
-                        ₹
-                        {Number(
-                          pass.price || 0
-                        ).toLocaleString('en-IN')}
-                      </strong>
-                    </div>
-
-                  </div>
-
-
-                  <p
-                    style={{
-                      minHeight: '44px',
-                      color: '#aaa',
-                      lineHeight: '1.5',
-                      margin: '0 0 18px',
-                    }}
-                  >
-                    {pass.description ||
-                      'No description added.'}
-                  </p>
-
-
-                  <div
-                    style={{
-                      display: 'flex',
-                      gap: '8px',
-                      flexWrap: 'wrap',
-                    }}
-                  >
-
-                    <button
-                      type="button"
-                      className="admin-edit-btn"
-                      onClick={() =>
-                        openEditAccessPass(pass)
-                      }
-                    >
-                      EDIT
-                    </button>
-
-                    <button
-                      type="button"
-                      className="admin-add-btn"
-                      onClick={() =>
-                        handleToggleAccessPass(pass)
-                      }
-                    >
-                      {pass.isActive
-                        ? 'DEACTIVATE'
-                        : 'ACTIVATE'}
-                    </button>
-
-                  </div>
-
-                </article>
-
-              ))}
-
-            </div>
-
-          )}
-
-
-        {showAccessPassForm && (
-
-          <form
-            onSubmit={handleSaveAccessPass}
-            style={{
-              marginTop: '22px',
-              padding: '22px',
-              borderRadius: '18px',
-              border:
-                '1px solid rgba(255,102,0,.25)',
-              background:
-                'linear-gradient(145deg,rgba(255,102,0,.07),rgba(255,255,255,.015))',
-            }}
-          >
-
-            <div className="admin-form-heading">
-
-              <span className="section-tag">
-                {editingAccessPass
-                  ? 'EDIT ACCESS'
-                  : 'NEW ACCESS'}
-              </span>
-
-              <h3>
-                {editingAccessPass
-                  ? 'EDIT '
-                  : 'ADD '}
-
-                <span>
-                  ACCESS.
-                </span>
-              </h3>
-
-            </div>
-
-
-            {accessPassFormError && (
-              <div className="admin-message admin-error">
-                {accessPassFormError}
-              </div>
-            )}
-
-
-            <div
-              style={{
-                display: 'grid',
-                gridTemplateColumns:
-                  'repeat(auto-fit,minmax(210px,1fr))',
-                gap: '14px',
-              }}
-            >
-
-              <div className="admin-login-field">
-
-                <label>
-                  ACCESS TYPE
-                </label>
-
-                <select
-                  name="passType"
-                  value={accessPassForm.passType}
-                  onChange={handleAccessPassChange}
-                >
-                  <option value="Daily Access">
-                    Daily Access
-                  </option>
-
-                  <option value="Weekly Access">
-                    Weekly Access
-                  </option>
-                </select>
-
-              </div>
-
-
-              <div className="admin-login-field">
-
-                <label>
-                  PRICE (₹)
-                </label>
-
-                <input
-                  name="price"
-                  type="number"
-                  min="0"
-                  value={accessPassForm.price}
-                  onChange={handleAccessPassChange}
-                  placeholder="e.g. 100"
-                  required
-                />
-
-              </div>
-
-
-              {isMainAdmin && (
-
-                <div className="admin-login-field">
-
-                  <label>
-                    BRANCH
-                  </label>
-
-                  <select
-                    name="gymBranch"
-                    value={accessPassForm.gymBranch}
-                    onChange={handleAccessPassChange}
-                  >
-
-                    <option value="Kalyanpur">
-                      Kalyanpur
-                    </option>
-
-                    <option value="Gopalpur">
-                      Gopalpur
-                    </option>
-
-                  </select>
-
-                </div>
-
-              )}
-
-
-              <div
-                className="admin-login-field"
-                style={{
-                  gridColumn: '1 / -1',
-                }}
-              >
-
-                <label>
-                  DESCRIPTION
-                </label>
-
-                <textarea
-                  name="description"
-                  rows="3"
-                  value={
-                    accessPassForm.description
-                  }
-                  onChange={
-                    handleAccessPassChange
-                  }
-                  placeholder="Describe this access product."
-                />
-
-              </div>
-
-            </div>
-
-
-            <label
-              style={{
-                display: 'flex',
-                alignItems: 'center',
-                gap: '9px',
-                marginTop: '14px',
-              }}
-            >
-
-              <input
-                type="checkbox"
-                name="isActive"
-                checked={
-                  accessPassForm.isActive
-                }
-                onChange={
-                  handleAccessPassChange
-                }
-              />
-
-              ACTIVE
-
+            <label>
+              BRANCH
             </label>
 
-
-            <div
-              style={{
-                display: 'flex',
-                gap: '10px',
-                marginTop: '18px',
-              }}
+            <select
+              name="gymBranch"
+              value={
+                accessPassForm.gymBranch
+              }
+              onChange={
+                handleAccessPassChange
+              }
             >
 
-              <button
-                type="submit"
-                className="admin-add-btn"
-                disabled={savingAccessPass}
-              >
-                {savingAccessPass
-                  ? 'SAVING...'
-                  : editingAccessPass
-                    ? 'UPDATE ACCESS'
-                    : 'CREATE ACCESS'}
-              </button>
+              <option value="Kalyanpur">
+                Kalyanpur
+              </option>
 
-              <button
-                type="button"
-                className="admin-edit-btn"
-                onClick={() => {
+              <option value="Gopalpur">
+                Gopalpur
+              </option>
 
-                  setShowAccessPassForm(false);
-                  setEditingAccessPass(null);
-                  setAccessPassFormError('');
+            </select>
 
-                }}
-              >
-                CANCEL
-              </button>
-
-            </div>
-
-          </form>
+          </div>
 
         )}
 
-      </section>
+
+        {/* DESCRIPTION */}
+
+        <div
+          className="admin-login-field"
+          style={{
+            gridColumn:
+              '1 / -1',
+          }}
+        >
+
+          <label>
+            DESCRIPTION
+          </label>
+
+          <textarea
+            name="description"
+            rows="3"
+            value={
+              accessPassForm.description
+            }
+            onChange={
+              handleAccessPassChange
+            }
+            placeholder={
+              accessPassForm.passType ===
+              'Weekly Access'
+                ? 'Stay consistent with 7 days of full access to all gym facilities'
+                : 'Perfect for those who want to stay active with flexible short term access'
+            }
+          />
+
+        </div>
+
+      </div>
+
+
+      {/* ACTIVE */}
+
+      <label
+        style={{
+          display: 'flex',
+          alignItems: 'center',
+          gap: '9px',
+          marginTop: '14px',
+        }}
+      >
+
+        <input
+          type="checkbox"
+          name="isActive"
+          checked={
+            accessPassForm.isActive
+          }
+          onChange={
+            handleAccessPassChange
+          }
+        />
+
+        ACTIVE
+
+      </label>
+
+
+      {/* FORM ACTIONS */}
+
+      <div
+        style={{
+          display: 'flex',
+          gap: '10px',
+          marginTop: '18px',
+        }}
+      >
+
+        <button
+          type="submit"
+          className="admin-add-btn"
+          disabled={
+            savingAccessPass
+          }
+        >
+
+          {savingAccessPass
+            ? 'SAVING...'
+            : editingAccessPass
+              ? 'UPDATE ACCESS'
+              : 'CREATE ACCESS'}
+
+        </button>
+
+
+        <button
+          type="button"
+          className="admin-edit-btn"
+          onClick={() => {
+
+            setShowAccessPassForm(
+              false
+            );
+
+            setEditingAccessPass(
+              null
+            );
+
+            setAccessPassFormError(
+              ''
+            );
+
+          }}
+        >
+          CANCEL
+        </button>
+
+      </div>
+
+    </form>
+
+  )}
+
+</section>
 
 
       {/* =====================================================
@@ -4782,7 +4979,6 @@ const handleAttendanceChange = (e) => {
     STAFF MANAGEMENT
 ===================================================== */}
 
-{isMainAdmin && (
 <section className="admin-staff-management">
 
   {/* STAFF HEADER */}
@@ -4798,8 +4994,10 @@ const handleAttendanceChange = (e) => {
       </h2>
 
       <p>
-        Manage receptionist accounts and control dashboard access.
-        {isMainAdmin && selectedBranchId !== 'all'
+        {isMainAdmin
+          ? 'Manage receptionist accounts, branch assignments and dashboard access.'
+          : `View staff accounts available to ${selectedBranchName}.`}
+        {selectedBranchId !== 'all'
           ? ` — ${selectedBranchName}`
           : ''}
       </p>
@@ -4956,7 +5154,9 @@ const handleAttendanceChange = (e) => {
                   </span>
 
                   <span className="staff-account-meta">
-                    BRANCH: {member.gymBranch || 'NOT ASSIGNED'}
+                    BRANCH: {Array.isArray(member.gymBranches) && member.gymBranches.length > 0
+                      ? member.gymBranches.join(' / ')
+                      : member.gymBranch || 'NOT ASSIGNED'}
                   </span>
 
                   <span
@@ -5057,7 +5257,9 @@ const handleAttendanceChange = (e) => {
                   </p>
 
                   <p className="staff-branch-label">
-                    BRANCH: {selectedStaff.gymBranch || 'NOT ASSIGNED'}
+                    BRANCH: {Array.isArray(selectedStaff.gymBranches) && selectedStaff.gymBranches.length > 0
+                      ? selectedStaff.gymBranches.join(' / ')
+                      : selectedStaff.gymBranch || 'NOT ASSIGNED'}
                   </p>
 
                 </div>
@@ -5082,23 +5284,25 @@ const handleAttendanceChange = (e) => {
                     : 'INACTIVE'}
                 </span>
 
-                <button
-                  type="button"
-                  className={`staff-status-button ${
-                    selectedStaff.status === 'active'
-                      ? 'staff-deactivate'
-                      : 'staff-activate'
-                  }`}
-                  onClick={() =>
-                    handleToggleStaffStatus(
-                      selectedStaff
-                    )
-                  }
-                >
-                  {selectedStaff.status === 'active'
-                    ? 'DEACTIVATE'
-                    : 'ACTIVATE'}
-                </button>
+                {isMainAdmin && (
+                  <button
+                    type="button"
+                    className={`staff-status-button ${
+                      selectedStaff.status === 'active'
+                        ? 'staff-deactivate'
+                        : 'staff-activate'
+                    }`}
+                    onClick={() =>
+                      handleToggleStaffStatus(
+                        selectedStaff
+                      )
+                    }
+                  >
+                    {selectedStaff.status === 'active'
+                      ? 'DEACTIVATE'
+                      : 'ACTIVATE'}
+                  </button>
+                )}
 
               </div>
 
@@ -5147,6 +5351,88 @@ const handleAttendanceChange = (e) => {
           </div>
 
 
+          {/* MAIN ADMIN BRANCH ASSIGNMENT */}
+
+          {isMainAdmin && (
+            <div
+              style={{
+                marginBottom: '22px',
+                padding: '18px',
+                borderRadius: '14px',
+                border: '1px solid rgba(255,255,255,.10)',
+                background: 'rgba(255,255,255,.025)',
+              }}
+            >
+              <div className="staff-permission-heading" style={{ marginBottom: '14px' }}>
+                <div>
+                  <span className="staff-panel-label">
+                    BRANCH ACCESS
+                  </span>
+                  <h3>
+                    ASSIGN <span>BRANCHES.</span>
+                  </h3>
+                  <p>
+                    Main admin only. Select every branch this staff account can access.
+                  </p>
+                </div>
+              </div>
+
+              <div
+                style={{
+                  display: 'flex',
+                  gap: '12px',
+                  flexWrap: 'wrap',
+                  marginBottom: '14px',
+                }}
+              >
+                {GYM_BRANCHES.map((branch) => {
+                  const checked = staffBranches.includes(branch._id);
+
+                  return (
+                    <label
+                      key={branch._id}
+                      className={`staff-permission-option ${
+                        checked ? 'staff-permission-enabled' : ''
+                      }`}
+                      style={{ minWidth: '180px' }}
+                    >
+                      <input
+                        type="checkbox"
+                        checked={checked}
+                        onChange={() => {
+                          setStaffBranches((current) =>
+                            checked
+                              ? current.filter((item) => item !== branch._id)
+                              : [...current, branch._id]
+                          );
+                          setStaffError('');
+                          setStaffSuccess('');
+                        }}
+                      />
+                      <span className="staff-custom-check">
+                        {checked ? '✓' : ''}
+                      </span>
+                      <span className="staff-permission-name">
+                        {branch.name}
+                      </span>
+                    </label>
+                  );
+                })}
+              </div>
+
+              <button
+                type="button"
+                className="staff-save-button"
+                onClick={handleAssignStaffBranches}
+                disabled={savingStaffBranches}
+              >
+                {savingStaffBranches
+                  ? 'SAVING...'
+                  : 'SAVE BRANCH ASSIGNMENTS  →'}
+              </button>
+            </div>
+          )}
+
           {/* PERMISSION HEADING */}
 
           <div className="staff-permission-heading">
@@ -5162,8 +5448,9 @@ const handleAttendanceChange = (e) => {
               </h3>
 
               <p>
-                Choose exactly what this staff member
-                can view, add, edit or delete.
+                {isMainAdmin
+                  ? 'Choose exactly what this staff member can view, add, edit or delete.'
+                  : 'Permissions are read-only for branch staff. The main admin controls access.'}
               </p>
 
             </div>
@@ -5323,6 +5610,7 @@ const handleAttendanceChange = (e) => {
                             <input
                               type="checkbox"
                               checked={checked}
+                              disabled={!isMainAdmin}
                               onChange={() =>
                                 handlePermissionChange(
                                   section.key,
@@ -5358,25 +5646,32 @@ const handleAttendanceChange = (e) => {
 
           {/* SAVE */}
 
-          <div className="staff-save-area">
+          {isMainAdmin ? (
+            <div className="staff-save-area">
+              <div className="staff-save-note">
+                <span>●</span>
+                Changes are saved to this account.
+              </div>
 
-            <div className="staff-save-note">
-              <span>●</span>
-              Changes are saved to this account.
+              <button
+                type="button"
+                className="staff-save-button"
+                onClick={handleSavePermissions}
+                disabled={savingPermissions}
+              >
+                {savingPermissions
+                  ? 'SAVING...'
+                  : 'SAVE PERMISSIONS  →'}
+              </button>
             </div>
-
-            <button
-              type="button"
-              className="staff-save-button"
-              onClick={handleSavePermissions}
-              disabled={savingPermissions}
-            >
-              {savingPermissions
-                ? 'SAVING...'
-                : 'SAVE PERMISSIONS  →'}
-            </button>
-
-          </div>
+          ) : (
+            <div className="staff-save-area">
+              <div className="staff-save-note">
+                <span>●</span>
+                Read-only view. Main admin manages permissions and branch assignments.
+              </div>
+            </div>
+          )}
 
         </>
 
@@ -5387,7 +5682,6 @@ const handleAttendanceChange = (e) => {
   </div>
 
 </section>
-)}
 
       {/* =====================================================
           PAYMENT MANAGEMENT

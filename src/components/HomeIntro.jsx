@@ -29,8 +29,8 @@ const features = [
     title: 'STRENGTH TRAINING SESSIONS',
     description:
       'Build strength, power and confidence with structured resistance training focused on steady and measurable progress.',
-    link: '#plans',
-    linkText: 'Start Training →',
+    link: '#offers',
+    linkText: 'View Offers →',
     className: 'feature-cyan',
   },
 ];

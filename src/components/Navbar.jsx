@@ -1,7 +1,6 @@
 const navLinks = [
   { label: 'Home', href: '#home' },
   { label: 'Features', href: '#features' },
-  { label: 'Membership', href: '#plans' },
   { label: 'Software', href: '#portal' },
   { label: 'Contact', href: '#contact' },
 ];

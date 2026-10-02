@@ -937,202 +937,6 @@ body.light .header {
 
 /* =========================
 
-   MEMBERSHIP
-
-\========================= */
-
-.membership-section {
-
-  background:
-
-    radial-gradient(
-
-      circle at 50% 50%,
-
-      rgba(139, 92, 246, 0.08),
-
-      transparent 50%
-
-    );
-
-}
-
-.pricing-grid {
-
-  display: grid;
-
-  grid-template-columns: repeat(3, 1fr);
-
-  gap: 24px;
-
-  align-items: stretch;
-
-}
-
-.price-card {
-
-  position: relative;
-
-  background: rgba(21, 21, 28, 0.5);
-
-  border: 1px solid rgba(255, 255, 255, 0.12);
-
-  padding: 40px 32px;
-
-  border-radius: 10px;
-
-  transition: 0.35s;
-
-}
-
-.price-card:hover {
-
-  transform: translateY(-10px);
-
-  box-shadow: var(--shadow);
-
-}
-
-.price-card.popular {
-
-  border: 2px solid var(--orange);
-
-  transform: scale(1.04);
-
-  box-shadow: 0 0 50px rgba(255, 77, 0, 0.13);
-
-}
-
-.price-card.popular:hover {
-
-  transform: scale(1.04) translateY(-8px);
-
-}
-
-.popular-badge {
-
-  position: absolute;
-
-  top: -13px;
-
-  left: 50%;
-
-  transform: translateX(-50%);
-
-  background: var(--orange);
-
-  color: #000;
-
-  padding: 6px 15px;
-
-  font-family: var(--mono);
-
-  font-size: 9px;
-
-  font-weight: 700;
-
-}
-
-.price-label {
-
-  font-family: var(--mono);
-
-  font-size: 10px;
-
-  color: var(--orange);
-
-  letter-spacing: 2px;
-
-}
-
-.price-card h3 {
-
-  font-family: var(--heading);
-
-  font-size: 50px;
-
-  margin-top: 12px;
-
-  font-weight: 700;
-
-}
-
-.price {
-
-  font-family: var(--heading);
-
-  font-size: 56px;
-
-  margin: 24px 0;
-
-  font-weight: 700;
-
-}
-
-.price small {
-
-  font-family: var(--body);
-
-  font-size: 12px;
-
-  color: var(--muted);
-
-}
-
-.price-card ul {
-
-  list-style: none;
-
-  display: flex;
-
-  flex-direction: column;
-
-  gap: 13px;
-
-  color: var(--muted);
-
-  font-size: 13px;
-
-  margin-bottom: 32px;
-
-}
-
-.price-btn {
-
-  width: 100%;
-
-  padding: 14px;
-
-  background: transparent;
-
-  border: 1px solid var(--border);
-
-  color: var(--text);
-
-  font-family: var(--mono);
-
-  font-weight: 700;
-
-  font-size: 10px;
-
-  cursor: pointer;
-
-  transition: 0.25s;
-
-}
-
-.price-btn:hover {
-
-  background: var(--orange);
-
-  color: #000;
-
-  border-color: var(--orange);
-
-}
-
-/* =========================
-
    SOFTWARE / DASHBOARD
 
 \========================= */
@@ -2615,14 +2419,10 @@ footer {
   }
 
   .feature-grid,
-  .pricing-grid,
   .testimonial-grid {
     grid-template-columns: 1fr;
   }
 
-  .price-card.popular {
-    transform: none;
-  }
 
   .software-intro {
     flex-direction: column;
@@ -5993,4 +5793,302 @@ footer {
   .puja-offer-actions button {
     width: 100%;
   }
+}
+/* =========================================================
+   GALLERY — POLISHED SQUARE CARD DESIGN
+   ========================================================= */
+
+.gallery-section {
+  width: 100%;
+}
+
+
+/* =========================================================
+   GALLERY GRID
+   ========================================================= */
+
+.gallery-grid {
+  display: grid;
+  grid-template-columns: repeat(3, minmax(0, 1fr));
+  gap: 22px;
+  align-items: start;
+}
+
+
+/* =========================================================
+   GALLERY CARD
+   ========================================================= */
+
+.gallery-card {
+  width: 100%;
+  min-width: 0;
+  display: flex;
+  flex-direction: column;
+}
+
+
+/* =========================================================
+   SQUARE IMAGE BOX
+   ========================================================= */
+
+.gallery-image-box {
+  width: 100%;
+  aspect-ratio: 1 / 1;
+  position: relative;
+  overflow: hidden;
+  border-radius: 14px;
+  background: #111;
+  isolation: isolate;
+}
+
+
+/* =========================================================
+   IMAGE
+   ========================================================= */
+
+.gallery-image {
+  width: 100%;
+  height: 100%;
+  display: block;
+  object-fit: cover;
+  object-position: center;
+  transition:
+    transform 0.45s ease,
+    filter 0.45s ease;
+}
+
+
+/* =========================================================
+   IMAGE HOVER
+   ========================================================= */
+
+.gallery-card:hover .gallery-image {
+  transform: scale(1.04);
+  filter: brightness(1.04);
+}
+
+
+/* =========================================================
+   TEXT BELOW IMAGE
+   ========================================================= */
+
+.gallery-card-info {
+  padding: 12px 3px 0;
+  text-align: left;
+}
+
+
+.gallery-card-category {
+  display: block;
+  margin-bottom: 4px;
+
+  font-size: 10px;
+  font-weight: 700;
+  letter-spacing: 1.8px;
+  line-height: 1.2;
+
+  text-transform: uppercase;
+
+  opacity: 0.65;
+}
+
+
+.gallery-card-info h3 {
+  margin: 0;
+
+  font-size: 17px;
+  font-weight: 800;
+  line-height: 1.2;
+  letter-spacing: 0.4px;
+
+  text-transform: uppercase;
+}
+
+
+/* =========================================================
+   REMOVE OLD GALLERY SIZING
+   ========================================================= */
+
+.gallery-grid .gallery-item,
+.gallery-grid .gallery-large,
+.gallery-grid .gallery-tall,
+.gallery-grid .gallery-wide {
+  min-height: 0 !important;
+  max-height: none !important;
+  height: auto !important;
+  width: auto !important;
+  aspect-ratio: auto !important;
+  grid-column: auto !important;
+  grid-row: auto !important;
+}
+
+
+/* =========================================================
+   REMOVE OLD OVERLAY
+   ========================================================= */
+
+.gallery-card .gallery-overlay {
+  display: none !important;
+}
+
+
+/* =========================================================
+   PLACEHOLDER
+   ========================================================= */
+
+.gallery-placeholder {
+  width: 100%;
+  height: 100%;
+
+  display: flex;
+  align-items: center;
+  justify-content: center;
+
+  background: #151515;
+}
+
+
+.gallery-number {
+  font-size: 36px;
+  font-weight: 800;
+  opacity: 0.35;
+}
+
+
+/* =========================================================
+   KALYANPUR
+   ========================================================= */
+
+.gallery-kalyanpur {
+  grid-template-columns: repeat(3, minmax(0, 1fr));
+}
+
+
+/* =========================================================
+   GOPALPUR
+   ========================================================= */
+
+.gallery-gopalpur {
+  grid-template-columns: repeat(3, minmax(0, 1fr));
+}
+
+
+/* =========================================================
+   BOTTOM MESSAGE
+   ========================================================= */
+
+.gallery-bottom {
+  margin-top: 28px;
+
+  display: flex;
+  align-items: center;
+  justify-content: center;
+  flex-wrap: wrap;
+
+  gap: 10px;
+
+  font-size: 11px;
+  font-weight: 700;
+  letter-spacing: 2px;
+  text-transform: uppercase;
+
+  opacity: 0.7;
+}
+
+
+/* =========================================================
+   TABLET
+   ========================================================= */
+
+@media (max-width: 900px) {
+
+  .gallery-grid {
+    grid-template-columns: repeat(2, minmax(0, 1fr));
+    gap: 18px;
+  }
+
+  .gallery-kalyanpur,
+  .gallery-gopalpur {
+    grid-template-columns: repeat(2, minmax(0, 1fr));
+  }
+
+  .gallery-card-info {
+    padding-top: 10px;
+  }
+
+  .gallery-card-info h3 {
+    font-size: 15px;
+  }
+
+  .gallery-card-category {
+    font-size: 9px;
+    letter-spacing: 1.5px;
+  }
+
+}
+
+
+/* =========================================================
+   MOBILE
+   ========================================================= */
+
+@media (max-width: 600px) {
+
+  .gallery-grid {
+    grid-template-columns: repeat(2, minmax(0, 1fr));
+    gap: 14px;
+  }
+
+  .gallery-kalyanpur,
+  .gallery-gopalpur {
+    grid-template-columns: repeat(2, minmax(0, 1fr));
+  }
+
+  .gallery-image-box {
+    border-radius: 11px;
+  }
+
+  .gallery-card-info {
+    padding-top: 8px;
+  }
+
+  .gallery-card-category {
+    font-size: 8px;
+    letter-spacing: 1.2px;
+    margin-bottom: 3px;
+  }
+
+  .gallery-card-info h3 {
+    font-size: 12px;
+    letter-spacing: 0.3px;
+  }
+
+  .gallery-bottom {
+    margin-top: 22px;
+    gap: 7px;
+    font-size: 8px;
+    letter-spacing: 1.3px;
+  }
+
+}
+
+
+/* =========================================================
+   VERY SMALL MOBILE
+   ========================================================= */
+
+@media (max-width: 400px) {
+
+  .gallery-grid {
+    gap: 11px;
+  }
+
+  .gallery-card-info h3 {
+    font-size: 11px;
+  }
+
+  .gallery-card-category {
+    font-size: 7px;
+  }
+
 }
