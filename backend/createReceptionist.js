@@ -4,7 +4,7 @@ const mongoose = require('mongoose');
 const bcrypt = require('bcryptjs');
 const Admin = require('./models/Admin');
 
-async function createReceptionist() {
+async function createOrUpdateReceptionist() {
     try {
         await mongoose.connect(process.env.MONGO_URI);
 
@@ -13,30 +13,85 @@ async function createReceptionist() {
         const email = 'reception@alphagym.com';
         const password = 'Reception@123';
 
-        const existing = await Admin.findOne({ email });
+        // =====================================================
+        // FIND EXISTING RECEPTIONIST
+        // =====================================================
 
-        if (existing) {
-            console.log('Receptionist already exists.');
+        let receptionist = await Admin.findOne({ email });
+
+        // =====================================================
+        // IF RECEPTIONIST ALREADY EXISTS
+        // UPDATE BRANCHES
+        // =====================================================
+
+        if (receptionist) {
+
+            receptionist.name = 'Gym Receptionist';
+            receptionist.role = 'receptionist';
+            receptionist.status = 'active';
+
+            // BOTH BRANCHES
+            receptionist.gymBranches = [
+                'Kalyanpur',
+                'Gopalpur',
+            ];
+
+            // Do not use the old single-branch field
+            receptionist.gymBranch = null;
+
+            // Keep password unchanged if the account already
+            // has a password.
+            if (!receptionist.password) {
+                receptionist.password =
+                    await bcrypt.hash(password, 10);
+            }
+
+            await receptionist.save();
+
+            console.log('\nReceptionist updated successfully!');
+            console.log('--------------------------------');
+            console.log('Email:', receptionist.email);
+            console.log('Role:', receptionist.role);
+            console.log(
+                'Branches:',
+                receptionist.gymBranches
+            );
+            console.log('Status:', receptionist.status);
+            console.log('--------------------------------');
+
             return;
         }
 
-        const hashedPassword = await bcrypt.hash(password, 10);
+        // =====================================================
+        // CREATE NEW RECEPTIONIST
+        // =====================================================
 
-        const receptionist = await Admin.create({
+        const hashedPassword =
+            await bcrypt.hash(password, 10);
+
+        receptionist = await Admin.create({
+
             name: 'Gym Receptionist',
+
             email,
+
             password: hashedPassword,
+
             role: 'receptionist',
+
             status: 'active',
 
+            // BOTH BRANCHES
             gymBranches: [
                 'Kalyanpur',
                 'Gopalpur',
             ],
 
+            // Legacy single branch field
             gymBranch: null,
 
             permissions: {
+
                 members: {
                     view: true,
                     add: true,
@@ -76,7 +131,9 @@ async function createReceptionist() {
                     edit: false,
                     delete: false,
                 },
+
             },
+
         });
 
         console.log('\nReceptionist created successfully!');
@@ -84,16 +141,26 @@ async function createReceptionist() {
         console.log('Email:', receptionist.email);
         console.log('Password:', password);
         console.log('Role:', receptionist.role);
-        console.log('Branches:', receptionist.gymBranches);
+        console.log(
+            'Branches:',
+            receptionist.gymBranches
+        );
         console.log('Status:', receptionist.status);
         console.log('--------------------------------');
 
     } catch (error) {
-        console.error('Error creating receptionist:', error);
+
+        console.error(
+            'Error creating/updating receptionist:',
+            error
+        );
+
     } finally {
+
         await mongoose.disconnect();
+
         console.log('MongoDB disconnected');
     }
 }
 
-createReceptionist();
+createOrUpdateReceptionist();
