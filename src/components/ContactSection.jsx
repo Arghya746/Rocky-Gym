@@ -23,6 +23,64 @@ export default function ContactSection({ branchConfig }) {
         ? 'Kalyanpur'
         : '';
 
+  const isGopalpur = gymBranch === 'Gopalpur';
+
+  /* =========================================================
+     BRANCH LOCATION DATA
+     ========================================================= */
+
+  const locationData = isGopalpur
+    ? {
+        branchName: 'GOPALPUR',
+        locationLabel: 'GOPALPUR',
+        address: (
+          <>
+            Premises No. 596/N, Rozi Niwas, 2nd Floor,
+            <br />
+            Above Wine Shop, Opposite Pizza Express,
+            <br />
+            P.R. Mukherjee, Mother Teresa Road,
+            <br />
+            Chelidanga, Asansol, West Bengal 713304
+          </>
+        ),
+        shortAddress: (
+          <>
+            Premises No. 596/N, Rozi Niwas, 2nd Floor,
+            <br />
+            Chelidanga, Asansol - 713304
+          </>
+        ),
+        mapTitle: 'Alpha Gym Gopalpur Chelidanga Asansol',
+        mapUrl:
+          'https://www.google.com/maps?q=Alpha%20Gym%20Chelidanga%20Asansol&output=embed',
+      }
+    : {
+        branchName: 'KALYANPUR',
+        locationLabel: 'KALYANPUR',
+        address: (
+          <>
+            1st Floor, Anudeep Apartment, Plot 43,
+            <br />
+            Near Kalyanpur Adi Durgapuja Pandal,
+            <br />
+            Kalyanpur Housing, Kanyapur,
+            <br />
+            Asansol, West Bengal 713305
+          </>
+        ),
+        shortAddress: (
+          <>
+            1st Floor, Anudeep Apartment, Plot 43,
+            <br />
+            Kalyanpur Housing, Asansol - 713305
+          </>
+        ),
+        mapTitle: 'Alpha Gym Kalyanpur Asansol',
+        mapUrl:
+          'https://www.google.com/maps?q=Alpha%20Gym%20Kalyanpur%20Asansol&output=embed',
+      };
+
   /* =========================================================
      FORM CHANGE
      ========================================================= */
@@ -245,7 +303,7 @@ export default function ContactSection({ branchConfig }) {
           <div className="contact-info">
 
             {/* =============================================
-                LOCATION 1
+                CURRENT BRANCH LOCATION
             ============================================= */}
 
             <div className="contact-info-item">
@@ -255,75 +313,51 @@ export default function ContactSection({ branchConfig }) {
               <div>
 
                 <small>
-                  LOCATION 1 — KALYANPUR
+                  LOCATION — {locationData.locationLabel}
                 </small>
 
                 <strong>
-                  1st Floor, Anudeep Apartment, Plot 43,
-                  Shakespeare Sarani, Kalyanpur Housing,
-                  Asansol - 713305
-                  <br />
-                  (Near Kalyanpur Adi Durgapuja Pandal)
+                  {locationData.address}
                 </strong>
 
               </div>
 
             </div>
 
-            {/* =============================================
-                LOCATION 2
-            ============================================= */}
 
-            <div className="contact-info-item">
+    <div className="contact-info-item">
 
-              <span>📍</span>
+  <span>🕐</span>
 
-              <div>
+  <div>
 
-                <small>
-                  LOCATION 2 — CHELIDANGA
-                </small>
+    <small>
+      {gymBranch.toUpperCase()} BRANCH TIMINGS
+    </small>
 
-                <strong>
-                  2nd Floor, Rozi Niwas, Mother Teresa Road,
-                  Chelidanga, Asansol - 713304
-                  <br />
-                  (Above Wine Shop, Opposite Pizza Xpress Pizzeria)
-                </strong>
+    <strong>
+      {gymBranch === 'Kalyanpur' ? (
+        <>
+          6:00 AM — 12:00 PM
+          <br />
+          4:00 PM — 10:00 PM
+        </>
+      ) : gymBranch === 'Gopalpur' ? (
+        <>
+          6:00 AM — 11:00 AM
+          <br />
+          4:00 PM — 10:00 PM
+        </>
+      ) : (
+        <>
+          Please select a gym branch.
+        </>
+      )}
+    </strong>
 
-              </div>
+  </div>
 
-            </div>
-
-            {/* =============================================
-                TIMINGS
-            ============================================= */}
-
-            <div className="contact-info-item">
-
-              <span>🕐</span>
-
-              <div>
-
-                <small>
-                  GYM TIMINGS
-                </small>
-
-                <strong>
-                  Kalyanpur: 6:00 AM — 12:00 PM
-                  <br />
-                  4:00 PM — 10:00 PM
-                  <br />
-                  <br />
-                  Gopalpur: 6:00 AM — 11:00 AM
-                  <br />
-                  4:00 PM — 10:00 PM
-                </strong>
-
-              </div>
-
-            </div>
-
+</div>
             {/* =============================================
                 WHATSAPP
             ============================================= */}
@@ -364,6 +398,7 @@ export default function ContactSection({ branchConfig }) {
 
             </div>
 
+
             {/* =============================================
                 EMAIL
             ============================================= */}
@@ -389,6 +424,7 @@ export default function ContactSection({ branchConfig }) {
               </div>
 
             </div>
+
 
             {/* =============================================
                 INSTAGRAM
@@ -581,7 +617,7 @@ export default function ContactSection({ branchConfig }) {
 
 
       {/* =====================================================
-          GOOGLE MAPS
+          GOOGLE MAP
       ===================================================== */}
 
       <div className="container contact-maps">
@@ -593,11 +629,11 @@ export default function ContactSection({ branchConfig }) {
           </div>
 
           <h3>
-            OUR <span>LOCATIONS.</span>
+            OUR <span>LOCATION.</span>
           </h3>
 
           <p>
-            Visit Alpha Gym at either of our Asansol locations.
+            Visit Alpha Gym at our {locationData.branchName.toLowerCase()} branch.
           </p>
 
         </div>
@@ -606,7 +642,7 @@ export default function ContactSection({ branchConfig }) {
         <div className="maps-grid">
 
           {/* ===============================================
-              KALYANPUR MAP
+              CURRENT BRANCH MAP
           =============================================== */}
 
           <div className="map-card">
@@ -624,7 +660,7 @@ export default function ContactSection({ branchConfig }) {
                 </small>
 
                 <h4>
-                  KALYANPUR
+                  {locationData.branchName}
                 </h4>
 
               </div>
@@ -633,8 +669,8 @@ export default function ContactSection({ branchConfig }) {
 
 
             <iframe
-              title="Alpha Gym Kalyanpur Asansol"
-              src="https://www.google.com/maps?q=Alpha%20Gym%20Kalyanpur%20Asansol&output=embed"
+              title={locationData.mapTitle}
+              src={locationData.mapUrl}
               loading="lazy"
               allowFullScreen
               referrerPolicy="no-referrer-when-downgrade"
@@ -642,57 +678,7 @@ export default function ContactSection({ branchConfig }) {
 
 
             <div className="map-address">
-
-              1st Floor, Anudeep Apartment, Plot 43,
-              Shakespeare Sarani, Kalyanpur Housing,
-              Asansol - 713305
-
-            </div>
-
-          </div>
-
-
-          {/* ===============================================
-              CHELIDANGA MAP
-          =============================================== */}
-
-          <div className="map-card">
-
-            <div className="map-card-header">
-
-              <span>
-                02
-              </span>
-
-              <div>
-
-                <small>
-                  ALPHA GYM
-                </small>
-
-                <h4>
-                  CHELIDANGA
-                </h4>
-
-              </div>
-
-            </div>
-
-
-            <iframe
-              title="Alpha Gym Chelidanga Asansol"
-              src="https://www.google.com/maps?q=Alpha%20Gym%20Chelidanga%20Asansol&output=embed"
-              loading="lazy"
-              allowFullScreen
-              referrerPolicy="no-referrer-when-downgrade"
-            />
-
-
-            <div className="map-address">
-
-              2nd Floor, Rozi Niwas, Mother Teresa Road,
-              Chelidanga, Asansol - 713304
-
+              {locationData.shortAddress}
             </div>
 
           </div>

@@ -23,9 +23,15 @@ export default function GymSelection() {
     <section className="gym-selection">
       <div className="gym-selection-container">
 
-        {/* HEADER */}
+        {/* =================================================
+            HEADER
+            ================================================= */}
+
         <div className="gym-selection-header">
-          <span className="section-tag">ALPHA GYM</span>
+
+          <span className="section-tag">
+            ALPHA GYM
+          </span>
 
           <h1>
             CHOOSE
@@ -36,9 +42,14 @@ export default function GymSelection() {
             Select your preferred Alpha Gym branch to view its
             trainers, memberships, offers, gallery and contact details.
           </p>
+
         </div>
 
-        {/* GYM CARDS */}
+
+        {/* =================================================
+            GYM CARDS
+            ================================================= */}
+
         <div className="gym-selection-grid">
 
           {gyms.map((gym) => (
@@ -47,25 +58,38 @@ export default function GymSelection() {
               to={gym.route}
               className={`gym-selection-card ${gym.className}`}
             >
+
               <div className="gym-card-content">
+
+                {/* CARD NUMBER */}
 
                 <span className="gym-card-number">
                   {gym.id === 'kalyanpur' ? '01' : '02'}
                 </span>
 
-                <h2>{gym.name}</h2>
 
-                <div className="gym-card-photo">
-                  <span>[ GYM PHOTO ]</span>
-                </div>
+                {/* GYM NAME */}
 
-                <p>{gym.description}</p>
+                <h2>
+                  {gym.name}
+                </h2>
+
+
+                {/* DESCRIPTION */}
+
+                <p>
+                  {gym.description}
+                </p>
+
+
+                {/* VIEW GYM */}
 
                 <span className="gym-card-link">
                   VIEW GYM <span>→</span>
                 </span>
 
               </div>
+
             </Link>
           ))}
 
