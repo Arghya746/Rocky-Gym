@@ -51,7 +51,14 @@ import MemberDetails from './pages/MemberDetails';
 import PaymentReceipt from './pages/PaymentReceipt';
 
 /* =========================================================
+   WEBSITE URL
+   ========================================================= */
+
+const WEBSITE_URL = 'https://rocky-gym-mj6j.vercel.app';
+
+/* =========================================================
    SHARED BRANCH CONFIGURATION
+   =========================================================
 
    IMPORTANT:
    Do NOT export BRANCH_CONFIG from App.jsx.
@@ -72,10 +79,10 @@ const BRANCH_CONFIG = {
 
     slug: 'kalyanpur',
 
-    title: 'Alpha Gym Kalyanpur',
+    title: 'Alpha Gym Kalyanpur | Asansol',
 
     description:
-      'Alpha Gym Kalyanpur — gym information, trainers, memberships, offers, gallery and contact details.',
+      'Alpha Gym Kalyanpur in Asansol — gym information, trainers, membership offers, gallery, timings and contact details.',
 
     /* -------------------------------------------------------
        GYM INFORMATION
@@ -166,9 +173,6 @@ const BRANCH_CONFIG = {
 
     /* -------------------------------------------------------
        OFFERS
-
-       Membership Plans are intentionally removed.
-       Offers remain separate.
     ------------------------------------------------------- */
 
     offers: [
@@ -258,17 +262,11 @@ const BRANCH_CONFIG = {
       evening: '4:00 PM – 10:00 PM',
 
       monday: '',
-
       tuesday: '',
-
       wednesday: '',
-
       thursday: '',
-
       friday: '',
-
       saturday: '',
-
       sunday: '',
     },
 
@@ -314,10 +312,10 @@ const BRANCH_CONFIG = {
 
     slug: 'gopalpur',
 
-    title: 'Alpha Gym Gopalpur',
+    title: 'Alpha Gym Gopalpur | Asansol',
 
     description:
-      'Alpha Gym Gopalpur — gym information, trainers, memberships, offers, gallery and contact details.',
+      'Alpha Gym Gopalpur in Asansol — gym information, trainers, membership offers, gallery, timings and contact details.',
 
     /* -------------------------------------------------------
        GYM INFORMATION
@@ -497,17 +495,11 @@ const BRANCH_CONFIG = {
       evening: '4:00 PM – 10:00 PM',
 
       monday: '',
-
       tuesday: '',
-
       wednesday: '',
-
       thursday: '',
-
       friday: '',
-
       saturday: '',
-
       sunday: '',
     },
 
@@ -711,9 +703,42 @@ function RouteMeta() {
       branchConfig = BRANCH_CONFIG.gopalpur;
     }
 
-    /* -----------------------------------------------------
+    /* =====================================================
+       ROUTE INFORMATION
+    ===================================================== */
+
+    let pageTitle = 'Alpha Gym | Asansol';
+
+    let pageDescription =
+      'Alpha Gym in Asansol with Kalyanpur and Gopalpur branches, offering strength training, cardio, personal training and modern workout facilities.';
+
+    let canonicalUrl = `${WEBSITE_URL}/`;
+
+    if (branchConfig) {
+      pageTitle = branchConfig.title;
+
+      pageDescription = branchConfig.description;
+
+      canonicalUrl = `${WEBSITE_URL}/${branchConfig.slug}`;
+    }
+
+    if (pathname === '/admin/login') {
+      pageTitle = 'Admin Login • Alpha Gym';
+
+      pageDescription =
+        'Secure Alpha Gym administration login.';
+    }
+
+    if (isAdminRoute && pathname !== '/admin/login') {
+      pageTitle = 'Admin Dashboard • Alpha Gym';
+
+      pageDescription =
+        'Alpha Gym administration dashboard.';
+    }
+
+    /* =====================================================
        ROBOTS
-    ----------------------------------------------------- */
+    ===================================================== */
 
     let robotsMeta = document.querySelector(
       'meta[name="robots"]'
@@ -737,25 +762,15 @@ function RouteMeta() {
         : 'index, follow'
     );
 
-    /* -----------------------------------------------------
+    /* =====================================================
        TITLE
-    ----------------------------------------------------- */
+    ===================================================== */
 
-    if (branchConfig) {
-      document.title = branchConfig.title;
-    } else if (pathname === '/') {
-      document.title = 'Choose Your Gym • Alpha Gym';
-    } else if (pathname === '/admin/login') {
-      document.title = 'Admin Login • Alpha Gym';
-    } else if (isAdminRoute) {
-      document.title = 'Admin Dashboard • Alpha Gym';
-    } else {
-      document.title = 'Alpha Gym';
-    }
+    document.title = pageTitle;
 
-    /* -----------------------------------------------------
+    /* =====================================================
        DESCRIPTION
-    ----------------------------------------------------- */
+    ===================================================== */
 
     let descriptionMeta = document.querySelector(
       'meta[name="description"]'
@@ -772,20 +787,242 @@ function RouteMeta() {
       document.head.appendChild(descriptionMeta);
     }
 
+    descriptionMeta.setAttribute(
+      'content',
+      pageDescription
+    );
+
+    /* =====================================================
+       CANONICAL
+    ===================================================== */
+
+    let canonicalLink = document.querySelector(
+      'link[rel="canonical"]'
+    );
+
+    if (!canonicalLink) {
+      canonicalLink = document.createElement('link');
+
+      canonicalLink.setAttribute(
+        'rel',
+        'canonical'
+      );
+
+      document.head.appendChild(canonicalLink);
+    }
+
+    canonicalLink.setAttribute(
+      'href',
+      canonicalUrl
+    );
+
+    /* =====================================================
+       OPEN GRAPH — TITLE
+    ===================================================== */
+
+    let ogTitle = document.querySelector(
+      'meta[property="og:title"]'
+    );
+
+    if (!ogTitle) {
+      ogTitle = document.createElement('meta');
+
+      ogTitle.setAttribute(
+        'property',
+        'og:title'
+      );
+
+      document.head.appendChild(ogTitle);
+    }
+
+    ogTitle.setAttribute(
+      'content',
+      pageTitle
+    );
+
+    /* =====================================================
+       OPEN GRAPH — DESCRIPTION
+    ===================================================== */
+
+    let ogDescription = document.querySelector(
+      'meta[property="og:description"]'
+    );
+
+    if (!ogDescription) {
+      ogDescription = document.createElement('meta');
+
+      ogDescription.setAttribute(
+        'property',
+        'og:description'
+      );
+
+      document.head.appendChild(ogDescription);
+    }
+
+    ogDescription.setAttribute(
+      'content',
+      pageDescription
+    );
+
+    /* =====================================================
+       OPEN GRAPH — URL
+    ===================================================== */
+
+    let ogUrl = document.querySelector(
+      'meta[property="og:url"]'
+    );
+
+    if (!ogUrl) {
+      ogUrl = document.createElement('meta');
+
+      ogUrl.setAttribute(
+        'property',
+        'og:url'
+      );
+
+      document.head.appendChild(ogUrl);
+    }
+
+    ogUrl.setAttribute(
+      'content',
+      canonicalUrl
+    );
+
+    /* =====================================================
+       OPEN GRAPH — SITE NAME
+    ===================================================== */
+
+    let ogSiteName = document.querySelector(
+      'meta[property="og:site_name"]'
+    );
+
+    if (!ogSiteName) {
+      ogSiteName = document.createElement('meta');
+
+      ogSiteName.setAttribute(
+        'property',
+        'og:site_name'
+      );
+
+      document.head.appendChild(ogSiteName);
+    }
+
+    ogSiteName.setAttribute(
+      'content',
+      'Alpha Gym | Asansol'
+    );
+
+    /* =====================================================
+       OPEN GRAPH — TYPE
+    ===================================================== */
+
+    let ogType = document.querySelector(
+      'meta[property="og:type"]'
+    );
+
+    if (!ogType) {
+      ogType = document.createElement('meta');
+
+      ogType.setAttribute(
+        'property',
+        'og:type'
+      );
+
+      document.head.appendChild(ogType);
+    }
+
+    ogType.setAttribute(
+      'content',
+      'website'
+    );
+
+    /* =====================================================
+       BRANCH STRUCTURED DATA
+    =====================================================
+
+       The main organization schema already exists in
+       index.html.
+
+       Here we add branch-specific schema dynamically
+       when a user visits a branch page.
+    */
+
+    const existingBranchSchema = document.getElementById(
+      'alpha-gym-branch-schema'
+    );
+
+    if (existingBranchSchema) {
+      existingBranchSchema.remove();
+    }
+
     if (branchConfig) {
-      descriptionMeta.setAttribute(
-        'content',
-        branchConfig.description
-      );
-    } else if (pathname === '/') {
-      descriptionMeta.setAttribute(
-        'content',
-        'Choose your Alpha Gym branch — Kalyanpur or Gopalpur.'
-      );
-    } else {
-      descriptionMeta.setAttribute(
-        'content',
-        'Alpha Gym premium fitness experience.'
+      const branchSchema =
+        document.createElement('script');
+
+      branchSchema.id =
+        'alpha-gym-branch-schema';
+
+      branchSchema.type =
+        'application/ld+json';
+
+      const branchSchemaData = {
+        '@context': 'https://schema.org',
+
+        '@type': 'ExerciseGym',
+
+        '@id': canonicalUrl,
+
+        name: branchConfig.gym.displayName,
+
+        url: canonicalUrl,
+
+        description: pageDescription,
+
+        telephone: branchConfig.contact.phone,
+
+        address: {
+          '@type': 'PostalAddress',
+
+          streetAddress:
+            branchConfig.location.address,
+
+          addressLocality:
+            branchConfig.location.city,
+
+          addressRegion:
+            branchConfig.location.state,
+
+          postalCode:
+            branchConfig.location.address.includes(
+              '713305'
+            )
+              ? '713305'
+              : '713304',
+
+          addressCountry:
+            branchConfig.location.country,
+        },
+
+        areaServed: {
+          '@type': 'City',
+
+          name: 'Asansol',
+        },
+
+        parentOrganization: {
+          '@type': 'Organization',
+
+          name: 'Alpha Gym | Asansol',
+
+          url: WEBSITE_URL,
+        },
+      };
+
+      branchSchema.textContent =
+        JSON.stringify(branchSchemaData);
+
+      document.head.appendChild(
+        branchSchema
       );
     }
   }, [location.pathname]);
@@ -830,7 +1067,8 @@ function App() {
   ======================================================= */
 
   const showToast = (message) => {
-    const toast = document.getElementById('toast');
+    const toast =
+      document.getElementById('toast');
 
     if (!toast) {
       return;
@@ -844,9 +1082,10 @@ function App() {
       showToast.timeoutId
     );
 
-    showToast.timeoutId = window.setTimeout(() => {
-      toast.classList.remove('show');
-    }, 2800);
+    showToast.timeoutId =
+      window.setTimeout(() => {
+        toast.classList.remove('show');
+      }, 2800);
   };
 
   /* =======================================================
@@ -962,8 +1201,6 @@ function App() {
 
         {/* =================================================
             ADMIN DASHBOARD
-
-            AdminDashboard.jsx remains unchanged.
         ================================================= */}
 
         <Route

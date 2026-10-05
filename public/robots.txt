@@ -2,4 +2,4 @@ User-agent: *
 Allow: /
 Disallow: /admin
 
-Sitemap: https://rocky-gym-2zsv.vercel.app/sitemap.xml
+Sitemap: https://rocky-gym-mj6j.vercel.app/sitemap.xml

@@ -944,41 +944,53 @@ export default function AdminDashboard() {
         );
       }
 
-      const response = await fetch(
-        `${API_URL}/api/contacts`,
-        {
-          headers: {
-            Authorization: `Bearer ${token}`,
-          },
-        }
-      );
+      const headers = {
+  Authorization: `Bearer ${token}`,
+};
 
-      const data = await response.json();
+// Send the active branch for branch-scoped users.
+// Main admin keeps ALL BRANCHES behavior.
+if (
+  selectedBranchId &&
+  selectedBranchId !== 'all'
+) {
+  headers['x-gym-branch'] = normalizeBranch(
+    selectedBranchId
+  );
+}
 
-      if (!response.ok) {
-        throw new Error(
-          data.message ||
-            'Failed to fetch enquiries.'
-        );
-      }
+const response = await fetch(
+  `${API_URL}/api/contacts`,
+  {
+    headers,
+  }
+);
 
-      setContacts(filterBySelectedBranch(data.contacts || []));
+const data = await response.json();
 
-    } catch (error) {
-      console.error(
-        'Fetch contacts error:',
-        error
-      );
+if (!response.ok) {
+  throw new Error(
+    data.message ||
+      'Failed to fetch enquiries.'
+  );
+}
 
-      setError(
-        'Unable to load enquiries.'
-      );
+setContacts(filterBySelectedBranch(data.contacts || []));
 
-    } finally {
-      setLoading(false);
-    }
+} catch (error) {
+  console.error(
+    'Fetch contacts error:',
+    error
+  );
+
+  setError(
+    'Unable to load enquiries.'
+  );
+
+} finally {
+  setLoading(false);
+}
   };
-
 
   // =========================================================
   // DASHBOARD STATS
@@ -7531,5 +7543,6 @@ const handleAttendanceChange = (e) => {
           )}
 
       </section>
-      </div>
-  )}
+    </div>
+  );
+};

@@ -638,8 +638,20 @@ const requirePermission = (
                 current[part];
         }
 
+        const role =
+            normalizeRole(
+                req.adminRole ||
+                req.admin.role
+            );
+
+        const legacyReceptionEnquiryView =
+            permission === 'enquiries.view' &&
+            (current === undefined || current === null) &&
+            isReceptionRole(role);
+
         if (
-            current !== true
+            current !== true &&
+            !legacyReceptionEnquiryView
         ) {
 
             return res.status(403).json({
