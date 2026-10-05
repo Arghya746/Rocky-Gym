@@ -1,10 +1,15 @@
 import { useEffect, useState } from 'react';
-import { useNavigate, useParams } from 'react-router-dom';
+import {
+    useNavigate,
+    useParams,
+    useSearchParams,
+} from 'react-router-dom';
 import API_URL from '../config/api';
 
 export default function MemberDetails() {
     const { id } = useParams();
     const navigate = useNavigate();
+    const [searchParams] = useSearchParams();
 
     const [member, setMember] = useState(null);
     const [payments, setPayments] = useState([]);
@@ -46,22 +51,40 @@ export default function MemberDetails() {
             // --------------------------------------------------
             // AUTH + ACTIVE BRANCH HEADER
             // --------------------------------------------------
+
             const headers = {
                 Authorization: `Bearer ${adminToken}`,
             };
 
-            const selectedBranchId =
-                localStorage.getItem('gymBranch');
+            /*
+             * IMPORTANT:
+             * The dashboard now passes the active branch
+             * through the URL:
+             *
+             * /admin/members/MEMBER_ID?branch=Kalyanpur
+             *
+             * or
+             *
+             * /admin/members/MEMBER_ID?branch=Gopalpur
+             *
+             * This prevents MemberDetails from using a stale
+             * localStorage gymBranch value.
+             */
 
-            // Receptionists are branch-scoped.
-            // Main admin can continue using ALL BRANCHES.
+            const branchFromUrl =
+                searchParams.get('branch');
+
             if (
-                selectedBranchId &&
-                selectedBranchId !== 'all'
+                branchFromUrl &&
+                branchFromUrl !== 'all'
             ) {
                 headers['x-gym-branch'] =
-                    selectedBranchId;
+                    branchFromUrl;
             }
+
+            // --------------------------------------------------
+            // FETCH ALL MEMBER DATA
+            // --------------------------------------------------
 
             const [
                 memberResponse,
@@ -72,6 +95,7 @@ export default function MemberDetails() {
                 // --------------------------------------------------
                 // MEMBER DETAILS
                 // --------------------------------------------------
+
                 fetch(
                     `${API_URL}/api/members/${id}`,
                     {
@@ -82,6 +106,7 @@ export default function MemberDetails() {
                 // --------------------------------------------------
                 // PAYMENTS
                 // --------------------------------------------------
+
                 fetch(
                     `${API_URL}/api/payments`,
                     {
@@ -92,6 +117,7 @@ export default function MemberDetails() {
                 // --------------------------------------------------
                 // ATTENDANCE
                 // --------------------------------------------------
+
                 fetch(
                     `${API_URL}/api/attendance`,
                     {
@@ -102,6 +128,7 @@ export default function MemberDetails() {
                 // --------------------------------------------------
                 // WORKOUTS
                 // --------------------------------------------------
+
                 fetch(
                     `${API_URL}/api/workouts`,
                     {
@@ -122,39 +149,48 @@ export default function MemberDetails() {
             const workoutsData =
                 await workoutsResponse.json();
 
+            // --------------------------------------------------
+            // RESPONSE VALIDATION
+            // --------------------------------------------------
+
             if (!memberResponse.ok) {
                 throw new Error(
                     memberData.message ||
-                    'Unable to fetch member details.'
+                        'Unable to fetch member details.'
                 );
             }
 
             if (!paymentsResponse.ok) {
                 throw new Error(
                     paymentsData.message ||
-                    'Unable to fetch payments.'
+                        'Unable to fetch payments.'
                 );
             }
 
             if (!attendanceResponse.ok) {
                 throw new Error(
                     attendanceData.message ||
-                    'Unable to fetch attendance.'
+                        'Unable to fetch attendance.'
                 );
             }
 
             if (!workoutsResponse.ok) {
                 throw new Error(
                     workoutsData.message ||
-                    'Unable to fetch workouts.'
+                        'Unable to fetch workouts.'
                 );
             }
+
+            // --------------------------------------------------
+            // MEMBER
+            // --------------------------------------------------
 
             setMember(memberData.member);
 
             // --------------------------------------------------
             // FILTER PAYMENTS FOR THIS MEMBER
             // --------------------------------------------------
+
             const memberPayments =
                 (paymentsData.payments || []).filter(
                     (payment) => {
@@ -172,6 +208,7 @@ export default function MemberDetails() {
             // --------------------------------------------------
             // FILTER ATTENDANCE FOR THIS MEMBER
             // --------------------------------------------------
+
             const memberAttendance =
                 (attendanceData.attendance || []).filter(
                     (record) => {
@@ -189,6 +226,7 @@ export default function MemberDetails() {
             // --------------------------------------------------
             // FILTER WORKOUTS FOR THIS MEMBER
             // --------------------------------------------------
+
             const memberWorkouts =
                 (workoutsData.workouts || []).filter(
                     (workout) => {
@@ -206,7 +244,6 @@ export default function MemberDetails() {
             setPayments(memberPayments);
             setAttendance(memberAttendance);
             setWorkouts(memberWorkouts);
-
         } catch (error) {
             console.error(
                 'Member Details Error:',
@@ -215,7 +252,7 @@ export default function MemberDetails() {
 
             setError(
                 error.message ||
-                'Unable to load member details.'
+                    'Unable to load member details.'
             );
         } finally {
             setLoading(false);
@@ -270,6 +307,10 @@ export default function MemberDetails() {
         return 'member-details-status';
     };
 
+    // --------------------------------------------------
+    // LOADING
+    // --------------------------------------------------
+
     if (loading) {
         return (
             <div className="member-details-page">
@@ -279,6 +320,10 @@ export default function MemberDetails() {
             </div>
         );
     }
+
+    // --------------------------------------------------
+    // ERROR
+    // --------------------------------------------------
 
     if (error) {
         return (
@@ -303,6 +348,10 @@ export default function MemberDetails() {
         );
     }
 
+    // --------------------------------------------------
+    // MEMBER NOT FOUND
+    // --------------------------------------------------
+
     if (!member) {
         return (
             <div className="member-details-page">
@@ -323,6 +372,10 @@ export default function MemberDetails() {
             </div>
         );
     }
+
+    // --------------------------------------------------
+    // MEMBER DETAILS PAGE
+    // --------------------------------------------------
 
     return (
         <div className="member-details-page">
@@ -358,7 +411,6 @@ export default function MemberDetails() {
                 </button>
 
             </div>
-
 
             {/* =========================
                 MEMBER OVERVIEW
@@ -396,7 +448,6 @@ export default function MemberDetails() {
                 </div>
 
             </section>
-
 
             {/* =========================
                 PERSONAL INFORMATION
@@ -459,7 +510,6 @@ export default function MemberDetails() {
 
             </section>
 
-
             {/* =========================
                 MEMBERSHIP
             ========================= */}
@@ -473,8 +523,6 @@ export default function MemberDetails() {
 
                 <div className="member-info-grid">
 
-                    {/* OFFER */}
-
                     <div className="member-info-item">
                         <span>OFFER</span>
 
@@ -483,9 +531,6 @@ export default function MemberDetails() {
                                 'No Offer'}
                         </strong>
                     </div>
-
-
-                    {/* OFFER PRICE */}
 
                     <div className="member-info-item">
                         <span>OFFER PRICE</span>
@@ -497,9 +542,6 @@ export default function MemberDetails() {
                         </strong>
                     </div>
 
-
-                    {/* START DATE */}
-
                     <div className="member-info-item">
                         <span>START DATE</span>
 
@@ -509,9 +551,6 @@ export default function MemberDetails() {
                             )}
                         </strong>
                     </div>
-
-
-                    {/* END DATE */}
 
                     <div className="member-info-item">
                         <span>END DATE</span>
@@ -523,9 +562,6 @@ export default function MemberDetails() {
                         </strong>
                     </div>
 
-
-                    {/* MEMBERSHIP AMOUNT */}
-
                     <div className="member-info-item">
                         <span>
                             MEMBERSHIP AMOUNT
@@ -535,9 +571,6 @@ export default function MemberDetails() {
                             ₹{member.amount || 0}
                         </strong>
                     </div>
-
-
-                    {/* STATUS */}
 
                     <div className="member-info-item">
                         <span>STATUS</span>
@@ -550,7 +583,6 @@ export default function MemberDetails() {
                 </div>
 
             </section>
-
 
             {/* =========================
                 PAYMENT HISTORY
@@ -640,7 +672,6 @@ export default function MemberDetails() {
 
             </section>
 
-
             {/* =========================
                 ATTENDANCE HISTORY
             ========================= */}
@@ -718,7 +749,6 @@ export default function MemberDetails() {
                 )}
 
             </section>
-
 
             {/* =========================
                 WORKOUT HISTORY

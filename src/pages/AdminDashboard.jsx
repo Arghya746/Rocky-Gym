@@ -3732,17 +3732,27 @@ const handleAttendanceChange = (e) => {
 
                         <td>
 
-                          <button
-                            type="button"
-                            className="admin-view-btn"
-                            onClick={() =>
-                              navigate(
-                                `/admin/members/${member._id}`
-                              )
-                            }
-                          >
-                            VIEW
-                          </button>
+                         <button
+  type="button"
+  className="admin-view-btn"
+  onClick={() => {
+    const activeBranch =
+      selectedBranchId &&
+      selectedBranchId !== 'all'
+        ? normalizeBranch(selectedBranchId)
+        : '';
+
+    navigate(
+      `/admin/members/${member._id}${
+        activeBranch
+          ? `?branch=${encodeURIComponent(activeBranch)}`
+          : ''
+      }`
+    );
+  }}
+>
+  VIEW
+</button>
 
                           <button
                             type="button"
