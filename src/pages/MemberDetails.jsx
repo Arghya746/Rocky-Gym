@@ -43,9 +43,25 @@ export default function MemberDetails() {
                 return;
             }
 
+            // --------------------------------------------------
+            // AUTH + ACTIVE BRANCH HEADER
+            // --------------------------------------------------
             const headers = {
                 Authorization: `Bearer ${adminToken}`,
             };
+
+            const selectedBranchId =
+                localStorage.getItem('gymBranch');
+
+            // Receptionists are branch-scoped.
+            // Main admin can continue using ALL BRANCHES.
+            if (
+                selectedBranchId &&
+                selectedBranchId !== 'all'
+            ) {
+                headers['x-gym-branch'] =
+                    selectedBranchId;
+            }
 
             const [
                 memberResponse,
@@ -53,6 +69,9 @@ export default function MemberDetails() {
                 attendanceResponse,
                 workoutsResponse,
             ] = await Promise.all([
+                // --------------------------------------------------
+                // MEMBER DETAILS
+                // --------------------------------------------------
                 fetch(
                     `${API_URL}/api/members/${id}`,
                     {
@@ -60,6 +79,9 @@ export default function MemberDetails() {
                     }
                 ),
 
+                // --------------------------------------------------
+                // PAYMENTS
+                // --------------------------------------------------
                 fetch(
                     `${API_URL}/api/payments`,
                     {
@@ -67,6 +89,9 @@ export default function MemberDetails() {
                     }
                 ),
 
+                // --------------------------------------------------
+                // ATTENDANCE
+                // --------------------------------------------------
                 fetch(
                     `${API_URL}/api/attendance`,
                     {
@@ -74,6 +99,9 @@ export default function MemberDetails() {
                     }
                 ),
 
+                // --------------------------------------------------
+                // WORKOUTS
+                // --------------------------------------------------
                 fetch(
                     `${API_URL}/api/workouts`,
                     {
@@ -124,6 +152,9 @@ export default function MemberDetails() {
 
             setMember(memberData.member);
 
+            // --------------------------------------------------
+            // FILTER PAYMENTS FOR THIS MEMBER
+            // --------------------------------------------------
             const memberPayments =
                 (paymentsData.payments || []).filter(
                     (payment) => {
@@ -138,6 +169,9 @@ export default function MemberDetails() {
                     }
                 );
 
+            // --------------------------------------------------
+            // FILTER ATTENDANCE FOR THIS MEMBER
+            // --------------------------------------------------
             const memberAttendance =
                 (attendanceData.attendance || []).filter(
                     (record) => {
@@ -152,6 +186,9 @@ export default function MemberDetails() {
                     }
                 );
 
+            // --------------------------------------------------
+            // FILTER WORKOUTS FOR THIS MEMBER
+            // --------------------------------------------------
             const memberWorkouts =
                 (workoutsData.workouts || []).filter(
                     (workout) => {
