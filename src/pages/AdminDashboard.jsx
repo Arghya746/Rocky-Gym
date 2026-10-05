@@ -1063,15 +1063,27 @@ setContacts(filterBySelectedBranch(data.contacts || []));
         );
       }
 
-      const response = await fetch(
-        `${API_URL}/api/members`,
-        {
-          headers: {
-            Authorization: `Bearer ${token}`,
-          },
-        }
-      );
+     const headers = {
+  Authorization: `Bearer ${token}`,
+};
 
+// Send the active branch for branch-scoped users.
+// Main admin keeps ALL BRANCHES behavior.
+if (
+  selectedBranchId &&
+  selectedBranchId !== 'all'
+) {
+  headers['x-gym-branch'] = normalizeBranch(
+    selectedBranchId
+  );
+}
+
+const response = await fetch(
+  `${API_URL}/api/members`,
+  {
+    headers,
+  }
+);
       const data = await response.json();
 
       if (!response.ok) {
