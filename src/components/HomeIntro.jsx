@@ -2,7 +2,11 @@ import cardioImage from '../assets/Cardio.jpg.jpeg';
 import trainerImage from '../assets/Trainers.jpg.jpeg';
 import strengthImage from '../assets/Strengths.jpg.jpeg';
 
-const features = [
+import kalyanpurCardioImage from '../assets/Kalyanpur-Cardio.jpeg';
+import kalyanpurTrainerImage from '../assets/Kalyanpur-Trainers.jpeg';
+import kalyanpurStrengthImage from '../assets/Kalyanpur-Strength.jpeg';
+
+const gopalpurFeatures = [
   {
     number: '01',
     image: cardioImage,
@@ -35,6 +39,39 @@ const features = [
   },
 ];
 
+const kalyanpurFeatures = [
+  {
+    number: '01',
+    image: kalyanpurCardioImage,
+    title: 'CARDIO SESSIONS',
+    description:
+      'Boost your stamina, endurance and energy with dynamic cardio sessions designed to keep you active and consistent.',
+    link: '#contact',
+    linkText: 'Explore →',
+    className: 'feature-orange',
+  },
+  {
+    number: '02',
+    image: kalyanpurTrainerImage,
+    title: 'PERSONAL TRAINER SESSIONS',
+    description:
+      'Train with expert guidance, personalized workout plans and proper techniques designed around your fitness goals.',
+    link: '#contact',
+    linkText: 'Meet Trainers →',
+    className: 'feature-purple',
+  },
+  {
+    number: '03',
+    image: kalyanpurStrengthImage,
+    title: 'STRENGTH TRAINING SESSIONS',
+    description:
+      'Build strength, power and confidence with structured resistance training focused on steady and measurable progress.',
+    link: '#offers',
+    linkText: 'View Offers →',
+    className: 'feature-cyan',
+  },
+];
+
 export default function HomeIntro({ branchConfig }) {
   const branchName =
     branchConfig?.gym?.branchName ||
@@ -48,6 +85,12 @@ export default function HomeIntro({ branchConfig }) {
   const description =
     branchConfig?.gym?.description ||
     'A place built for people who are ready to challenge themselves, build strength, and transform their lives.';
+
+  // Select the correct images according to the branch
+  const features =
+    branchName === 'Kalyanpur'
+      ? kalyanpurFeatures
+      : gopalpurFeatures;
 
   return (
     <section
@@ -111,45 +154,46 @@ export default function HomeIntro({ branchConfig }) {
 
 
         {/* FEATURE CARDS
-            SHOW ONLY ON GOPALPUR
-            KALYANPUR: THREE FEATURE IMAGES REMOVED
+            KALYANPUR:
+            Uses the 3 new Kalyanpur images.
+
+            GOPALPUR:
+            Uses the existing 3 Gopalpur images.
         */}
-        {branchName !== 'Kalyanpur' && (
-          <div className="feature-grid">
+        <div className="feature-grid">
 
-            {features.map((feature) => (
-              <article
-                key={feature.number}
-                className={`feature-card ${feature.className}`}
-              >
+          {features.map((feature) => (
+            <article
+              key={feature.number}
+              className={`feature-card ${feature.className}`}
+            >
 
-                <div className="feature-number">
-                  {feature.number}
-                </div>
+              <div className="feature-number">
+                {feature.number}
+              </div>
 
-                <img
-                  src={feature.image}
-                  alt={`${feature.title} at ${displayName}`}
-                  className="feature-image"
-                />
+              <img
+                src={feature.image}
+                alt={`${feature.title} at ${displayName}`}
+                className="feature-image"
+              />
 
-                <h3>
-                  {feature.title}
-                </h3>
+              <h3>
+                {feature.title}
+              </h3>
 
-                <p>
-                  {feature.description}
-                </p>
+              <p>
+                {feature.description}
+              </p>
 
-                <a href={feature.link}>
-                  {feature.linkText}
-                </a>
+              <a href={feature.link}>
+                {feature.linkText}
+              </a>
 
-              </article>
-            ))}
+            </article>
+          ))}
 
-          </div>
-        )}
+        </div>
 
       </div>
     </section>
