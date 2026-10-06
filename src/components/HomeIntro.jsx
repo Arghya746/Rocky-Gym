@@ -59,6 +59,7 @@ export default function HomeIntro({ branchConfig }) {
 
         {/* ALPHA GYM INTRODUCTION */}
         <div className="section-heading intro-heading">
+
           <div className="section-tag">
             WELCOME TO {displayName.toUpperCase()}
           </div>
@@ -85,10 +86,13 @@ export default function HomeIntro({ branchConfig }) {
             provides the equipment, environment, expertise, and motivation you
             need to reach your goals.
           </p>
+
         </div>
+
 
         {/* WHY ALPHA GYM */}
         <div className="section-heading why-heading">
+
           <div className="section-tag">
             WHY {branchName.toUpperCase()}
           </div>
@@ -102,35 +106,50 @@ export default function HomeIntro({ branchConfig }) {
             Everything you need to transform your body, improve your
             performance and stay consistent.
           </p>
+
         </div>
 
-        {/* FEATURE CARDS */}
-        <div className="feature-grid">
-          {features.map((feature) => (
-            <article
-              key={feature.number}
-              className={`feature-card ${feature.className}`}
-            >
-              <div className="feature-number">
-                {feature.number}
-              </div>
 
-              <img
-                src={feature.image}
-                alt={`${feature.title} at ${displayName}`}
-                className="feature-image"
-              />
+        {/* FEATURE CARDS
+            SHOW ONLY ON GOPALPUR
+            KALYANPUR: THREE FEATURE IMAGES REMOVED
+        */}
+        {branchName !== 'Kalyanpur' && (
+          <div className="feature-grid">
 
-              <h3>{feature.title}</h3>
+            {features.map((feature) => (
+              <article
+                key={feature.number}
+                className={`feature-card ${feature.className}`}
+              >
 
-              <p>{feature.description}</p>
+                <div className="feature-number">
+                  {feature.number}
+                </div>
 
-              <a href={feature.link}>
-                {feature.linkText}
-              </a>
-            </article>
-          ))}
-        </div>
+                <img
+                  src={feature.image}
+                  alt={`${feature.title} at ${displayName}`}
+                  className="feature-image"
+                />
+
+                <h3>
+                  {feature.title}
+                </h3>
+
+                <p>
+                  {feature.description}
+                </p>
+
+                <a href={feature.link}>
+                  {feature.linkText}
+                </a>
+
+              </article>
+            ))}
+
+          </div>
+        )}
 
       </div>
     </section>
