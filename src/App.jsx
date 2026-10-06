@@ -15,8 +15,8 @@ import './App.css';
    ========================================================= */
 
 import akramTrainerImage from './assets/Akram trainer.jpeg';
-import shariqueTrainerImage from './assets/Sharique trainer.jpeg';
 import nikitaTrainerImage from './assets/Nikita Trainer.jpeg';
+import shariqueTrainerImage from './assets/Sharique trainer.jpeg';
 
 /* =========================================================
    PUBLIC COMPONENTS
@@ -443,7 +443,7 @@ const BRANCH_CONFIG = {
     contact: {
       phone: '89271-00145',
 
-      alternatePhone: '73877-66912',
+      alternatePhone: '7325818777',
 
       email: 'alphagym.asn@gmail.com',
 
