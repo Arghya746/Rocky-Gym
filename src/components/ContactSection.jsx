@@ -325,39 +325,45 @@ export default function ContactSection({ branchConfig }) {
             </div>
 
 
-    <div className="contact-info-item">
+            {/* =============================================
+                BRANCH TIMINGS
+            ============================================= */}
 
-  <span>🕐</span>
+            <div className="contact-info-item">
 
-  <div>
+              <span>🕐</span>
 
-    <small>
-      {gymBranch.toUpperCase()} BRANCH TIMINGS
-    </small>
+              <div>
 
-    <strong>
-      {gymBranch === 'Kalyanpur' ? (
-        <>
-          6:00 AM — 12:00 PM
-          <br />
-          4:00 PM — 10:00 PM
-        </>
-      ) : gymBranch === 'Gopalpur' ? (
-        <>
-          6:00 AM — 11:00 AM
-          <br />
-          4:00 PM — 10:00 PM
-        </>
-      ) : (
-        <>
-          Please select a gym branch.
-        </>
-      )}
-    </strong>
+                <small>
+                  {gymBranch.toUpperCase()} BRANCH TIMINGS
+                </small>
 
-  </div>
+                <strong>
+                  {gymBranch === 'Kalyanpur' ? (
+                    <>
+                      6:00 AM — 12:00 PM
+                      <br />
+                      4:00 PM — 10:00 PM
+                    </>
+                  ) : gymBranch === 'Gopalpur' ? (
+                    <>
+                      6:00 AM — 11:00 AM
+                      <br />
+                      4:00 PM — 10:00 PM
+                    </>
+                  ) : (
+                    <>
+                      Please select a gym branch.
+                    </>
+                  )}
+                </strong>
 
-</div>
+              </div>
+
+            </div>
+
+
             {/* =============================================
                 WHATSAPP
             ============================================= */}
@@ -385,11 +391,11 @@ export default function ContactSection({ branchConfig }) {
                   {' / '}
 
                   <a
-                    href="https://wa.me/917387766912"
+                    href="https://wa.me/917325818777"
                     target="_blank"
                     rel="noreferrer"
                   >
-                    73877-66912
+                    73258-18777
                   </a>
 
                 </strong>
@@ -633,7 +639,8 @@ export default function ContactSection({ branchConfig }) {
           </h3>
 
           <p>
-            Visit Alpha Gym at our {locationData.branchName.toLowerCase()} branch.
+            Visit Alpha Gym at our{' '}
+            {locationData.branchName.toLowerCase()} branch.
           </p>
 
         </div>
