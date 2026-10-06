@@ -210,7 +210,8 @@ const BRANCH_CONFIG = {
     contact: {
       phone: '89271-00145',
 
-      alternatePhone: '73877-66912',
+      /* UPDATED NUMBER */
+      alternatePhone: '7325818777',
 
       email: 'alphagym.asn@gmail.com',
 
@@ -443,6 +444,7 @@ const BRANCH_CONFIG = {
     contact: {
       phone: '89271-00145',
 
+      /* UPDATED NUMBER */
       alternatePhone: '7325818777',
 
       email: 'alphagym.asn@gmail.com',
