@@ -1,11 +1,6 @@
 # 🏋️ Alpha Gym — Gym Management System
 
 A modern, responsive gym website and management system demo designed for fitness centers and gym owners.
-
-## 🌐 Live Demo
-
-Coming soon...
-
 ## ✨ Features
 
 ### 🏠 Gym Website
